@@ -53,9 +53,9 @@ summarized in the table below.
    +------------------------------------+-----------------------+-----------------------------------------------------------------------------------+
    | Feature                            | Keyword               | Notes                                                                             |
    +====================================+=======================+===================================================================================+
-   | Electric dipole moment             | DIPOLE                |                                                                                   |
+   | List containing electric dipole    | DIPOLE                |                                                               components                |
    +------------------------------------+-----------------------+-----------------------------------------------------------------------------------+
-   | Electric quadrupole moment         | QUADRUPOLE            | Raw (traced) moments and traceless multipoles                                     |
+   | List containing electric           | QUADRUPOLE            | Raw (traced) moments and traceless multipoles               quadrupole components       |
    +------------------------------------+-----------------------+-----------------------------------------------------------------------------------+
    | All moments up order N             | MULTIPOLE(N)          | Only raw (traced) moments. Sets global variables e.g. "DIPOLE X", "32-POLE XYYZZ" |
    +------------------------------------+-----------------------+-----------------------------------------------------------------------------------+
