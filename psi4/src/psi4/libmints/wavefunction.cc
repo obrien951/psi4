@@ -49,6 +49,9 @@
 #include "psi4/libmints/corrtab.h"
 #include "psi4/psi4-dec.h"
 #include "psi4/libpsi4util/exception.h"
+#include "psi4/findif/findif.h"
+
+#include <typeinfo>
 
 #include <cstdlib>
 #include <cstdio>
