@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -31,19 +31,21 @@
 
 // This macro may be used in a class to declare
 // a private variable with a set and get function
-#define READ_WRITE_VAR(type,name) \
-public: \
-type get_name() const {return name;} \
-void  set_name(type _value_) {name = _value_;}  \
-private: \
-type name;
+#define READ_WRITE_VAR(type, name)                  \
+   public:                                          \
+    type get_name() const { return name; }          \
+    void set_name(type _value_) { name = _value_; } \
+                                                    \
+   private:                                         \
+    type name;
 
 // This macro may be used in a class to declare
 // a private variable with a get function
-#define READ_VAR(type,name) \
-public: \
-type get_name() const {return name;} \
-private: \
-type name;
+#define READ_VAR(type, name)               \
+   public:                                 \
+    type get_name() const { return name; } \
+                                           \
+   private:                                \
+    type name;
 
-#endif // _psi_src_lib_libpsi4util_class_macros_h_
+#endif  // _psi_src_lib_libpsi4util_class_macros_h_

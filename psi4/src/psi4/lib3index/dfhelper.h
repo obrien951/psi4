@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -79,10 +79,16 @@ class PSI_API DFHelper {
     size_t get_memory() { return memory_; }
 
     /// Returns the number of doubles in the *screened* AO integrals
-    size_t get_AO_size() { return big_skips_[nao_]; }
+    size_t get_AO_size() { return big_skips_[nbf_]; }
+
+    /// Returns the size of the in-core version in doubles
+    size_t get_core_size() {
+        AO_core();
+        return required_core_size_;
+    }
 
     /// Returns the amount of sparsity in the AO integrals
-    double ao_sparsity() { return (1.0 - (double)small_skips_[nao_] / (double)(nao_ * nao_)); }
+    double ao_sparsity() { return (1.0 - (double)small_skips_[nbf_] / (double)(nbf_ * nbf_)); }
 
     ///
     /// Sets the AO integrals to in-core. (Defaults to TRUE)
@@ -141,8 +147,18 @@ class PSI_API DFHelper {
     void set_omega(double omega) { omega_ = omega; }
     size_t get_omega() { return omega_; }
 
+    ///
+    /// set the printing verbosity parameter
+    /// @param print_lvl indicating verbosity
+    ///
+    void set_print_lvl(int print_lvl) { print_lvl_ = print_lvl; }
+    int get_print_lvl() { return print_lvl_; }
+
     /// Initialize the object
     void initialize();
+
+    /// Prepare the sparsity matrix
+    void prepare_sparsity();
 
     /// print tons of useful info
     void print_header();
@@ -257,25 +273,25 @@ class PSI_API DFHelper {
     size_t get_naux() { return naux_; }
 
     /// builds J/K
-    void build_JK(std::vector<SharedMatrix> Cleft, std::vector<SharedMatrix> Cright,
-                           std::vector<SharedMatrix> D, std::vector<SharedMatrix> J,
-                           std::vector<SharedMatrix> K, size_t max_nocc,
-                           bool do_J, bool do_K, bool do_wK, bool lr_symmetric);
+    void build_JK(std::vector<SharedMatrix> Cleft, std::vector<SharedMatrix> Cright, std::vector<SharedMatrix> D,
+                  std::vector<SharedMatrix> J, std::vector<SharedMatrix> K, size_t max_nocc, bool do_J, bool do_K,
+                  bool do_wK, bool lr_symmetric);
 
    protected:
     // => basis sets <=
     std::shared_ptr<BasisSet> primary_;
     std::shared_ptr<BasisSet> aux_;
-    size_t nao_;
+    size_t nbf_;
     size_t naux_;
 
     // => memory in doubles <=
     size_t memory_ = 256000000;
+    size_t required_core_size_;
 
     // => internal holders <=
     std::string method_ = "STORE";
-    bool direct_;
-    bool direct_iaQ_;
+    bool direct_ = false;
+    bool direct_iaQ_ = false;
     bool symm_compute_;
     bool AO_core_ = true;
     bool MO_core_ = false;
@@ -291,30 +307,31 @@ class PSI_API DFHelper {
     bool do_wK_ = false;
     double omega_;
     bool debug_ = false;
+    bool sparsity_prepared_ = false;
+    int print_lvl_ = 1;
 
     // => in-core machinery <=
     void AO_core();
-    std::vector<double> Ppq_;
+    std::unique_ptr<double[]> Ppq_;
     std::map<double, SharedMatrix> metrics_;
 
     // => AO building machinery <=
     void prepare_AO();
     void prepare_AO_core();
     void compute_dense_Qpq_blocking_Q(const size_t start, const size_t stop, double* Mp,
-                      std::vector<std::shared_ptr<TwoBodyAOInt>> eri);
+                                      std::vector<std::shared_ptr<TwoBodyAOInt>> eri);
     void compute_sparse_pQq_blocking_Q(const size_t start, const size_t stop, double* Mp,
-                      std::vector<std::shared_ptr<TwoBodyAOInt>> eri);
+                                       std::vector<std::shared_ptr<TwoBodyAOInt>> eri);
     void compute_sparse_pQq_blocking_p(const size_t start, const size_t stop, double* Mp,
-                      std::vector<std::shared_ptr<TwoBodyAOInt>> eri);
+                                       std::vector<std::shared_ptr<TwoBodyAOInt>> eri);
     void compute_sparse_pQq_blocking_p_symm(const size_t start, const size_t stop, double* Mp,
-                           std::vector<std::shared_ptr<TwoBodyAOInt>> eri);
+                                            std::vector<std::shared_ptr<TwoBodyAOInt>> eri);
     void contract_metric_AO_core_symm(double* Qpq, double* metp, size_t begin, size_t end);
     void grab_AO(const size_t start, const size_t stop, double* Mp);
 
     // first integral transforms
-    void first_transform_pQq(size_t nao, size_t naux, size_t bsize, size_t bcount, size_t block_size,
-        double* Mp, double* Tp, double* Bp, std::vector<std::vector<double>>& C_buffers);
-
+    void first_transform_pQq(size_t bsize, size_t bcount, size_t block_size, double* Mp, double* Tp, double* Bp,
+                             std::vector<std::vector<double>>& C_buffers);
 
     // => index vectors for screened AOs <=
     std::vector<size_t> small_skips_;
@@ -336,14 +353,13 @@ class PSI_API DFHelper {
                                                          std::vector<std::pair<size_t, size_t>>& b);
     std::pair<size_t, size_t> Qshell_blocks_for_transform(const size_t mem, size_t wtmp, size_t wfinal,
                                                           std::vector<std::pair<size_t, size_t>>& b);
-    void metric_contraction_blocking(std::vector<std::pair<size_t, size_t>>& steps,
-        size_t blocking_index, size_t block_sizes, size_t total_mem, size_t memory_factor, size_t memory_bump);
+    void metric_contraction_blocking(std::vector<std::pair<size_t, size_t>>& steps, size_t blocking_index,
+                                     size_t block_sizes, size_t total_mem, size_t memory_factor, size_t memory_bump);
 
     // => Schwarz Screening <=
     std::vector<size_t> schwarz_fun_mask_;
     std::vector<size_t> schwarz_shell_mask_;
     std::vector<size_t> schwarz_fun_count_;
-    void prepare_sparsity();
 
     // => Coulomb metric handling <=
     std::vector<std::pair<double, std::string>> metric_keys_;
@@ -363,15 +379,14 @@ class PSI_API DFHelper {
     // => spaces and transformation maps <=
     std::map<std::string, std::tuple<SharedMatrix, size_t>> spaces_;
     std::map<std::string, std::tuple<std::string, std::string, size_t>> transf_;
-    std::map<std::string, std::vector<double>> transf_core_;
+    std::map<std::string, std::unique_ptr<double[]>> transf_core_;
 
     // => transformation machinery <=
     std::pair<size_t, size_t> identify_order();
     void print_order();
-    void put_transformations_Qpq(int naux, int begin, int end,
-        int wsize, int bsize, double* Fp, int ind, bool bleft);
-    void put_transformations_pQq(int naux, int begin, int end, int block_size, int bcount,
-        int wsize, int bsize, double* Np, double* Fp, int ind, bool bleft);
+    void put_transformations_Qpq(int begin, int end, int wsize, int bsize, double* Fp, int ind, bool bleft);
+    void put_transformations_pQq(int begin, int end, int block_size, int bcount, int wsize, int bsize, double* Np,
+                                 double* Fp, int ind, bool bleft);
     std::vector<std::pair<std::string, size_t>> sorted_spaces_;
     std::vector<std::string> order_;
     std::vector<std::string> bspace_;
@@ -379,9 +394,8 @@ class PSI_API DFHelper {
 
     // => FILE IO maintenence <=
     typedef struct StreamStruct {
-
         StreamStruct();
-        StreamStruct(std::string filename, std::string op, bool activate=true);
+        StreamStruct(std::string filename, std::string op, bool activate = true);
         ~StreamStruct();
 
         FILE* get_stream(std::string op);
@@ -419,7 +433,7 @@ class PSI_API DFHelper {
     std::vector<size_t> AO_file_sizes_;
     std::vector<std::string> AO_names_;
     std::string start_filename(std::string start);
-    void filename_maker(std::string name, size_t a0, size_t a1, size_t a2, size_t op=0);
+    void filename_maker(std::string name, size_t a0, size_t a1, size_t a2, size_t op = 0);
     void AO_filename_maker(size_t i);
     void check_file_key(std::string);
     void check_file_tuple(std::string name, std::pair<size_t, size_t> t0, std::pair<size_t, size_t> t1,
@@ -432,10 +446,9 @@ class PSI_API DFHelper {
     void transpose_disk(std::string name, std::tuple<size_t, size_t, size_t> order);
 
     // => JK <=
-    void compute_JK(std::vector<SharedMatrix> Cleft, std::vector<SharedMatrix> Cright,
-                           std::vector<SharedMatrix> D, std::vector<SharedMatrix> J,
-                           std::vector<SharedMatrix> K, size_t max_nocc,
-                           bool do_J, bool do_K, bool do_wK, bool lr_symmetric);
+    void compute_JK(std::vector<SharedMatrix> Cleft, std::vector<SharedMatrix> Cright, std::vector<SharedMatrix> D,
+                    std::vector<SharedMatrix> J, std::vector<SharedMatrix> K, size_t max_nocc, bool do_J, bool do_K,
+                    bool do_wK, bool lr_symmetric);
     void compute_D(std::vector<SharedMatrix> D, std::vector<SharedMatrix> Cleft, std::vector<SharedMatrix> Cright);
     void compute_J(std::vector<SharedMatrix> D, std::vector<SharedMatrix> J, double* Mp, double* T1p, double* T2p,
                    std::vector<std::vector<double>>& D_buffers, size_t bcount, size_t block_size);
@@ -444,8 +457,8 @@ class PSI_API DFHelper {
     void compute_K(std::vector<SharedMatrix> Cleft, std::vector<SharedMatrix> Cright, std::vector<SharedMatrix> K,
                    double* Tp, double* Jtmp, double* Mp, size_t bcount, size_t block_size,
                    std::vector<std::vector<double>>& C_buffers, bool lr_symmetric);
-    std::tuple<size_t, size_t> Qshell_blocks_for_JK_build(
-        std::vector<std::pair<size_t, size_t>>& b, size_t max_nocc, bool lr_symmetric);
+    std::tuple<size_t, size_t> Qshell_blocks_for_JK_build(std::vector<std::pair<size_t, size_t>>& b, size_t max_nocc,
+                                                          bool lr_symmetric);
 
     // => misc <=
     void fill(double* b, size_t count, double value);

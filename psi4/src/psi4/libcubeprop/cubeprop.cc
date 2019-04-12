@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -34,7 +34,6 @@
 #include "psi4/libmints/pointgrp.h"
 #include "psi4/libmints/matrix.h"
 #include "psi4/libmints/vector.h"
-#include "psi4/libfilesystem/path.h"
 #include "psi4/libpsi4util/PsiOutStream.h"
 #include "psi4/liboptions/liboptions.h"
 #include "psi4/libpsi4util/process.h"
@@ -71,14 +70,18 @@ CubeProperties::CubeProperties(SharedWavefunction wfn) : options_(Process::envir
 
     int nirrep = wfn->nirrep();
     Dimension nmopi = wfn->nmopi();
+    nalpha_ = 0;
     // Gather orbital information
     for (int h = 0; h < nirrep; h++) {
+        nalpha_ += wfn->nalphapi()[h];
         for (int i = 0; i < (int)nmopi[h]; i++) {
             info_a_.push_back(std::tuple<double, int, int>(wfn->epsilon_a()->get(h, i), i, h));
         }
     }
     std::sort(info_a_.begin(), info_a_.end(), std::less<std::tuple<double, int, int> >());  // Sort as in wfn
+    nbeta_ = 0;
     for (int h = 0; h < nirrep; h++) {
+        nbeta_ += wfn->nbetapi()[h];
         for (int i = 0; i < (int)nmopi[h]; i++) {
             info_b_.push_back(std::tuple<double, int, int>(wfn->epsilon_b()->get(h, i), i, h));
         }
@@ -97,22 +100,8 @@ void CubeProperties::print_header() {
     outfile->Printf("  ==> One Electron Grid Properties (v2.0) <==\n\n");
     grid_->print_header();
 }
-void CubeProperties::compute_properties() {
+void CubeProperties::raw_compute_properties() {
     print_header();
-
-    std::string filepath = options_.get_str("CUBEPROP_FILEPATH");
-    std::stringstream ss;
-    ss << filepath << "/"
-       << "geom.xyz";
-
-    // Is filepath a valid directory?
-    if (filesystem::path(filepath).make_absolute().is_directory() == false) {
-        printf("Filepath \"%s\" is not valid.  Please create this directory.\n", filepath.c_str());
-        outfile->Printf("Filepath \"%s\" is not valid.  Please create this directory.\n", filepath.c_str());
-        exit(Failure);
-    }
-
-    basisset_->molecule()->save_xyz_file(ss.str());
 
     for (size_t ind = 0; ind < options_["CUBEPROP_TASKS"].size(); ind++) {
         std::string task = options_["CUBEPROP_TASKS"][ind].to_string();
@@ -160,15 +149,68 @@ void CubeProperties::compute_properties() {
             for (size_t ind = 0; ind < indsa0.size(); ++ind) {
                 int i = std::get<1>(info_a_[indsa0[ind]]);
                 int h = std::get<2>(info_a_[indsa0[ind]]);
-                labelsa.push_back(to_string(i + 1) + "-" + ct.gamma(h).symbol());
+                labelsa.push_back(std::to_string(i + 1) + "-" + ct.gamma(h).symbol());
             }
             for (size_t ind = 0; ind < indsb0.size(); ++ind) {
                 int i = std::get<1>(info_b_[indsb0[ind]]);
                 int h = std::get<2>(info_b_[indsb0[ind]]);
-                labelsb.push_back(to_string(i + 1) + "-" + ct.gamma(h).symbol());
+                labelsb.push_back(std::to_string(i + 1) + "-" + ct.gamma(h).symbol());
             }
             if (indsa0.size()) compute_orbitals(Ca_, indsa0, labelsa, "Psi_a");
             if (indsb0.size()) compute_orbitals(Cb_, indsb0, labelsb, "Psi_b");
+        } else if (task == "FRONTIER_ORBITALS") {
+            std::vector<int> indsa0;
+            std::vector<int> indsb0;
+            std::vector<std::string> labelsa;
+            std::vector<std::string> labelsb;
+            CharacterTable ct = basisset_->molecule()->point_group()->char_table();
+            if (nalpha_ == nbeta_) {
+                indsa0.push_back(nalpha_-1);
+                labelsa.push_back(std::to_string(std::get<1>(info_a_[nalpha_-1]) + 1) + "-" +
+                                  ct.gamma(std::get<2>(info_a_[nalpha_-1])).symbol() + "_HOMO");
+                indsa0.push_back(nalpha_);
+                labelsa.push_back(std::to_string(std::get<1>(info_a_[nalpha_]) + 1) + "-" +
+                                  ct.gamma(std::get<2>(info_a_[nalpha_])).symbol() + "_LUMO");
+            } else {
+                int orb_index = nalpha_;
+                indsa0.push_back(orb_index);
+                labelsa.push_back(std::to_string(std::get<1>(info_a_[orb_index]) + 1) + "-" +
+                                  ct.gamma(std::get<2>(info_a_[orb_index])).symbol() + "_LVMO");
+                indsb0.push_back(orb_index);
+                labelsb.push_back(std::to_string(std::get<1>(info_b_[orb_index]) + 1) + "-" +
+                                  ct.gamma(std::get<2>(info_b_[orb_index])).symbol() + "_LVMO");
+                for (int i = 1; i <= nalpha_ - nbeta_; i++) {
+                    orb_index = nalpha_ - i;
+                    indsa0.push_back(orb_index);
+                    labelsa.push_back(std::to_string(std::get<1>(info_a_[orb_index]) + 1) + "-" +
+                                  ct.gamma(std::get<2>(info_a_[orb_index])).symbol() + "_SOMO");
+                }
+                orb_index = nbeta_ - 1;
+                indsa0.push_back(orb_index);
+                labelsa.push_back(std::to_string(std::get<1>(info_a_[orb_index]) + 1) + "-" +
+                                  ct.gamma(std::get<2>(info_a_[orb_index])).symbol() + "_DOMO");
+                orb_index = nbeta_ - 1;
+                indsb0.push_back(orb_index);
+                labelsb.push_back(std::to_string(std::get<1>(info_b_[orb_index]) + 1) + "-" +
+                                  ct.gamma(std::get<2>(info_b_[orb_index])).symbol() + "_DOMO");
+            }
+            if (indsa0.size()) compute_orbitals(Ca_, indsa0, labelsa, "Psi_a");
+            if (indsb0.size()) compute_orbitals(Cb_, indsb0, labelsb, "Psi_b");
+        } else if (task == "DUAL_DESCRIPTOR") {
+            // Calculates the dual descriptor from frontier molecular orbitals.
+            // The dual descriptor is a good measure of electro-/nucleophilicity:
+            // f^2(r) = rho_lumo(r) - rho_homo(r)
+            // See 10.1021/jp046577a and 10.1007/s10910-014-0437-7
+            std::vector<int> indsa0;
+            if (nalpha_ != nbeta_) {
+                throw PSIEXCEPTION(task + "is not implemented for open-shell systems");
+            } else {
+                indsa0.push_back(nalpha_);
+                indsa0.push_back(nalpha_-1);
+                std::stringstream ss;
+                ss << "DUAL_" << (nalpha_+1) << "_LUMO-" << nalpha_ << "_HOMO";
+                compute_difference(Ca_, indsa0, ss.str(), true);
+            }
         } else if (task == "BASIS_FUNCTIONS") {
             std::vector<int> inds0;
             if (options_["CUBEPROP_BASIS_FUNCTIONS"].size() == 0) {
@@ -203,9 +245,13 @@ void CubeProperties::compute_orbitals(std::shared_ptr<Matrix> C, const std::vect
                                       const std::vector<std::string>& labels, const std::string& key) {
     grid_->compute_orbitals(C, indices, labels, key);
 }
+void CubeProperties::compute_difference(std::shared_ptr<Matrix> C, const std::vector<int>& indices,
+                                      const std::string& label, bool square) {
+    grid_->compute_difference(C, indices, label, square);
+}
 void CubeProperties::compute_basis_functions(const std::vector<int>& indices, const std::string& key) {
     grid_->compute_basis_functions(indices, key);
 }
 void CubeProperties::compute_LOL(std::shared_ptr<Matrix> D, const std::string& key) { grid_->compute_LOL(D, key); }
 void CubeProperties::compute_ELF(std::shared_ptr<Matrix> D, const std::string& key) { grid_->compute_ELF(D, key); }
-}
+}  // namespace psi

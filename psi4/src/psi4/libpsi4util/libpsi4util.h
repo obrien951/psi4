@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -31,10 +31,11 @@
 
 #include "psi4/pragma.h"
 
+#include <cctype>
+#include <algorithm>
+#include <chrono>
 #include <string>
 #include <vector>
-#include <algorithm>
-#include <sys/time.h>
 
 namespace psi {
 
@@ -70,20 +71,17 @@ std::string add_reference(std::string &str, int reference);
 
 void append_reference(std::string &str, int reference);
 
-std::string find_and_replace(std::string &source, const std::string &target,
-                             const std::string &replace);
+std::string find_and_replace(std::string &source, const std::string &target, const std::string &replace);
 
 void trim_spaces(std::string &str);
 
 template <typename Range1T, typename Range2T>
-bool iequals(const Range1T &Input, const Range2T &Test){
-    if (std::distance(std::begin(Input), std::end(Input)) !=
-        std::distance(std::begin(Test), std::end(Test)))
+bool iequals(const Range1T &Input, const Range2T &Test) {
+    if (std::distance(std::begin(Input), std::end(Input)) != std::distance(std::begin(Test), std::end(Test)))
         return false;
 
-    return std::equal(
-        std::begin(Input), std::end(Input), std::begin(Test),
-        [](unsigned char a, unsigned char b) { return std::tolower(a) == std::tolower(b); });
+    return std::equal(std::begin(Input), std::end(Input), std::begin(Test),
+                      [](unsigned char a, unsigned char b) { return std::tolower(a) == std::tolower(b); });
 }
 
 std::vector<std::string> split(const std::string &input, const std::string &regex);
@@ -102,14 +100,10 @@ class PSI_API Timer {
     double get();
 
    private:
-    struct timeval ___start, ___end;
-    struct timezone ___dummy;
-    double delta_time_seconds;
-    double delta_time_hours;
-    double delta_time_days;
+    std::chrono::high_resolution_clock::time_point start;
 };
 
 void generate_combinations(int n, int k, std::vector<std::vector<int>> &combinations);
 }
 
-#endif // _psi_src_lib_libpsi4util_libpsi4util_h_
+#endif  // _psi_src_lib_libpsi4util_libpsi4util_h_

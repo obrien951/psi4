@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -102,7 +102,7 @@ void DFOCC::lccd_iterations() {
         Elccd_old = Elccd;
 
         // print
-        outfile->Printf(" %3d      %12.10f         %12.10f      %12.2e  \n", itr_occ, Ecorr, DE, rms_t2);
+        outfile->Printf(" %3d      %13.10f         %13.10f     %12.2e  \n", itr_occ, Ecorr, DE, rms_t2);
 
         if (itr_occ >= cc_maxiter) {
             conver = 0;  // means iterations were NOT converged

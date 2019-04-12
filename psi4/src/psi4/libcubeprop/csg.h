@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -30,16 +30,19 @@
 #define _psi_src_lib_libcubeprop_csg_h_
 
 #include <map>
-#include <set>
-
-#include "psi4/libmints/typedefs.h"
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace psi {
 
-class Options;
 class BasisExtents;
-class RKSFunctions;
+class BasisSet;
 class BlockOPoints;
+class Matrix;
+class Molecule;
+class Options;
+class RKSFunctions;
 
 class CubicScalarGrid {
    protected:
@@ -181,6 +184,10 @@ class CubicScalarGrid {
     void compute_orbitals(std::shared_ptr<Matrix> C, const std::vector<int>& indices,
                           const std::vector<std::string>& labels, const std::string& name,
                           const std::string& type = "CUBE");
+    /// Compute a set of orbital-type properties and drop files corresponding to name, index, symmetry label, and type
+    void compute_difference(std::shared_ptr<Matrix> C, const std::vector<int>& indices,
+                          const std::string& label, bool square = false, const std::string& type = "CUBE");
+
     /// Compute a LOL-type property and drop a file corresponding to name and type
     void compute_LOL(std::shared_ptr<Matrix> D, const std::string& name, const std::string& type = "CUBE");
     /// Compute an ELF-type property and drop a file corresponding to name and type (TODO: this seems very unstable)
@@ -189,8 +196,11 @@ class CubicScalarGrid {
     /// Compute the isocountour range that capture a given fraction of a property. Exponent is used
     /// to properly compute the density. E.g. for orbitals exponent = 2, for densities exponent = 1
     std::pair<double, double> compute_isocontour_range(double* v2, double exponent);
+
+    /// A helper function to construct ECP comment in the cubefile header.
+    std::string ecp_header();
 };
 
-}  // End namespace
+}  // namespace psi
 
 #endif

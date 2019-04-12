@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -44,18 +44,15 @@ namespace psi {
 ** Returns: none
 **
 ** \ingroup CIOMR
-*/ 
-void sq_to_tri(double **bmat, double *amat, int size)
-{
-  int i, j, ij;
+*/
+void sq_to_tri(double **bmat, double *amat, int size) {
+    int i, j, ij;
 
-  ij=0;
-  for(i=0; i < size; i++) {
-    for(j=0 ; j <= i; j++) {
-      amat[ij++] = bmat[i][j];
+    ij = 0;
+    for (i = 0; i < size; i++) {
+        for (j = 0; j <= i; j++) {
+            amat[ij++] = bmat[i][j];
+        }
     }
-  }
-
 }
-
 }

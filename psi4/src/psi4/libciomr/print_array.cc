@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -49,39 +49,38 @@ namespace psi {
 **
 ** \ingroup CIOMR
 */
-void print_array(double *a, int m, std::string out)
-   {
-   std::shared_ptr<psi::PsiOutStream> printer=(out=="outfile"?outfile:
-         std::make_shared<PsiOutStream>(out));
-      int ii,jj,kk,mm,nn,ll;
-      int i,j,i1,i2;
+void print_array(double *a, int m, std::string out) {
+    std::shared_ptr<psi::PsiOutStream> printer = (out == "outfile" ? outfile : std::make_shared<PsiOutStream>(out));
+    int ii, jj, kk, mm, nn, ll;
+    int i, j, i1, i2;
 
-      ii=0;jj=0;
+    ii = 0;
+    jj = 0;
 L200:
-      ii++;
-      jj++;
-      kk=10*jj;
-      nn = kk + kk*(kk-1)/2;
-      mm=m;
-      if (m > kk) mm=kk;
-      ll = 2*(mm-ii+1)+1;
-      printer->Printf("\n");
-      for (i=ii; i <= mm; i++) printer->Printf("       %5d",i);
-      printer->Printf("\n");
-      for (i=ii; i <= m; i++) {
-         i1=i*(i-1)/2+ii;
-         i2=i+i*(i-1)/2;
-         if (i2 > nn) i2 = i1+9;
-         printer->Printf("\n%5d",i);
-         for (j=i1; j <= i2; j++) {
-            printer->Printf("%12.7f",a[j-1]);
-            }
-         }
-      if (m <= kk) {
-         printer->Printf("\n");
-         return;
-         }
-      ii=kk; goto L200;
-      }
-
+    ii++;
+    jj++;
+    kk = 10 * jj;
+    nn = kk + kk * (kk - 1) / 2;
+    mm = m;
+    if (m > kk) mm = kk;
+    ll = 2 * (mm - ii + 1) + 1;
+    printer->Printf("\n");
+    for (i = ii; i <= mm; i++) printer->Printf("       %5d", i);
+    printer->Printf("\n");
+    for (i = ii; i <= m; i++) {
+        i1 = i * (i - 1) / 2 + ii;
+        i2 = i + i * (i - 1) / 2;
+        if (i2 > nn) i2 = i1 + 9;
+        printer->Printf("\n%5d", i);
+        for (j = i1; j <= i2; j++) {
+            printer->Printf("%12.7f", a[j - 1]);
+        }
+    }
+    if (m <= kk) {
+        printer->Printf("\n");
+        return;
+    }
+    ii = kk;
+    goto L200;
+}
 }

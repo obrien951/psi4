@@ -3,7 +3,7 @@
 .. #
 .. # Psi4: an open-source quantum chemistry software package
 .. #
-.. # Copyright (c) 2007-2018 The Psi4 Developers.
+.. # Copyright (c) 2007-2019 The Psi4 Developers.
 .. #
 .. # The copyrights for code used from other parties are included in
 .. # the corresponding files.
@@ -59,8 +59,13 @@ Programmers' Manual
 .. toctree::
    :maxdepth: 2
 
-   contributing
-   programming
+   prog_intro
+   prog_newcode
+   prog_corelibs
+   add_tests
+   prog_debug_profile
+   documentation
+   psipep
    manage_index
    psi4api
 

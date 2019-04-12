@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -58,7 +58,7 @@ inline double DE_rfo_energy(double rfo_t, double rfo_g, double rfo_h) {
 }
 
 // Take Rational Function Optimization step
-void MOLECULE::rfo_step(void) {
+void MOLECULE::rfo_step() {
   int i, j;
   int dim = Ncoord();
   double tval, tval2;

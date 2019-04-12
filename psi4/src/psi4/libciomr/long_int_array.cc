@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -43,7 +43,7 @@
 
 #include <cstdio>
 #include <cstdlib>
-#include <strings.h>
+#include <cstring>
 
 namespace psi {
 
@@ -58,17 +58,15 @@ namespace psi {
 ** C. David Sherrill
 ** \ingroup CIOMR
 */
-long int * init_long_int_array(int size)
-{
-  long int *array;
+long int *init_long_int_array(int size) {
+    long int *array;
 
-  if ((array = (long int *) malloc(sizeof(long int)*size))==nullptr) {
-    outfile->Printf("init_array:  trouble allocating memory \n");
-    outfile->Printf("size = %d\n",size);
-    exit(PSI_RETURN_FAILURE);
-  }
-  bzero(array,sizeof(long int)*size);
-  return(array);
+    if ((array = (long int *)malloc(sizeof(long int) * size)) == nullptr) {
+        outfile->Printf("init_array:  trouble allocating memory \n");
+        outfile->Printf("size = %d\n", size);
+        exit(PSI_RETURN_FAILURE);
+    }
+    memset(array, 0, sizeof(long int) * size);
+    return (array);
 }
-
 }

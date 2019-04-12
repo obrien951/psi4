@@ -3,7 +3,7 @@
 #
 # Psi4: an open-source quantum chemistry software package
 #
-# Copyright (c) 2007-2018 The Psi4 Developers.
+# Copyright (c) 2007-2019 The Psi4 Developers.
 #
 # The copyrights for code used from other parties are included in
 # the corresponding files.
@@ -35,7 +35,6 @@ from __future__ import absolute_import
 from __future__ import print_function
 
 from psi4.driver import p4util
-from psi4.driver.constants import *
 
 
 def collect_displaced_matrix_data(db, signature, row_dim):

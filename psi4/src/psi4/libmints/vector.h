@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -26,28 +26,23 @@
  * @END LICENSE
  */
 
-#ifndef _psi_src_lib_libmints_vector_h
-#define _psi_src_lib_libmints_vector_h
+#pragma once
 
-#include "psi4/libmints/dimension.h"
-#include "psi4/libmints/typedefs.h"
-
-#include <cstdlib>
-#include <cstdio>
 #include <vector>
-#include <iterator>
 #include <memory>
+
+#include "dimension.h"
 
 namespace psi {
 
 class Matrix;
 
-class VectorIterator;
+class Vector;
+using SharedVector = std::shared_ptr<Vector>;
 
 /*! \ingroup MINTS */
-class PSI_API Vector
-{
-protected:
+class PSI_API Vector final {
+   protected:
     /// Actual data, of size dimpi_.sum()
     std::vector<double> v_;
     /// Pointer offsets into v_, of size dimpi_.n()
@@ -74,7 +69,7 @@ protected:
     /// Numpy Shape
     std::vector<int> numpy_shape_;
 
-public:
+   public:
     /// Default constructor, zeros everything out
     Vector();
 
@@ -83,32 +78,26 @@ public:
 
     /// Constructor, allocates memory
     /// (this should be deprecated in favor of the Dimension-based version)
-    Vector(int nirrep, int *dimpi);
+    explicit Vector(int nirrep, int *dimpi);
 
     /// Constructor, convenience for 1 irrep
-    Vector(int dim);
+    explicit Vector(int dim);
 
     /// Constructor, allocates memory
     /// (this should be deprecated in favor of the Dimension-based version)
-    Vector(const std::string &name, int nirrep, int *dimpi);
+    explicit Vector(const std::string &name, int nirrep, int *dimpi);
 
     /// Constructor, convenience for 1 irrep
-    Vector(const std::string &name, int dim);
+    explicit Vector(const std::string &name, int dim);
 
     /// Constructor, takes Dimension object
-    Vector(const Dimension &dimpi);
+    explicit Vector(const Dimension &dimpi);
 
     /// Constructor, takes Dimension object
-    Vector(const std::string &name, const Dimension &dimpi);
+    explicit Vector(const std::string &name, const Dimension &dimpi);
 
     /// Destructor, frees memory
-    virtual ~Vector();
-
-    /**
-     * Convenient creation function return SharedMatrix
-     */
-    static SharedVector create(const std::string &name,
-                                          const Dimension &dim);
+    ~Vector();
 
     void init(int nirrep, int *dimpi);
 
@@ -118,31 +107,26 @@ public:
 
     Vector *clone();
 
-    /// Sets the vector_ to the data in vec
-    void set(double *vec);
-
     /// Returns a pointer to irrep h
     double *pointer(int h = 0) { return vector_[h]; }
 
     const double *pointer(int h = 0) const { return vector_[h]; }
 
     /// Returns a single element value
-    double get(int h, int m) { return vector_[h][m]; }
-
-    /// Sets a single element value
-    void set(int h, int m, double val) { vector_[h][m] = val; }
-
-    /// Returns a single element value
-    double get(int m) { return vector_[0][m]; }
+    double get(int m) const { return vector_[0][m]; }
 
     /// Sets a single element value
     void set(int m, double val) { vector_[0][m] = val; }
 
+    /// Returns a single element value
+    double get(int h, int m) const { return vector_[h][m]; }
+
+    /// Sets a single element value
+    void set(int h, int m, double val) { vector_[h][m] = val; }
+
     void add(int m, double val) { vector_[0][m] += val; }
 
     void add(int h, int m, double val) { vector_[h][m] += val; }
-
-    void add(const std::vector<double> &rhs);
 
     /// Adds other vector to this
     void add(const SharedVector &other);
@@ -164,7 +148,7 @@ public:
      * @param slice Vector slice
      * @return SharedVector object
      */
-    SharedVector get_block(const Slice& slice);
+    SharedVector get_block(const Slice &slice);
 
     /**
      * Set a vector block
@@ -172,7 +156,7 @@ public:
      * @param slice Vector slice
      * @param block the SharedVector object block to set
      */
-    void set_block(const Slice& slice,SharedVector block);
+    void set_block(const Slice &slice, SharedVector block);
 
     double &operator()(int i) { return vector_[0][i]; }
 
@@ -182,14 +166,11 @@ public:
 
     const double &operator[](int i) const { return vector_[0][i]; }
 
-    /// Returns a copy of the vector_
-    double *to_block_vector();
-
     /// Returns the dimension per irrep h
     int dim(int h = 0) const { return dimpi_[h]; }
 
     /// Returns the dimension array
-    const Dimension& dimpi() const { return dimpi_; }
+    const Dimension &dimpi() const { return dimpi_; }
 
     /// Returns the number of irreps
     int nirrep() const { return nirrep_; }
@@ -237,62 +218,26 @@ public:
     double rms();
 
     /// Scale the elements of the vector
-    void scale(const double &sc);
-
-    typedef std::vector<double>::iterator iterator;
-    typedef std::vector<double>::const_iterator const_iterator;
-
-    /// @{
-    /** Returns the starting iterator for the entire v_. */
-    iterator begin() { return v_.begin(); }
-
-    const_iterator begin() const { return v_.begin(); }
-    /// @}
-
-    /// @{
-    /** Returns the ending iterator for the entire v_. */
-    iterator end() { return v_.end(); }
-
-    const_iterator end() const { return v_.end(); }
-    /// @}
-
-    /// @{
-    /** Returns the starting iterator for irrep h. */
-    iterator begin_irrep(int h) {
-        iterator it = v_.begin();
-        for (int g = 0; g < h; ++g) it += dimpi_[h];
-        return it;
-    }
-    // The following won't compile with clang++ and c++11
-    // const_iterator begin_irrep(int h) const
-    //  { return const_iterator(vector_[h]); }
-    /// @}
-
-    /// @{
-    /** Returns the starting iterator for irrep h. */
-    iterator end_irrep(int h) {
-        iterator it = v_.begin();
-        for (int g = 0; g <= h; ++g) it += dimpi_[h];
-        return it;
-    }
-    // The following won't compile with clang++ and c++11
-    // const_iterator end_irrep(int h) const
-    //    { return const_iterator(vector_[h]) + dimpi_[h]; }
-    /// @}
+    void scale(double sc);
 
     /**
-    * Adds accessability to the matrix shape for numpy
-    */
+     * Adds accessability to the matrix shape for numpy
+     */
     void set_numpy_shape(std::vector<int> shape) { numpy_shape_ = shape; }
     std::vector<int> numpy_shape() { return numpy_shape_; }
 
-    friend class Matrix;
+    PSI_DEPRECATED(
+        "Using `Vector::create` instead of `auto my_vec = std::make_shared<Vector>(name, dim);` "
+        "is deprecated, and in 1.4 it will "
+        "stop working")
+    static SharedVector create(const std::string &name, const Dimension &dim) {
+        return std::make_shared<Vector>(name, dim);
+    }
 };
 
 /*! \ingroup MINTS */
-class IntVector
-{
-protected:
+class PSI_API IntVector {
+   protected:
     /// IntVector data
     int **vector_;
     /// Number of irreps
@@ -311,7 +256,7 @@ protected:
     /// Copies data to vector_
     void copy_from(int **);
 
-public:
+   public:
     /// Default constructor, zeros everything out
     IntVector();
 
@@ -339,65 +284,40 @@ public:
     void set(int *vec);
 
     /// Returns a pointer to irrep h
-    int *pointer(int h = 0)
-    {
-        return vector_[h];
-    }
+    int *pointer(int h = 0) { return vector_[h]; }
 
     /// Returns a single element value
-    int get(int h, int m)
-    {
-        return vector_[h][m];
-    }
+    int get(int h, int m) { return vector_[h][m]; }
 
     /// Sets a single element value
-    void set(int h, int m, int val)
-    {
-        vector_[h][m] = val;
-    }
+    void set(int h, int m, int val) { vector_[h][m] = val; }
 
     /// Returns a copy of the vector_
     int *to_block_vector();
 
     /// Returns the dimension per irrep h
-    int dim(int h = 0) const
-    {
-        return dimpi_[h];
-    }
+    int dim(int h = 0) const { return dimpi_[h]; }
 
     /// Returns the dimension array
-    int *dimpi() const
-    {
-        return dimpi_;
-    }
+    int *dimpi() const { return dimpi_; }
 
     /// Returns the number of irreps
-    int nirrep() const
-    {
-        return nirrep_;
-    }
+    int nirrep() const { return nirrep_; }
 
     /**
      * Sets the name of the vector, used in print(...)
      *
      * @param name New name to use.
      */
-    void set_name(const std::string &name)
-    {
-        name_ = name;
-    }
+    void set_name(const std::string &name) { name_ = name; }
 
     /**
      * Gets the name of the matrix.
      */
-    std::string name() const
-    {
-        return name_;
-    }
+    std::string name() const { return name_; }
 
     /// Python compatible printer
-    void print_out()
-    { print("outfile"); }
+    void print_out() { print("outfile"); }
 
     /**
      * Print the matrix using print_mat
@@ -412,10 +332,6 @@ public:
 
     /// Copies rhs to this
     void copy(const IntVector &rhs);
-
-    friend class VectorIterator;
 };
 
-}
-
-#endif
+}  // namespace psi

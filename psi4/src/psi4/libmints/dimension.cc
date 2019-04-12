@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -160,8 +160,8 @@ bool Slice::validate_slice() {
     for (int h = 0, max_h = begin_.n(); h < max_h; h++) {
         if (begin_[h] < 0) {
             valid = false;
-            msg = "Invalid Slice: element " + std::to_string(h) +
-                              " of begin Dimension object is less than zero (" + std::to_string(begin_[h]) + ")";
+            msg = "Invalid Slice: element " + std::to_string(h) + " of begin Dimension object is less than zero (" +
+                  std::to_string(begin_[h]) + ")";
             break;
         }
         if (end_[h] < begin_[h]) {
@@ -171,11 +171,11 @@ bool Slice::validate_slice() {
             break;
         }
     }
-    if (not valid) {
+    if (!valid) {
         begin_.print();
         end_.print();
         throw PSIEXCEPTION(msg);
     }
     return valid;
 }
-}
+}  // namespace psi

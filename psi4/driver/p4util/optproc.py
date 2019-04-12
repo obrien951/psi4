@@ -3,7 +3,7 @@
 #
 # Psi4: an open-source quantum chemistry software package
 #
-# Copyright (c) 2007-2018 The Psi4 Developers.
+# Copyright (c) 2007-2019 The Psi4 Developers.
 #
 # The copyrights for code used from other parties are included in
 # the corresponding files.
@@ -25,11 +25,14 @@
 #
 # @END LICENSE
 #
-
 r"""Module to provide mechanism to store and restore option states in driver.
 
 """
-from .exceptions import *
+import sys
+from contextlib import contextmanager
+
+from psi4 import core
+from .exceptions import ValidationError
 
 
 class OptionState(object):
@@ -43,6 +46,7 @@ class OptionState(object):
         >>> print(OptionState('DF_BASIS_MP2'))
 
     """
+
     def __init__(self, option, module=None):
         self.option = option.upper()
         if module:
@@ -67,12 +71,16 @@ class OptionState(object):
         text = ''
         if self.module:
             text += """  ==> %s Option in Module %s <==\n\n""" % (self.option, self.module)
-            text += """  Global (has changed?) value: %7s %s\n""" % ('(' + str(self.haschanged_global) + ')', self.value_global)
-            text += """  Local (has changed?) value:  %7s %s\n""" % ('(' + str(self.haschanged_local) + ')', self.value_local)
-            text += """  Used (has changed?) value:   %7s %s\n""" % ('(' + str(self.haschanged_used) + ')', self.value_used)
+            text += """  Global (has changed?) value: %7s %s\n""" % ('(' + str(self.haschanged_global) + ')',
+                                                                     self.value_global)
+            text += """  Local (has changed?) value:  %7s %s\n""" % ('(' + str(self.haschanged_local) + ')',
+                                                                     self.value_local)
+            text += """  Used (has changed?) value:   %7s %s\n""" % ('(' + str(self.haschanged_used) + ')',
+                                                                     self.value_used)
         else:
             text += """  ==> %s Option in Global Scope <==\n\n""" % (self.option)
-            text += """  Global (has changed?) value: %7s %s\n""" % ('(' + str(self.haschanged_global) + ')', self.value_global)
+            text += """  Global (has changed?) value: %7s %s\n""" % ('(' + str(self.haschanged_global) + ')',
+                                                                     self.value_global)
         text += """\n"""
         return text
 
@@ -101,6 +109,7 @@ class OptionsState(object):
         >>> optstash.restore()
 
     """
+
     def __init__(self, *largs):
         self.data = {}
         for item in largs:
@@ -112,10 +121,13 @@ class OptionsState(object):
         elif len(item) == 1:
             key = (item[0], )
         else:
-            raise ValidationError('Each argument to OptionsState should be an array, the first element of which is     the module scope and the second element of which is the module name. Bad argument: %s' % (item))
+            raise ValidationError(
+                'Each argument to OptionsState should be an array, the first element of which is     the module scope and the second element of which is the module name. Bad argument: %s'
+                % (item))
 
         if key in self.data:
-            raise ValidationError('Malformed options state, duplicate key adds of "%s". This should not happen, please raise a issue on github.com/psi4/psi4' % key)
+            raise ValidationError(
+                'Malformed options state, duplicate key adds of "{}". This should not happen, please raise a issue on github.com/psi4/psi4'.format(key))
         else:
             self.data[key] = OptionState(*key)
 
@@ -128,3 +140,10 @@ class OptionsState(object):
     def restore(self):
         for key, item in self.data.items():
             item.restore()
+
+
+@contextmanager
+def OptionsStateCM(osd):
+    oso = OptionsState(osd)
+    yield
+    oso.restore()

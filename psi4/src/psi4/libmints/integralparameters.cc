@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -32,39 +32,31 @@
 
 using namespace psi;
 
-CorrelationFactor::CorrelationFactor(size_t nparam)
-    : IntegralParameters(nparam)
-{
-}
+CorrelationFactor::CorrelationFactor(size_t nparam) : IntegralParameters(nparam) {}
 
 CorrelationFactor::CorrelationFactor(std::shared_ptr<Vector> coeff, std::shared_ptr<Vector> exponent)
-    : IntegralParameters(coeff->dim())
-{
+    : IntegralParameters(coeff->dim()) {
     set_params(coeff, exponent);
 }
 
-CorrelationFactor::~CorrelationFactor()
-{
+CorrelationFactor::~CorrelationFactor() {
     delete[] coeff_;
     delete[] exponent_;
 }
 
-void CorrelationFactor::set_params(std::shared_ptr<Vector> coeff, std::shared_ptr<Vector> exponent)
-{
+void CorrelationFactor::set_params(std::shared_ptr<Vector> coeff, std::shared_ptr<Vector> exponent) {
     int nparam = coeff->dim();
     if (nparam) {
         coeff_ = new double[nparam];
         exponent_ = new double[nparam];
-        for (int i=0; i<nparam; ++i) {
+        for (int i = 0; i < nparam; ++i) {
             coeff_[i] = coeff->get(0, i);
             exponent_[i] = exponent->get(0, i);
         }
     }
 }
 
-FittedSlaterCorrelationFactor::FittedSlaterCorrelationFactor(double exponent)
-    : CorrelationFactor(6)
-{
+FittedSlaterCorrelationFactor::FittedSlaterCorrelationFactor(double exponent) : CorrelationFactor(6) {
     // Perform the fit.
     auto exps = std::make_shared<Vector>(6);
     auto coeffs = std::make_shared<Vector>(6);

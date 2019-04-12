@@ -3,7 +3,7 @@
 #
 # Psi4: an open-source quantum chemistry software package
 #
-# Copyright (c) 2007-2018 The Psi4 Developers.
+# Copyright (c) 2007-2019 The Psi4 Developers.
 #
 # The copyrights for code used from other parties are included in
 # the corresponding files.
@@ -27,7 +27,6 @@
 #
 
 """Module with non-generic exceptions classes."""
-from __future__ import print_function
 
 
 class QcdbException(Exception):
@@ -130,6 +129,7 @@ class Dftd3Error(QcdbException):
         self.msg = msg
         print('\nDftd3Error: %s\n\n' % (msg))
 
+
 class TestComparisonError(QcdbException):
     """Error called when a test case fails due to a failed
     compare_values() call. Prints error message *msg* to standard
@@ -158,5 +158,3 @@ class FeatureDeprecated(QcdbException):
         QcdbException.__init__(self, msg)
         self.msg = msg
         print('\nFeature deprecated: {}\n\n'.format(msg))
-
-

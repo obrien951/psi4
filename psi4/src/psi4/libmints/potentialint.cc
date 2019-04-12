@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -28,16 +28,15 @@
 
 #include "psi4/libmints/potentialint.h"
 
-namespace psi{
+namespace psi {
 
-PCMPotentialInt::PCMPotentialInt(std::vector<SphericalTransform>& trans,
-std::shared_ptr<BasisSet> bs1, std::shared_ptr<BasisSet> /* bs2 */, int /* deriv */):
-    PotentialInt(trans, bs1, bs1)
-{
+PCMPotentialInt::PCMPotentialInt(std::vector<SphericalTransform>& trans, std::shared_ptr<BasisSet> bs1,
+                                 std::shared_ptr<BasisSet> /* bs2 */, int /* deriv */)
+    : PotentialInt(trans, bs1, bs1) {
     // We don't want to transform the integrals from Cartesian (6d, 10f, ...) to Pure (5d, 7f, ...)
     // for each external charge.  It'll be better to backtransform the density / Fock matrices to
     // the Cartesian basis, if necessary.
     force_cartesian_ = true;
 }
 
-} //Namespace
+}  // namespace psi

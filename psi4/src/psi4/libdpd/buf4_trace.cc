@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -30,20 +30,18 @@
 
 namespace psi {
 
-double DPD::buf4_trace(dpdbuf4 *Buf)
-{
-  double trace = 0.0;
-  for(int h=0; h < Buf->params->nirreps; h++) {
-    if(Buf->params->rowtot[h] == Buf->params->coltot[h]) {
-      buf4_mat_irrep_init(Buf, h);
-      buf4_mat_irrep_rd(Buf, h);
-      for(int row=0; row < Buf->params->rowtot[h]; row++) 
-        trace += Buf->matrix[h][row][row];
-      buf4_mat_irrep_close(Buf, h);
+double DPD::buf4_trace(dpdbuf4 *Buf) {
+    double trace = 0.0;
+    for (int h = 0; h < Buf->params->nirreps; h++) {
+        if (Buf->params->rowtot[h] == Buf->params->coltot[h]) {
+            buf4_mat_irrep_init(Buf, h);
+            buf4_mat_irrep_rd(Buf, h);
+            for (int row = 0; row < Buf->params->rowtot[h]; row++) trace += Buf->matrix[h][row][row];
+            buf4_mat_irrep_close(Buf, h);
+        }
     }
-  }
 
-  return trace;
+    return trace;
 }
 
-}
+}  // namespace psi

@@ -3,7 +3,7 @@
 #
 # Psi4: an open-source quantum chemistry software package
 #
-# Copyright (c) 2007-2018 The Psi4 Developers.
+# Copyright (c) 2007-2019 The Psi4 Developers.
 #
 # The copyrights for code used from other parties are included in
 # the corresponding files.
@@ -26,15 +26,17 @@
 # @END LICENSE
 #
 """Module with utility functions for use in input files."""
-from __future__ import division
+
 import os
 import re
 import sys
 import math
+import warnings
 
 import numpy as np
 
-from .exceptions import *
+from psi4 import core
+from .exceptions import ValidationError, TestComparisonError
 
 
 def oeprop(wfn, *args, **kwargs):
@@ -181,8 +183,8 @@ def set_memory(inputval, execute=True):
     min_mem_allowed = 262144000
     if memory_amount < min_mem_allowed:
         raise ValidationError(
-            """set_memory(): Requested {:.3} MiB ({:.3} MB); minimum 250 MiB (263 MB). Please, sir, I want some more.""".format(
-                memory_amount / 1024**2, memory_amount / 1000**2))
+            """set_memory(): Requested {:.3} MiB ({:.3} MB); minimum 250 MiB (263 MB). Please, sir, I want some more."""
+            .format(memory_amount / 1024**2, memory_amount / 1000**2))
 
     if execute:
         core.set_memory_bytes(memory_amount)
@@ -215,13 +217,14 @@ def compare_values(expected, computed, digits, label, exitonfail=True):
 
     """
     if digits > 1:
-        thresh = 10 ** -digits
+        thresh = 10**-digits
         message = """\t{}: computed value ({:.{digits1}f}) does not match ({:.{digits1}f}) to {digits} digits.""".format(
-                  label, computed, expected, digits1=int(digits)+1, digits=digits)
+            label, computed, expected, digits1=int(digits) + 1, digits=digits)
     else:
         thresh = digits
         message = ("\t%s: computed value (%f) does not match (%f) to %f digits." % (label, computed, expected, digits))
-    if abs(expected - computed) > thresh:
+    if abs(float(expected) - float(computed)) > thresh:
+        # float cast handles decimal.Decimal vars
         print(message)
         if exitonfail:
             raise TestComparisonError(message)
@@ -268,12 +271,12 @@ def compare_matrices(expected, computed, digits, label):
 
     """
     if (expected.nirrep() != computed.nirrep()):
-        message = ("\t%s has %d irreps, but %s has %d\n." %
-                   (expected.name(), expected.nirrep(), computed.name(), computed.nirrep()))
+        message = ("\t%s has %d irreps, but %s has %d\n." % (expected.name(), expected.nirrep(), computed.name(),
+                                                             computed.nirrep()))
         raise TestComparisonError(message)
     if (expected.symmetry() != computed.symmetry()):
-        message = ("\t%s has %d symmetry, but %s has %d\n." %
-                   (expected.name(), expected.symmetry(), computed.name(), computed.symmetry()))
+        message = ("\t%s has %d symmetry, but %s has %d\n." % (expected.name(), expected.symmetry(), computed.name(),
+                                                               computed.symmetry()))
         raise TestComparisonError(message)
     nirreps = expected.nirrep()
     symmetry = expected.symmetry()
@@ -283,7 +286,7 @@ def compare_matrices(expected, computed, digits, label):
                        (expected.name(), expected.rows(irrep), irrep, computed.name(), computed.rows(irrep)))
             raise TestComparisonError(message)
         if (expected.cols(irrep ^ symmetry) != computed.cols(irrep ^ symmetry)):
-            message = ("\t%s has %d columns in irrep, but %s has %d\n." %
+            message = ("\t%s has %d columns in irrep %d, but %s has %d\n." %
                        (expected.name(), expected.cols(irrep), irrep, computed.name(), computed.cols(irrep)))
             raise TestComparisonError(message)
         rows = expected.rows(irrep)
@@ -292,8 +295,8 @@ def compare_matrices(expected, computed, digits, label):
         for row in range(rows):
             for col in range(cols):
                 if (abs(expected.get(irrep, row, col) - computed.get(irrep, row, col)) > 10**(-digits)):
-                    print("\t%s: computed value (%s) does not match (%s)." %
-                          (label, expected.get(irrep, row, col), computed.get(irrep, row, col)))
+                    print("\t%s: computed value (%s) does not match (%s)." % (label, expected.get(irrep, row, col),
+                                                                              computed.get(irrep, row, col)))
                     failed = 1
                     break
 
@@ -317,8 +320,8 @@ def compare_vectors(expected, computed, digits, label):
 
     """
     if (expected.nirrep() != computed.nirrep()):
-        message = ("\t%s has %d irreps, but %s has %d\n." %
-                   (expected.name(), expected.nirrep(), computed.name(), computed.nirrep()))
+        message = ("\t%s has %d irreps, but %s has %d\n." % (expected.name(), expected.nirrep(), computed.name(),
+                                                             computed.nirrep()))
         raise TestComparisonError(message)
     nirreps = expected.nirrep()
     for irrep in range(nirreps):
@@ -338,19 +341,21 @@ def compare_vectors(expected, computed, digits, label):
             computed.print_out()
             core.print_out("The reference vector\n")
             expected.print_out()
-            message = ("\t%s: computed value (%s) does not match (%s)." %
-                       (label, computed.get(irrep, entry), expected.get(irrep, entry)))
+            message = ("\t%s: computed value (%s) does not match (%s)." % (label, computed.get(irrep, entry),
+                                                                           expected.get(irrep, entry)))
             raise TestComparisonError(message)
     success(label)
     return True
 
 
-def compare_arrays(expected, computed, digits, label):
+def compare_arrays(expected, computed, digits, label, rtol=1.e-16):
     """Function to compare two numpy arrays. Prints :py:func:`util.success`
     when elements of vector *computed* match elements of vector *expected* to
     number of *digits*. Performs a system exit on failure to match symmetry
     structure, dimension, or element values. Used in input files in the test suite.
 
+    Sets rtol to zero to match expected Psi4 behaviour, otherwise measured as:
+        absolute(computed - expected) <= (atol + rtol * absolute(expected))
     """
 
     try:
@@ -365,8 +370,8 @@ def compare_arrays(expected, computed, digits, label):
         TestComparisonError("Input shapes do not match.")
 
     tol = 10**(-digits)
-    if not np.allclose(expected, computed, atol=tol):
-        message = "\tArray difference norm is %12.6f." % np.linalg.norm(expected - computed)
+    if not np.allclose(expected, computed, atol=tol, rtol=rtol):
+        message = "\tArray difference norm is %12.6e." % np.linalg.norm(expected - computed)
         raise TestComparisonError(message)
     success(label)
     return True
@@ -390,6 +395,61 @@ def compare_cubes(expected, computed, label):
         raise TestComparisonError(message)
     success(label)
     return True
+
+
+def compare_wavefunctions(expected, computed, digits=9, label='Wavefunctions equal'):
+    """Function to compare two wavefunctions. Prints :py:func:`util.success`
+    when value *computed* matches value *expected*.
+    Performs a system exit on failure. Used in input files in the test suite.
+
+    """
+    # yapf: disable
+    if expected.Ca():          compare_matrices(expected.Ca(), computed.Ca(), digits, 'compare Ca')
+    if expected.Cb():          compare_matrices(expected.Cb(), computed.Cb(), digits, 'compare Cb')
+    if expected.Da():          compare_matrices(expected.Da(), computed.Da(), digits, 'compare Da')
+    if expected.Db():          compare_matrices(expected.Db(), computed.Db(), digits, 'compare Db')
+    if expected.Fa():          compare_matrices(expected.Fa(), computed.Fa(), digits, 'compare Fa')
+    if expected.Fb():          compare_matrices(expected.Fb(), computed.Fb(), digits, 'compare Fb')
+    if expected.H():           compare_matrices(expected.H(), computed.H(), digits, 'compare H')
+    if expected.S():           compare_matrices(expected.S(), computed.S(), digits, 'compare S')
+    if expected.X():           compare_matrices(expected.X(), computed.X(), digits, 'compare X')
+    if expected.aotoso():      compare_matrices(expected.aotoso(), computed.aotoso(), digits, 'compare aotoso')
+    if expected.gradient():    compare_matrices(expected.gradient(), computed.gradient(), digits, 'compare gradient')
+    if expected.hessian():     compare_matrices(expected.hessian(), computed.hessian(), digits, 'compare hessian')
+    if expected.epsilon_a():   compare_vectors(expected.epsilon_a(), computed.epsilon_a(), digits, 'compare epsilon_a')
+    if expected.epsilon_b():   compare_vectors(expected.epsilon_b(), computed.epsilon_b(), digits, 'compare epsilon_b')
+    if expected.frequencies(): compare_vectors(expected.frequencies(), computed.frequencies(), digits, 'compare frequencies')
+    # yapf: enable
+    compare_integers(expected.nalpha(), computed.nalpha(), 'compare nalpha')
+    compare_integers(expected.nbeta(), computed.nbeta(), 'compare nbeta')
+    compare_integers(expected.nfrzc(), computed.nfrzc(), 'compare nfrzc')
+    compare_integers(expected.nirrep(), computed.nirrep(), 'compare nirrep')
+    compare_integers(expected.nmo(), computed.nmo(), 'compare nmo')
+    compare_integers(expected.nso(), computed.nso(), 'compare nso')
+    compare_strings(expected.name(), computed.name(), 'compare name')
+    compare_values(expected.energy(), computed.energy(), digits, 'compare energy')
+    compare_values(expected.efzc(), computed.efzc(), digits, 'compare frozen core energy')
+    compare_values(expected.get_dipole_field_strength()[0],
+                   computed.get_dipole_field_strength()[0], digits, 'compare dipole field strength x')
+    compare_values(expected.get_dipole_field_strength()[1],
+                   computed.get_dipole_field_strength()[1], digits, 'compare dipole field strength y')
+    compare_values(expected.get_dipole_field_strength()[2],
+                   computed.get_dipole_field_strength()[2], digits, 'compare dipole field strength z')
+
+    compare_strings(expected.basisset().name(), computed.basisset().name(), 'compare basis set name')
+    compare_integers(expected.basisset().nbf(), computed.basisset().nbf(), 'compare number of basis functions in set')
+    compare_integers(expected.basisset().nprimitive(),
+                     computed.basisset().nprimitive(), 'compare total number of primitives in basis set')
+
+    compare_strings(expected.molecule().name(), computed.molecule().name(), 'compare molecule name')
+    compare_strings(expected.molecule().get_full_point_group(),
+                    computed.molecule().get_full_point_group(), 'compare molecule point group')
+    compare_matrices(expected.molecule().geometry(),
+                     computed.molecule().geometry(), digits, 'compare molecule geometry')
+
+    success(label)
+    return True
+
 
 # Uncomment and use if compare_arrays above is inadequate
 #def compare_lists(expected, computed, digits, label):
@@ -528,6 +588,11 @@ def xml2dict(filename=None):
     active CSX file.
 
     """
+    warnings.warn(
+        "Using `psi4.driver.p4util.xml2dict` is deprecated (silently in 1.2), and in 1.3 it will stop working\n",
+        category=FutureWarning,
+        stacklevel=2)
+
     import xmltodict as xd
     if filename is None:
         csx = os.path.splitext(core.outfile_name())[0] + '.csx'
@@ -540,6 +605,11 @@ def xml2dict(filename=None):
 
 
 def getFromDict(dataDict, mapList):
+    warnings.warn(
+        "Using `psi4.driver.p4util.getFromDict` is deprecated (silently in 1.2), and in 1.3 it will stop working\n",
+        category=FutureWarning,
+        stacklevel=2)
+
     return reduce(lambda d, k: d[k], mapList, dataDict)
 
 
@@ -549,8 +619,14 @@ def csx2endict():
     dictionary.
 
     """
-    blockprefix = ['chemicalSemantics', 'molecularCalculation', 'quantumMechanics', 'singleReferenceState',
-                   'singleDeterminant']
+    warnings.warn(
+        "Using `psi4.driver.p4util.csx2endict` is deprecated (silently in 1.2), and in 1.3 it will stop working\n",
+        category=FutureWarning,
+        stacklevel=2)
+
+    blockprefix = [
+        'chemicalSemantics', 'molecularCalculation', 'quantumMechanics', 'singleReferenceState', 'singleDeterminant'
+    ]
     blockmidfix = ['energies', 'energy']
     prefix = 'cs:'
 
@@ -587,9 +663,14 @@ def compare_csx():
     active if write_csx flag on.
 
     """
+    warnings.warn(
+        "Using `psi4.driver.p4util.compare_csx` is deprecated (silently in 1.2), and in 1.3 it will stop working\n",
+        category=FutureWarning,
+        stacklevel=2)
+
     if 'csx4psi' in sys.modules.keys():
         if core.get_global_option('WRITE_CSX'):
             enedict = csx2endict()
             compare_integers(len(enedict) >= 2, True, 'CSX harvested')
             for pv, en in enedict.items():
-                compare_values(core.get_variable(pv), en, 6, 'CSX ' + pv + ' ' + str(round(en, 4)))
+                compare_values(core.variable(pv), en, 6, 'CSX ' + pv + ' ' + str(round(en, 4)))

@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -43,9 +43,6 @@ PRAGMA_WARNING_POP
 
 namespace psi {
 
-/// masks for classes of fragments to be acted upon by molecule functions
-/// The next fragment type should be 4, and ALL should be 7.
-
 /**
  * An abstract class to handle storage of Cartesian coordinate values, which
  * may be defined in terms of other variables through this mechanism, greatly
@@ -55,15 +52,11 @@ class CoordValue {
    protected:
     /// Fixed coordinate?
     bool fixed_;
-    /// Whether the current value is up to date or not
-    bool computed_;
 
    public:
-    CoordValue() : fixed_(false), computed_(false) {}
+    CoordValue() : fixed_(false) {}
 
-    CoordValue(bool fixed) : fixed_(fixed), computed_(false) {}
-
-    CoordValue(bool fixed, bool computed) : fixed_(fixed), computed_(computed) {}
+    CoordValue(bool fixed) : fixed_(fixed) {}
 
     virtual ~CoordValue() {}
 
@@ -82,8 +75,6 @@ class CoordValue {
     virtual void set(double val) = 0;
     /// The type of variable representation
     virtual CoordValueType type() = 0;
-    /// Flag the current value as outdated
-    void invalidate() { computed_ = false; }
     /// Clones the current object, using a user-provided variable array, for deep copying
     virtual std::shared_ptr<CoordValue> clone(std::map<std::string, double>& map) = 0;
 };
@@ -95,13 +86,13 @@ class NumberValue : public CoordValue {
     double value_;
 
    public:
-    NumberValue(double value, bool fixed = false) : CoordValue(fixed, true), value_(value) {}
-    double compute() { return value_; }
-    void set(double val) {
+    NumberValue(double value, bool fixed = false) : CoordValue(fixed), value_(value) {}
+    double compute() override { return value_; }
+    void set(double val) override {
         if (!fixed_) value_ = val;
     }
-    CoordValueType type() { return NumberType; }
-    std::shared_ptr<CoordValue> clone(std::map<std::string, double>& /*map*/) {
+    CoordValueType type() override { return NumberType; }
+    std::shared_ptr<CoordValue> clone(std::map<std::string, double>& /*map*/) override {
         return std::make_shared<NumberValue>(value_, fixed_);
     }
 };
@@ -118,26 +109,22 @@ class VariableValue : public CoordValue {
    public:
     VariableValue(const std::string name, std::map<std::string, double>& geometryVariables, bool negate = false,
                   bool fixed = false)
-        : CoordValue(fixed, true), name_(name), geometryVariables_(geometryVariables), negate_(negate) {}
-    double compute();
+        : CoordValue(fixed), name_(name), geometryVariables_(geometryVariables), negate_(negate) {}
+    double compute() override;
     bool negated() const { return negate_; }
     const std::string& name() const { return name_; }
-    void set(double val) {
+    void set(double val) override {
         if (!fixed_) {
             geometryVariables_[name_] = negate_ ? -val : val;
         }
     }
-    CoordValueType type() { return VariableType; }
-    std::shared_ptr<CoordValue> clone(std::map<std::string, double>& map) {
+    CoordValueType type() override { return VariableType; }
+    std::shared_ptr<CoordValue> clone(std::map<std::string, double>& map) override {
         return std::make_shared<VariableValue>(name_, map, negate_, fixed_);
     }
 };
 
 class CoordEntry {
-    template <class Archive>
-    friend void save(Archive& ar, const psi::Vector3& t, size_t /*version*/);
-    template <class Archive>
-    friend void load(Archive& ar, psi::Vector3& t, size_t /*version*/);
 
    protected:
     int entry_number_;
@@ -217,7 +204,9 @@ class CoordEntry {
     /// Whether this atom has the same mass and basis sets as another atom
     bool is_equivalent_to(const std::shared_ptr<CoordEntry>& other) const;
     /// Flags the current coordinates as being outdated.
-    virtual void invalidate() = 0;
+    void invalidate() {
+        computed_ = false;
+    }
     /// Clones the current object, using a user-provided variable array, for deep copying
     virtual std::shared_ptr<CoordEntry> clone(std::vector<std::shared_ptr<CoordEntry> >& atoms,
                                               std::map<std::string, double>& map) = 0;
@@ -292,22 +281,17 @@ class CartesianEntry : public CoordEntry {
                    std::shared_ptr<CoordValue> z, const std::map<std::string, std::string>& basis,
                    const std::map<std::string, std::string>& shells);
 
-    const Vector3& compute();
-    void set_coordinates(double x, double y, double z);
-    CoordEntryType type() { return CartesianCoord; }
-    void print_in_input_format();
-    std::string string_in_input_format();
-    void invalidate() {
-        computed_ = false;
-        x_->invalidate();
-        y_->invalidate();
-        z_->invalidate();
-    }
+    const Vector3& compute() override;
+    void set_coordinates(double x, double y, double z) override;
+    CoordEntryType type() override { return CartesianCoord; }
+    void print_in_input_format() override;
+    std::string string_in_input_format() override;
     std::shared_ptr<CoordEntry> clone(std::vector<std::shared_ptr<CoordEntry> >& /*atoms*/,
-                                      std::map<std::string, double>& map) {
+                                      std::map<std::string, double>& map) override {
         std::shared_ptr<CoordEntry> temp =
             std::make_shared<CartesianEntry>(entry_number_, Z_, charge_, mass_, symbol_, label_, A_, x_->clone(map),
                                              y_->clone(map), z_->clone(map), basissets_, shells_);
+        if (computed_) temp->compute(); // The constructor sets the coords we want, so this just sets computed_.
         return temp;
     }
 };
@@ -338,24 +322,18 @@ class ZMatrixEntry : public CoordEntry {
                  std::shared_ptr<CoordEntry> dto = std::shared_ptr<CoordEntry>(),
                  std::shared_ptr<CoordValue> dval = std::shared_ptr<CoordValue>());
 
-    virtual ~ZMatrixEntry();
-    void invalidate() {
-        computed_ = false;
-        if (rval_ != 0) rval_->invalidate();
-        if (aval_ != 0) aval_->invalidate();
-        if (dval_ != 0) dval_->invalidate();
-    }
-    const Vector3& compute();
-    void print_in_input_format();
-    std::string string_in_input_format();
-    void set_coordinates(double x, double y, double z);
-    CoordEntryType type() { return ZMatrixCoord; }
+    ~ZMatrixEntry() override;
+    const Vector3& compute() override;
+    void print_in_input_format() override;
+    std::string string_in_input_format() override;
+    void set_coordinates(double x, double y, double z) override;
+    CoordEntryType type() override { return ZMatrixCoord; }
     std::shared_ptr<CoordEntry> clone(std::vector<std::shared_ptr<CoordEntry> >& atoms,
-                                      std::map<std::string, double>& map) {
+                                      std::map<std::string, double>& map) override {
         std::shared_ptr<CoordEntry> temp;
         if (rto_ == 0 && ato_ == 0 && dto_ == 0) {
-            temp =
-                std::make_shared<ZMatrixEntry>(entry_number_, Z_, charge_, mass_, symbol_, label_, A_, basissets_, shells_);
+            temp = std::make_shared<ZMatrixEntry>(entry_number_, Z_, charge_, mass_, symbol_, label_, A_, basissets_,
+                                                  shells_);
         } else if (ato_ == 0 && dto_ == 0) {
             temp = std::make_shared<ZMatrixEntry>(entry_number_, Z_, charge_, mass_, symbol_, label_, A_, basissets_,
                                                   shells_, atoms[rto_->entry_number()], rval_->clone(map));
@@ -369,9 +347,10 @@ class ZMatrixEntry : public CoordEntry {
                                                   atoms[ato_->entry_number()], aval_->clone(map),
                                                   atoms[dto_->entry_number()], dval_->clone(map));
         }
+        if (computed_) temp->set_coordinates(coordinates_[0], coordinates_[1], coordinates_[2]);
         return temp;
     }
 };
-}
+}  // namespace psi
 
 #endif  // COORDENTRY_H

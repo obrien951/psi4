@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -27,9 +27,13 @@
  */
 
 #include "stability.h"
-#include "psi4/psi4-dec.h"
-#include "psi4/liboptions/liboptions.h"
 
+#include <algorithm>
+
+#include "psi4/psi4-dec.h"
+#include "psi4/physconst.h"
+
+#include "psi4/liboptions/liboptions.h"
 #include "psi4/libpsio/psio.hpp"
 #include "psi4/libciomr/libciomr.h"
 #include "psi4/libscf_solver/hf.h"
@@ -40,7 +44,6 @@
 #include "psi4/libmints/basisset.h"
 #include "psi4/libmints/molecule.h"
 #include "psi4/libmints/vector.h"
-#include "psi4/physconst.h"
 #include "psi4/libpsi4util/PsiOutStream.h"
 #include "psi4/libpsi4util/process.h"
 #include "psi4/liboptions/liboptions.h"
@@ -96,7 +99,7 @@ void UStab::set_reference(std::shared_ptr<Wavefunction> wfn) {
     eps_virb_ = wfn->epsilon_b_subset("SO", "VIR");
     molecule_ = wfn->molecule();
     basis_ = wfn->basisset();
-    Eref_ = wfn->reference_energy();
+    Eref_ = wfn->energy();
 }
 
 void UStab::print_header() {
@@ -105,13 +108,14 @@ void UStab::print_header() {
     outfile->Printf("         ------------------------------------------------------------\n");
     outfile->Printf("                              UHF Stability code                     \n");
     outfile->Printf("                                Jérôme Gonthier                     \n");
-    outfile->Printf("               Strong inspiration from R. Parrish's CIS              \n");
+    outfile->Printf("                   Strong inspiration from R. Parrish's CIS          \n");
     outfile->Printf("         ------------------------------------------------------------\n\n");
 
     outfile->Printf("  ==> Geometry <==\n\n");
     molecule_->print();
-    outfile->Printf( "  Nuclear repulsion = %20.15f\n", molecule_->nuclear_repulsion_energy(wfn->get_dipole_field_strength()));
-    //outfile->Printf( "  Reference energy  = %20.15f\n\n", Eref_);
+    outfile->Printf("  Nuclear repulsion = %20.15f\n",
+                    molecule_->nuclear_repulsion_energy(wfn->get_dipole_field_strength()));
+    // outfile->Printf( "  Reference energy  = %20.15f\n\n", Eref_);
 
     outfile->Printf("  ==> Basis Set <==\n\n");
     basis_->print_by_level("outfile", print_);
@@ -283,11 +287,12 @@ void UStab::preiterations() {
             outfile->Printf("    Reusing JK object from SCF.\n\n");
         } else {
             size_t effective_memory = (size_t)(0.125 * options_.get_double("CPHF_MEM_SAFETY_FACTOR") * memory_);
-            jk_ = JK::build_JK(basis_, reference_wavefunction_->get_basisset("DF_BASIS_SCF"), options_, false, effective_memory);
+            jk_ = JK::build_JK(basis_, reference_wavefunction_->get_basisset("DF_BASIS_SCF"), options_, false,
+                               effective_memory);
             jk_->set_memory(effective_memory);
             jk_->initialize();
         }
     }
 }
-}
-}  // End namespaces
+}  // namespace scf
+}  // namespace psi

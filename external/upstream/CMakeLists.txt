@@ -8,6 +8,9 @@ foreach(dir pybind11
             gdma
             libint
             pcmsolver
+            pylibefp
+            qcelemental
+            qcengine
             simint
             libxc
 )

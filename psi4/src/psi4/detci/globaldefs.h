@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -44,18 +44,19 @@
 #ifndef _psi_src_bin_detcas_globaldefs_h
 #define _psi_src_bin_detcas_globaldefs_h
 
-namespace psi { namespace detcas {
+namespace psi {
+namespace detcas {
 
 #define MAX_RAS_SPACES 4
-#define IOFF_MAX       50604
+#define IOFF_MAX 50604
 #ifdef INDEX
 #undef INDEX
 #endif
-#define INDEX(i,j) ( (i>j) ? (ioff[(i)] + (j)): (ioff[(j)] + (i)) )
-#define MIN0(a,b) (((a)<(b)) ? (a) : (b))
-#define MAX0(a,b) (((a)>(b)) ? (a) : (b))
+#define INDEX(i, j) ((i > j) ? (ioff[(i)] + (j)) : (ioff[(j)] + (i)))
+#define MIN0(a, b) (((a) < (b)) ? (a) : (b))
+#define MAX0(a, b) (((a) > (b)) ? (a) : (b))
 #define MAX_COMMENT 10
+}
+}  // namespace psi
 
-}} // end namespace psi::detcas
-
-#endif // header guard
+#endif  // header guard

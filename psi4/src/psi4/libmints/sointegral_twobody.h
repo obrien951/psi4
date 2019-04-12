@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -68,7 +68,7 @@ class BasisSet;
 // Only include the following function if Doxygen is running to generate appropriate
 // documentation.
 #ifdef DOXYGEN
-class TwoBodySOIntFunctor {
+class PSI_API TwoBodySOIntFunctor {
    public:
     void operator()(int pirrep, int pso, int qirrep, int qso, int rirrep, int rso, int sirrep, int sso, double value);
 };
@@ -990,7 +990,7 @@ void TwoBodySOInt::provide_IJKL_deriv1(int ish, int jsh, int ksh, int lsh, TwoBo
                     int labs = lirrepoff_[lsym] + lrel;
                     int lsooff = ksooff * nso4 + ltr;
 
-                    // Only totally symmetric pertubations are considered here!
+                    // Only totally symmetric perturbations are considered here!
                     if (isym ^ jsym ^ ksym ^ lsym) continue;
 
                     int iiabs = iabs;
@@ -1107,6 +1107,6 @@ void TwoBodySOInt::compute_integrals_deriv1(TwoBodySOIntFunctor &functor) {
 
 typedef std::shared_ptr<OneBodySOInt> SharedOneBodySOInt;
 typedef std::shared_ptr<TwoBodySOInt> SharedTwoBodySOInt;
-}
+}  // namespace psi
 
 #endif  // _psi_src_lib_libmints_sointegral_h_

@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -35,9 +35,9 @@
 #include <map>
 #include <memory>
 
-#define LINEAR_A_TOL 1.0E-2 //When sin(a) is below this, we consider the angle to be linear
+#define LINEAR_A_TOL 1.0E-2  // When sin(a) is below this, we consider the angle to be linear
 #define DEFAULT_SYM_TOL 1.0E-8
-#define FULL_PG_TOL 1.0e-8 // default
+#define FULL_PG_TOL 1.0e-8  // default
 
 #include "typedefs.h"
 #include "coordentry.h"
@@ -45,55 +45,71 @@
 namespace psi {
 class PointGroup;
 class BasisSet;
-enum RotorType {RT_ASYMMETRIC_TOP, RT_SYMMETRIC_TOP, RT_SPHERICAL_TOP, RT_LINEAR, RT_ATOM};
-enum FullPointGroup {PG_ATOM, PG_Cinfv, PG_Dinfh, PG_C1, PG_Cs, PG_Ci, PG_Cn, PG_Cnv,
- PG_Cnh, PG_Sn, PG_Dn, PG_Dnd, PG_Dnh, PG_Td, PG_Oh, PG_Ih};
+enum RotorType { RT_ASYMMETRIC_TOP, RT_SYMMETRIC_TOP, RT_SPHERICAL_TOP, RT_LINEAR, RT_ATOM };
+enum FullPointGroup {
+    PG_ATOM,
+    PG_Cinfv,
+    PG_Dinfh,
+    PG_C1,
+    PG_Cs,
+    PG_Ci,
+    PG_Cn,
+    PG_Cnv,
+    PG_Cnh,
+    PG_Sn,
+    PG_Dn,
+    PG_Dnd,
+    PG_Dnh,
+    PG_Td,
+    PG_Oh,
+    PG_Ih
+};
 
-const std::string RotorTypeList[] = {"ASYMMETRIC_TOP", "SYMMETRIC_TOP",
- "SPHERICAL_TOP", "LINEAR", "ATOM"};
+const std::string RotorTypeList[] = {"ASYMMETRIC_TOP", "SYMMETRIC_TOP", "SPHERICAL_TOP", "LINEAR", "ATOM"};
 
-const std::string FullPointGroupList[] = {"ATOM", "C_inf_v", "D_inf_h", "C1", "Cs", "Ci", "Cn", "Cnv",
- "Cnh", "Sn", "Dn", "Dnd", "Dnh", "Td", "Oh", "Ih"};
+const std::string FullPointGroupList[] = {"ATOM", "C_inf_v", "D_inf_h", "C1",  "Cs",  "Ci", "Cn", "Cnv",
+                                          "Cnh",  "Sn",      "Dn",      "Dnd", "Dnh", "Td", "Oh", "Ih"};
 
 /*! \ingroup MINTS
  *  \class Molecule
  *  \brief Molecule information class.
  */
-class PSI_API Molecule
-{
-public:
+class PSI_API Molecule {
+   public:
     /**
      * The type of geometry provided in the input
      */
     enum GeometryFormat {
-        ZMatrix,     /*!< Z-matrix coordinates */
-        Cartesian    /*!< Cartesian coordinates */
+        ZMatrix,  /*!< Z-matrix coordinates */
+        Cartesian /*!< Cartesian coordinates */
     };
     /**
      * The Units used to define the geometry
      */
-    enum GeometryUnits {Angstrom, Bohr};
+    enum GeometryUnits { Angstrom, Bohr };
     /**
      * How to handle each fragment
      */
     enum FragmentType {
-        Absent,  /*!< Neglect completely */
-        Real,    /*!< Include, as normal */
-        Ghost    /*!< Include, but with ghost atoms */
+        Absent, /*!< Neglect completely */
+        Real,   /*!< Include, as normal */
+        Ghost   /*!< Include, but with ghost atoms */
     };
 
-    enum FragmentLevel {
-        QMatom  = 1,    /*!< Quantum mechanical */
-        EFPatom = 2,    /*!< Effective fragment potential */
-        ALLatom = 3     /*!< All atom types */
-    };
-
-    typedef std::vector<std::shared_ptr<CoordEntry> > EntryVector;
+    typedef std::vector<std::shared_ptr<CoordEntry>> EntryVector;
     typedef EntryVector::iterator EntryVectorIter;
+    typedef std::map<std::string, std::string> Provenance;
+    typedef std::vector<std::tuple<int, int, double>> Connectivity;
 
-protected:
+   protected:
     /// Molecule (or fragment) name
     std::string name_;
+    /// Molecule comment
+    std::string comment_;
+    /// Molecule origin
+    Provenance provenance_;
+    /// Molecule connectivity
+    Connectivity connectivity_;
     /// Atom info vector (no knowledge of dummy atoms)
     EntryVector atoms_;
     /// Atom info vector (includes dummy atoms)
@@ -108,10 +124,6 @@ protected:
     /// Move to center of mass or not?
     bool move_to_com_;
 
-    /// Whether the charge was given by the user
-    bool charge_specified_;
-    /// Whether the multiplicity was specified by the user
-    bool multiplicity_specified_;
     /// The molecular charge
     int molecular_charge_;
     /// The multiplicity (defined as 2Ms + 1)
@@ -131,7 +143,7 @@ protected:
      * @param str the string to interpret.
      * @return the CoordValue interpretation of the string.
      */
-    CoordValue* get_coord_value(const std::string &str);
+    CoordValue* get_coord_value(const std::string& str);
 
     /**
      * Attempts to interpret a string as an atom specifier in a zmatrix.
@@ -140,7 +152,7 @@ protected:
      * @param line the current line, for error message printing.
      * @return the atom number (adjusted to zero-based counting)
      */
-    int get_anchor_atom(const std::string &str, const std::string &line);
+    int get_anchor_atom(const std::string& str, const std::string& line);
 
     /// Point group to use with this molecule.
     std::shared_ptr<PointGroup> pg_;
@@ -152,40 +164,40 @@ protected:
     /// Number of unique atoms
     int nunique_;
     /// Number of equivalent atoms per unique atom (length nunique_)
-    int *nequiv_;
+    int* nequiv_;
     /// Equivalent atom mapping array
-    int **equiv_;
+    int** equiv_;
     /// Atom to unique atom mapping array (length natom)
-    int *atom_to_unique_;
+    int* atom_to_unique_;
 
     /// A listing of the variables used to define the geometries
     std::map<std::string, double> geometry_variables_;
     /// A list describing how to handle each fragment
     std::vector<FragmentType> fragment_types_;
     /// The list of atom ranges defining each fragment from parent molecule
-    std::vector<std::pair<int, int> > fragments_;
+    std::vector<std::pair<int, int>> fragments_;
     /// Symmetry string from geometry specification
     std::string symmetry_from_input_;
     /// Reinterpret the coord entries or not
     /// Default is true, except for findif
     bool reinterpret_coordentries_;
-    /// Nilpotence boolean (flagged upon first determination of symmetry frame, reset each time a substantiative change is made)
+    /// Nilpotence boolean (flagged upon first determination of symmetry frame, reset each time a substantiative change
+    /// is made)
     bool lock_frame_;
     /// Whether this molecule has at least one zmatrix entry
     bool zmat_;
     /// Whether this molecule has at least one cartesian entry
     bool cart_;
 
-public:
-
+   public:
     Molecule();
     /// Copy constructor.
     Molecule(const Molecule& other);
     virtual ~Molecule();
 
-    Molecule clone(void) {
-      Molecule new_obj(*this);
-      return new_obj;
+    Molecule clone() {
+        Molecule new_obj(*this);
+        return new_obj;
     }
 
     /// @{
@@ -193,13 +205,6 @@ public:
     /// Assignment operator.
     Molecule& operator=(const Molecule& other);
     /// @}
-
-
-    /**
-     * Pull information from an XYZ file. Useful for debugging.
-     * \param xyzfilename Filename of xyz file.
-     */
-    void init_with_xyz(const std::string& xyzfilename);
 
     /**
      * Add an atom to the molecule
@@ -212,32 +217,39 @@ public:
      * \param charge charge to use if non standard
      * \param lbl extended atomic symbol
      * \param A mass number
+     *
+     * add_atom is for Cartesians with NumberValue coordinates. Use add_unsettled_atom otherwise (ZMAT, VariableValue).
      */
-    void add_atom(double Z, double x, double y, double z, std::string sym = "", double mass = 0.0,
-                  double charge = 0.0, std::string lbl = "", int A = -1);
+    void add_atom(double Z, double x, double y, double z, std::string sym = "", double mass = 0.0, double charge = 0.0,
+                  std::string lbl = "", int A = -1);
     void add_unsettled_atom(double Z, std::vector<std::string> anchor, std::string sym = "", double mass = 0.0,
                             double charge = 0.0, std::string lbl = "", int A = -1);
 
-    /// Whether the multiplicity was given by the user
-    bool multiplicity_specified() const { return multiplicity_specified_; }  // TODO remove
-    /// Whether the charge was given by the user
-    bool charge_specified() const { return charge_specified_; }  // TODO remove
     /// The number of fragments in the molecule
-    int nfragments() const { return fragments_.size();}
+    int nfragments() const { return fragments_.size(); }
     /// The number of active fragments in the molecule
     int nactive_fragments();
-    /// Returns the list of atoms belonging to a fragment.
-    // Needed for EFP interface
-    std::pair<int, int> fragment_atom_pair(int f) { return fragments_[f]; }  // TODO remove?
     /// Set whether to leave the geometry alone upon update_geometry()
     void set_lock_frame(bool tf) { lock_frame_ = tf; }
 
     /// Get molecule name
-    const std::string name() const {return name_; }
+    const std::string name() const { return name_; }
     /// Returns the name of the basis set on the specified atom
     const std::string& basis_on_atom(int atom) const;
     /// Set molecule name
-    void set_name(const std::string &_name) { name_ = _name; }
+    void set_name(const std::string& _name) { name_ = _name; }
+    /// Get molecule comment
+    const std::string comment() const { return comment_; }
+    /// Set molecule comment
+    void set_comment(const std::string &_comment) { comment_ = _comment; }
+    /// Get molecule provenance
+    const Provenance provenance() const { return provenance_; }
+    /// Set molecule provenance
+    void set_provenance(const Provenance &_provenance) { provenance_ = _provenance; }
+    /// Get molecule connectivity
+    const Connectivity connectivity() const { return connectivity_; }
+    /// Set molecule connectivity
+    void set_connectivity(const Connectivity &_connectivity) { connectivity_ = _connectivity; }
     /// Number of atoms
     int natom() const;
     /// Number of all atoms (includes dummies)
@@ -295,16 +307,17 @@ public:
     /// Returns the CoordEntry for an atom
     const std::shared_ptr<CoordEntry>& atom_entry(int atom) const;
 
-    void set_basis_all_atoms(const std::string& name, const std::string& type="BASIS");
-    void set_basis_by_symbol(const std::string& symbol, const std::string& name, const std::string& type="BASIS");
-    void set_basis_by_number(int number, const std::string& name, const std::string& type="BASIS");
-    void set_basis_by_label(const std::string& label, const std::string& name, const std::string& type="BASIS");
-    void set_shell_by_label(const std::string& label, const std::string& name, const std::string& type="BASIS");
+    void set_basis_all_atoms(const std::string& name, const std::string& type = "BASIS");
+    void set_basis_by_symbol(const std::string& symbol, const std::string& name, const std::string& type = "BASIS");
+    void set_basis_by_number(int number, const std::string& name, const std::string& type = "BASIS");
+    void set_basis_by_label(const std::string& label, const std::string& name, const std::string& type = "BASIS");
+    void set_shell_by_label(const std::string& label, const std::string& name, const std::string& type = "BASIS");
 
     /// @{
     /// Tests to see of an atom is at the passed position with a given tolerance
-    int atom_at_position1(double *, double tol = 0.05) const;
+    int atom_at_position1(double*, double tol = 0.05) const;
     int atom_at_position2(Vector3&, double tol = 0.05) const;
+    int atom_at_position3(const std::array<double, 3>&, const double tol = 0.05) const;
     /// @}
 
     /// Do we reinterpret coordentries during a call to update_geometry?
@@ -348,11 +361,6 @@ public:
     void reinterpret_coordentries();
 
     /**
-     * Reinterpret the fragments for QM/EFP and build the atom list
-     */
-    void reinterpret_fragments();
-
-    /**
      * Find the nearest point group within the tolerance specified, and adjust
      * the coordinates to have that symmetry.
      */
@@ -362,14 +370,14 @@ public:
     Vector3 center_of_mass() const;
     /// Computes nuclear repulsion energy
     /// The dipole field is a vector of length 3, containing the dipole field strength in the {x,y,z} directions.
-    double nuclear_repulsion_energy(const std::array<double,3> &dipole_field) const;
+    double nuclear_repulsion_energy(const std::array<double, 3>& dipole_field) const;
     /// The dipole generated by the nuclear charges evaluated at the origin.
     Vector3 nuclear_dipole() const;
     /// The dipole generated by the nuclear charges evaluated using a given origin.
-    Vector3 nuclear_dipole(const Vector3 &origin) const;
+    Vector3 nuclear_dipole(const Vector3& origin) const;
     /// Computes nuclear repulsion energy derivatives.
     /// The dipole field is a vector of length 3, containing the dipole field strength in the {x,y,z} directions.
-    Matrix nuclear_repulsion_energy_deriv1(const std::array<double, 3> &dipole_field) const;
+    Matrix nuclear_repulsion_energy_deriv1(const std::array<double, 3>& dipole_field) const;
     /// Computes nuclear repulsion energy second derivatives.
     Matrix nuclear_repulsion_energy_deriv2() const;
 
@@ -385,7 +393,7 @@ public:
      *  If you want the molecule to be reoriented about the center of mass
      *  make sure you call move_to_com() prior to calling reorient()
      */
-//    void reorient();
+    //    void reorient();
 
     /// Computes and returns a matrix depicting distances between atoms.
     Matrix distance_matrix() const;
@@ -397,7 +405,7 @@ public:
     Vector rotational_constants(double tol = FULL_PG_TOL) const;
 
     /// Print the rotational constants
-    void print_rotational_constants(void) const;
+    void print_rotational_constants() const;
     /// Return the rotor type
     RotorType rotor_type(double tol = FULL_PG_TOL) const;
 
@@ -419,14 +427,14 @@ public:
     /// Print the molecule in Angstrom
     void print_in_angstrom() const;
 
-    ///Print the geometrical parameters of the molecule
+    /// Print the geometrical parameters of the molecule
     void print_distances() const;
     void print_bond_angles() const;
     void print_dihedrals() const;
     void print_out_of_planes() const;
 
     /// Save an XYZ file
-    void save_xyz_file(const std::string & filename, bool save_ghosts = true) const;
+    void save_xyz_file(const std::string& filename, bool save_ghosts = true) const;
     /// Save an XYZ file to a string
     std::string save_string_xyz_file() const;
 
@@ -495,16 +503,8 @@ public:
      * Force the molecule to have the symmetry specified in pg_.
      * This is to handle noise coming in from optking.
      */
-    void symmetrize(double tol=0.05, bool suppress_mol_print_in_exc=false);
+    void symmetrize(double tol = 0.05, bool suppress_mol_print_in_exc = false);
     /// @}
-
-    /**
-     * Given a string (including newlines to separate lines), builds a new molecule
-     * and wraps it in a smart pointer
-     *
-     * @param geom a string providing the user's input
-     */
-    static std::shared_ptr<Molecule> create_molecule_from_string(const std::string &geom);
 
     /**
      * Regenerates a input file molecule specification string
@@ -608,7 +608,7 @@ public:
 
     /// The list of atom ranges defining each fragment from parent molecule (fragments[frag_ind] =
     /// <Afirst,Alast+1>)
-    const std::vector<std::pair<int, int> >& get_fragments() const { return fragments_; }
+    const std::vector<std::pair<int, int>>& get_fragments() const { return fragments_; }
     /// A list describing how to handle each fragment
     const std::vector<FragmentType>& get_fragment_types() const { return fragment_types_; }
     /// The charge of each fragment
@@ -616,10 +616,8 @@ public:
     /// The multiplicity of each fragment
     const std::vector<int>& get_fragment_multiplicities() const { return fragment_multiplicities_; }
     /// Sets the fragmentation information directly
-    void set_fragment_pattern(const std::vector<std::pair<int, int>>,
-                              const std::vector<FragmentType>,
-                              const std::vector<int>,
-                              const std::vector<int>);
+    void set_fragment_pattern(const std::vector<std::pair<int, int>>, const std::vector<FragmentType>,
+                              const std::vector<int>, const std::vector<int>);
 
     /// Sets whether this molecule contains at least one cartesian entry
     void set_has_cartesian(bool tf) { cart_ = tf; }
@@ -631,7 +629,7 @@ public:
     /// Also calls update_geometry()
     void set_variable(const std::string& str, double val);
     /// Plain assigns the vlue val to the variable labeled string in the list of geometry variables.
-    void set_geometry_variable(const std::string &str, double val) { geometry_variables_[str] = val; }
+    void set_geometry_variable(const std::string& str, double val) { geometry_variables_[str] = val; }
     /// Checks to see if the variable str is in the list, sets it to val and returns
     /// true if it is, and returns false if not.
     double get_variable(const std::string& str);
@@ -640,17 +638,11 @@ public:
     bool is_variable(const std::string& str) const;
 
     /// Sets the molecular charge
-    void set_molecular_charge(int charge) {
-        charge_specified_ = true;
-        molecular_charge_ = charge;
-    }
+    void set_molecular_charge(int charge) { molecular_charge_ = charge; }
     /// Gets the molecular charge
     int molecular_charge() const { return molecular_charge_; }
     /// Sets the multiplicity (defined as 2Ms + 1)
-    void set_multiplicity(int mult) {
-        multiplicity_specified_ = true;
-        multiplicity_ = mult;
-    }
+    void set_multiplicity(int mult) { multiplicity_ = mult; }
     /// Get the multiplicity (defined as 2Ms + 1)
     int multiplicity() const { return multiplicity_; }
 
@@ -692,6 +684,6 @@ public:
     void update_geometry();
 };
 
-}
+}  // namespace psi
 
 #endif

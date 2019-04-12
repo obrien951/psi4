@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -96,10 +96,10 @@ class PSI_API Dimension {
     const int& get(int i) const { return blocks_[i]; }
     void set(int i, int val) { blocks_[i] = val; }
 
-    friend bool operator==(const Dimension& a, const Dimension& b);
-    friend bool operator!=(const Dimension& a, const Dimension& b);
-    friend Dimension operator+(const Dimension& a, const Dimension& b);
-    friend Dimension operator-(const Dimension& a, const Dimension& b);
+    PSI_API friend bool operator==(const Dimension& a, const Dimension& b);
+    PSI_API friend bool operator!=(const Dimension& a, const Dimension& b);
+    PSI_API friend Dimension operator+(const Dimension& a, const Dimension& b);
+    PSI_API friend Dimension operator-(const Dimension& a, const Dimension& b);
 };
 
 /*! \ingroup MINTS
@@ -145,6 +145,6 @@ class PSI_API Slice {
     /// Check if this Slice is acceptable
     bool validate_slice();
 };
-}
+}  // namespace psi
 
 #endif  // _psi_src_lib_libmints_dimension_h_

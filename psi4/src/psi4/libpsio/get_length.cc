@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -34,30 +34,29 @@
 #include "psi4/libpsio/psio.h"
 
 namespace psi {
-  /*!
-   ** PSIO_GET_LENGTH(): Given a start page and offset for two data sets,
-   ** compute the number of bytes between them.  Note that eadd denotes the
-   ** beginning of the next entry and not the end of the current entry.
-   **
-   ** \ingroup PSIO
-   */
+/*!
+ ** PSIO_GET_LENGTH(): Given a start page and offset for two data sets,
+ ** compute the number of bytes between them.  Note that eadd denotes the
+ ** beginning of the next entry and not the end of the current entry.
+ **
+ ** \ingroup PSIO
+ */
 
-  size_t psio_get_length(psio_address sadd, psio_address eadd) {
-
+size_t psio_get_length(psio_address sadd, psio_address eadd) {
     size_t full_page_bytes;
 
     /* Number of bytes on fullpages */
-    full_page_bytes = (eadd.page - sadd.page- 1)*PSIO_PAGELEN;
+    full_page_bytes = (eadd.page - sadd.page - 1) * PSIO_PAGELEN;
 
     /* Uh, size_t will NEVER be less than 0 */
-    //if (full_page_bytes < 0) { /* We're on a single page */
+    // if (full_page_bytes < 0) { /* We're on a single page */
     //  return (eadd.offset - sadd.offset);
     //} else if (full_page_bytes == 0) { /* We're on the next page */
     if (full_page_bytes == 0) { /* We're on the next page */
-      return ((PSIO_PAGELEN - sadd.offset) + eadd.offset);
+        return ((PSIO_PAGELEN - sadd.offset) + eadd.offset);
     } else {
-      return ((PSIO_PAGELEN - sadd.offset) + full_page_bytes + eadd.offset);
+        return ((PSIO_PAGELEN - sadd.offset) + full_page_bytes + eadd.offset);
     }
-  }
-
 }
+
+}  // namespace psi

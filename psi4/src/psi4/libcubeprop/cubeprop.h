@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -64,6 +64,9 @@ class PSI_API CubeProperties {
     std::vector<std::tuple<double, int, int> > info_b_;
     /// Auxiliary Basis Set if Any
     std::shared_ptr<BasisSet> auxiliary_;
+    /// Total number of alpha/beta electrons
+    int nalpha_;
+    int nbeta_;
 
     // => Computers <= //
 
@@ -87,7 +90,7 @@ class PSI_API CubeProperties {
     // => High-Level Property Computers <= //
 
     /// Compute all relevant properties from options object specifications
-    void compute_properties();
+    void raw_compute_properties();
 
     // => Low-Level Property Computers (Do not use unless you are an advanced client code) <= //
 
@@ -100,13 +103,19 @@ class PSI_API CubeProperties {
     /// Compute an orbital task (key_N.cube, for 0-based indices of C)
     void compute_orbitals(std::shared_ptr<Matrix> C, const std::vector<int>& indices,
                           const std::vector<std::string>& labels, const std::string& key);
+    /// Compute a difference task between two indices of matrix C
+    void compute_difference(std::shared_ptr<Matrix> C, const std::vector<int>& indices,
+                          const std::string& label, bool square);
     /// Compute a basis function task (key_N.cube, for 0-based indices of basisset_)
     void compute_basis_functions(const std::vector<int>& indices, const std::string& key);
     /// Compute a LOL grid task (key.cube)
     void compute_LOL(std::shared_ptr<Matrix> D, const std::string& key);
     /// Compute an ELF grid task (key.cube)
     void compute_ELF(std::shared_ptr<Matrix> D, const std::string& key);
+
+    /// Returns Orbital Basis Set
+    std::shared_ptr<BasisSet> basisset() { return basisset_; }
 };
-}
+}  // namespace psi
 
 #endif

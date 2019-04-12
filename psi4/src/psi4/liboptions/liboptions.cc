@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -26,31 +26,18 @@
  * @END LICENSE
  */
 
-#include <iostream>
-#include <vector>
-#include <map>
-#include <cstddef>
-#include <stdexcept>
-#include <cstdio>
-#include <cstdlib>
-#include <iomanip>
-#include <sstream>
-#include <numeric>
-#include <assert.h>
-
 #include "liboptions.h"
-#include "liboptions_python.h"
+
+#include <algorithm>
+#include <numeric>
+
+#include "psi4/pragma.h"
+#include "psi4/psi4-dec.h"
 
 #include "psi4/libpsi4util/exception.h"
 #include "psi4/libpsi4util/libpsi4util.h"  // Needed for Ref counting, string splitting, and conversions
-#include "psi4/pragma.h"
 #include "psi4/libpsi4util/PsiOutStream.h"
 #include "psi4/libpsi4util/process.h"
-#include <memory>
-
-#include <typeinfo>
-#include "psi4/pybind11.h"
-#include "psi4/psi4-dec.h"
 
 namespace psi {
 
@@ -501,6 +488,9 @@ Options& Options::operator=(const Options& rhs) {
 
     locals_ = rhs.locals_;
     globals_ = rhs.globals_;
+    edit_globals_ = rhs.edit_globals_;
+    all_local_options_ = rhs.all_local_options_;
+    current_module_ = rhs.current_module_;
 
     return *this;
 }
@@ -632,7 +622,7 @@ DataType* Options::set_global_array_entry(const std::string& key, DataType* entr
         data.assign(entry);
     } else {
         // We're adding to an existing entry
-        ArrayType* arrptr(dynamic_cast<ArrayType*>(loc));
+        auto* arrptr(dynamic_cast<ArrayType*>(loc));
         arrptr->assign(entry);
     }
     return entry;
@@ -661,7 +651,7 @@ DataType* Options::set_local_array_entry(const std::string& module, const std::s
         locals_[module][key].assign(entry);
     } else {
         // We're adding to an existing entry
-        ArrayType* arrptr(dynamic_cast<ArrayType*>(loc));
+        auto* arrptr(dynamic_cast<ArrayType*>(loc));
         arrptr->assign(entry);
     }
     return entry;
@@ -684,7 +674,7 @@ DataType* Options::set_local_array_array(const std::string& module, const std::s
     return set_local_array_entry(module, key, new ArrayType(), entry);
 }
 
-void Options::clear(void) {
+void Options::clear() {
     globals_.clear();
     locals_.clear();
 }
@@ -887,4 +877,4 @@ std::vector<double> Options::get_double_vector(std::string key) {
 const char* Options::get_cstr(std::string key) { return (use(key).to_string().c_str()); }
 
 Data& Options::operator[](std::string key) { return use(key); }
-}
+}  // namespace psi

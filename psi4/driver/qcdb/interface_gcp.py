@@ -3,7 +3,7 @@
 #
 # Psi4: an open-source quantum chemistry software package
 #
-# Copyright (c) 2007-2018 The Psi4 Developers.
+# Copyright (c) 2007-2019 The Psi4 Developers.
 #
 # The copyrights for code used from other parties are included in
 # the corresponding files.
@@ -27,11 +27,10 @@
 #
 
 """Module with functions that interface with Grimme's GCP code."""
-from __future__ import absolute_import
-from __future__ import print_function
 import os
 import re
 import uuid
+import shutil
 import socket
 import subprocess
 
@@ -42,23 +41,22 @@ try:
 except ImportError:
     from .exceptions import *
     isP4regime = False
-from .p4regex import *
+from .util import parse_dertype
 from .molecule import Molecule
 
 
 def run_gcp(self, func=None, dertype=None, verbose=False):  # dashlvl=None, dashparam=None
-    """Function to call Grimme's dftd3 program (http://toc.uni-muenster.de/DFTD3/)
-    to compute the -D correction of level *dashlvl* using parameters for
-    the functional *func*. The dictionary *dashparam* can be used to supply
-    a full set of dispersion parameters in the absense of *func* or to supply
-    individual overrides in the presence of *func*. Returns energy if *dertype* is 0,
-    gradient if *dertype* is 1, else tuple of energy and gradient if *dertype*
-    unspecified. The dftd3 executable must be independently compiled and found in
-    :envvar:`PATH` or :envvar:`PSIPATH`.
-    *self* may be either a qcdb.Molecule (sensibly) or a psi4.Molecule
-    (works b/c psi4.Molecule has been extended by this method py-side and
-    only public interface fns used) or a string that can be instantiated
-    into a qcdb.Molecule.
+    """Function to call Grimme's GCP program
+    https://www.chemie.uni-bonn.de/pctc/mulliken-center/software/gcp/gcp
+    to compute an a posteriori geometrical BSSE correction to *self* for
+    several HF, generic DFT, and specific HF-3c and PBEh-3c method/basis
+    combinations, *func*. Returns energy if *dertype* is 0, gradient
+    if *dertype* is 1, else tuple of energy and gradient if *dertype*
+    unspecified. The gcp executable must be independently compiled and
+    found in :envvar:`PATH` or :envvar:`PSIPATH`. *self* may be either a
+    qcdb.Molecule (sensibly) or a psi4.Molecule (works b/c psi4.Molecule
+    has been extended by this method py-side and only public interface
+    fns used) or a string that can be instantiated into a qcdb.Molecule.
 
     """
     # Create (if necessary) and update qcdb.Molecule
@@ -68,7 +66,7 @@ def run_gcp(self, func=None, dertype=None, verbose=False):  # dashlvl=None, dash
     elif isinstance(self, core.Molecule):
         # called on a python export of a psi4.core.Molecule (py-side through Psi4's driver)
         self.create_psi4_string_from_molecule()
-    elif isinstance(self, basestring):
+    elif isinstance(self, str):
         # called on a string representation of a psi4.Molecule (c-side through psi4.Dispersion)
         self = Molecule(self)
     else:
@@ -82,15 +80,9 @@ def run_gcp(self, func=None, dertype=None, verbose=False):  # dashlvl=None, dash
 #        raise ValidationError("""-D correction level %s is not available. Choose among %s.""" % (dashlvl, dashcoeff.keys()))
 
     if dertype is None:
-        dertype = -1
-    elif der0th.match(str(dertype)):
-        dertype = 0
-    elif der1st.match(str(dertype)):
-        dertype = 1
-#    elif der2nd.match(str(dertype)):
-#        raise ValidationError('Requested derivative level \'dertype\' %s not valid for run_dftd3.' % (dertype))
+        derint, derdriver = -1, 'gradient'
     else:
-        raise ValidationError('Requested derivative level \'dertype\' %s not valid for run_dftd3.' % (dertype))
+        derint, derdriver = parse_dertype(dertype, max_derivative=1)
 
 #    if func is None:
 #        if dashparam is None:
@@ -167,7 +159,7 @@ def run_gcp(self, func=None, dertype=None, verbose=False):  # dashlvl=None, dash
         gcp_tmpdir = 'psi.' + str(os.getpid()) + '.' + psio.get_default_namespace() + \
             '.gcp.' + str(uuid.uuid4())[:8]
     else:
-        gcp_tmpdir = os.environ['HOME'] + os.sep + 'gcp_' + str(uuid.uuid4())[:8]
+        gcp_tmpdir = os.path.expanduser('~') + os.sep + 'gcp_' + str(uuid.uuid4())[:8]
     if os.path.exists(gcp_tmpdir) is False:
         os.mkdir(gcp_tmpdir)
     os.chdir(gcp_tmpdir)
@@ -213,7 +205,7 @@ def run_gcp(self, func=None, dertype=None, verbose=False):  # dashlvl=None, dash
     # Call gcp program
     command = ['gcp', geomfile]
     command.extend(['-level', func])
-    if dertype != 0:
+    if derint != 0:
         command.append('-grad')
     try:
         #print('command', command)
@@ -237,7 +229,7 @@ def run_gcp(self, func=None, dertype=None, verbose=False):  # dashlvl=None, dash
         raise Dftd3Error("""Unsuccessful gCP run.""")
 
     # Parse grad output
-    if dertype != 0:
+    if derint != 0:
         derivfile = './gcp_gradient'
         dfile = open(derivfile, 'r')
         dashdderiv = []
@@ -256,7 +248,7 @@ def run_gcp(self, func=None, dertype=None, verbose=False):  # dashlvl=None, dash
                 (len(dashdderiv), self.natom()))
 
     # Prepare results for Psi4
-    if isP4regime and dertype != 0:
+    if isP4regime and derint != 0:
         core.set_variable('GCP CORRECTION ENERGY', dashd)
         psi_dashdderiv = core.Matrix.from_list(dashdderiv)
 
@@ -267,7 +259,7 @@ def run_gcp(self, func=None, dertype=None, verbose=False):  # dashlvl=None, dash
 
         text = '\n  ==> GCP Output <==\n'
         text += out.decode('utf-8')
-        if dertype != 0:
+        if derint != 0:
             with open(derivfile, 'r') as handle:
                 text += handle.read().replace('D', 'E')
             text += '\n'
@@ -280,24 +272,25 @@ def run_gcp(self, func=None, dertype=None, verbose=False):  # dashlvl=None, dash
 #    os.unlink(paramfile1)
 #    os.unlink(paramfile2)
 #    os.unlink(geomfile)
-#    if dertype != 0:
+#    if derint != 0:
 #        os.unlink(derivfile)
 #    if defmoved is True:
 #        os.rename(defaultfile + '_hide', defaultfile)
 
+    # clean up files and remove scratch directory
     os.chdir('..')
-#    try:
-#        shutil.rmtree(dftd3_tmpdir)
-#    except OSError as e:
-#        ValidationError('Unable to remove dftd3 temporary directory %s' % e)
+    try:
+        shutil.rmtree(gcp_tmpdir)
+    except OSError as err:
+        raise OSError('Unable to remove gcp temporary directory: {}'.format(gcp_tmpdir)) from err
     os.chdir(current_directory)
 
     # return -D & d(-D)/dx
-    if dertype == -1:
+    if derint == -1:
         return dashd, dashdderiv
-    elif dertype == 0:
+    elif derint == 0:
         return dashd
-    elif dertype == 1:
+    elif derint == 1:
         return psi_dashdderiv
 
 try:

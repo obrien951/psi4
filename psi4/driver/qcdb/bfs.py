@@ -3,7 +3,7 @@
 #
 # Psi4: an open-source quantum chemistry software package
 #
-# Copyright (c) 2007-2018 The Psi4 Developers.
+# Copyright (c) 2007-2019 The Psi4 Developers.
 #
 # The copyrights for code used from other parties are included in
 # the corresponding files.
@@ -26,16 +26,12 @@
 # @END LICENSE
 #
 
-from __future__ import absolute_import
-from __future__ import print_function
-from __future__ import division
 import math
 import collections
 
 import numpy as np
 
-from .physconst import *
-from .periodictable import *
+import qcelemental as qcel
 
 
 def BFS(geom, elem, seed_atoms=None, bond_threshold=1.20):
@@ -154,10 +150,10 @@ def _get_covalent_radii(elem):
     try:
         caps = [el.capitalize() for el in elem]
     except AttributeError:
-        caps = [z2el[z].capitalize() for z in elem]
+        caps = [qcel.periodictable.to_E(z) for z in elem]
 
     covrad = np.fromiter((covalent_radii_lookup[caps[at]] for at in range(nat)), dtype=np.float, count=nat)
-    return np.divide(covrad, psi_bohr2angstroms)
+    return np.divide(covrad, qcel.constants.bohr2angstroms)
 
 
 def _get_key(x, y, z, b):

@@ -1,4 +1,4 @@
-find_package(gau2grid 1.1 CONFIG QUIET COMPONENTS gaussian)
+find_package(gau2grid 1.2 CONFIG QUIET COMPONENTS gaussian)
 
 if(${gau2grid_FOUND})
     get_property(_loc TARGET gau2grid::gg PROPERTY LOCATION)
@@ -13,10 +13,9 @@ else()
     message(STATUS "Suitable gau2grid could not be located, ${Magenta}Building gau2grid${ColourReset} instead.")
     ExternalProject_Add(gau2grid_external
         DEPENDS pybind11_external
-        GIT_REPOSITORY https://github.com/dgasmith/gau2grid
-        GIT_TAG v1.1.0
+        URL https://github.com/dgasmith/gau2grid/archive/v1.3.1.tar.gz
         UPDATE_COMMAND ""
-        CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}
+        CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${STAGED_INSTALL_PREFIX}
                    -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
                    -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
                    -DCMAKE_INSTALL_LIBDIR=${CMAKE_INSTALL_LIBDIR}
@@ -30,8 +29,7 @@ else()
                    -DSPHERICAL_ORDER=gaussian
                    -DENABLE_GENERIC=${ENABLE_GENERIC}
                    -DPYTHON_EXECUTABLE=${PYTHON_EXECUTABLE}
-        CMAKE_CACHE_ARGS -DCMAKE_C_FLAGS:STRING=${CMAKE_C_FLAGS}
-        INSTALL_COMMAND DESTDIR=${CMAKE_BINARY_DIR}/stage ${CMAKE_MAKE_PROGRAM} install)
+        CMAKE_CACHE_ARGS -DCMAKE_C_FLAGS:STRING=${CMAKE_C_FLAGS})
 
     set(gau2grid_DIR ${STAGED_INSTALL_PREFIX}/share/cmake/gau2grid CACHE PATH "path to internally built gau2gridConfig.cmake" FORCE)
 endif()

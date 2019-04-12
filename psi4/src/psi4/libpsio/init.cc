@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -43,8 +43,6 @@ PRAGMA_WARNING_IGNORE_DEPRECATED_DECLARATIONS
 PRAGMA_WARNING_POP
 #include "psi4/psi4-dec.h"
 #include "psi4/psifiles.h"
-
-#include <unistd.h>
 
 namespace psi {
 
@@ -116,7 +114,7 @@ PSIO::PSIO() {
 
 std::shared_ptr<PSIO> PSIO::shared_object() { return _default_psio_lib_; }
 
-int psio_init(void) {
+int psio_init() {
     if (_default_psio_lib_.get() == 0) {
         auto temp = std::make_shared<PSIO>();
         _default_psio_lib_ = temp;
@@ -138,4 +136,4 @@ int psio_init(void) {
 }
 
 int psio_state() { return _default_psio_lib_->state(); }
-}
+}  // namespace psi

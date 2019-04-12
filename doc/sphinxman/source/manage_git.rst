@@ -3,7 +3,7 @@
 .. #
 .. # Psi4: an open-source quantum chemistry software package
 .. #
-.. # Copyright (c) 2007-2018 The Psi4 Developers.
+.. # Copyright (c) 2007-2019 The Psi4 Developers.
 .. #
 .. # The copyrights for code used from other parties are included in
 .. # the corresponding files.
@@ -322,4 +322,12 @@ How to fix "cannot import name 'core' from {top-level-psi4-dir}
 First, what's happening? ``sys.path`` (where modules can be imported from in python) starts with ``''``.  If you `export PYTHONPATH={objdir}/stage/{prefix}/lib/{pymod_lib_dir}:$PYTHONPATH` to make PsiAPI easy, that inserts starting in pos’n 1 (0-indexed), so ``''`` still at the head of ``sys.path``. Now, if you try to run a psiapi/python file from ``{top-level-psi4-dir}`` that contains ``import psi4``, it will find the source tree ``psi4/__init__.py`` and fail because there’s no ``core.so`` around. That is, it’s finding what looks to be the psi4 module dir structure ``.`` when the one it wants is what you inserted into PYTHONPATH at pos’n 1.
 
 The way around this is to move the python file you're running to any other directory. Or, within the file, do ``sys.path.insert(0, {objdir}/stage/{prefix}/lib/{pymod_lib_dir}``.
+
+How to find tests without output.ref
+------------------------------------
+
+Ideally, each new test or much-altered test should add its own
+``output.ref``. When that doesn't happen, this command helps. ::
+
+    find tests/ -mindepth 1 -maxdepth 1 -type d '!' -exec test -e "{}/output.ref" ";" -print
 

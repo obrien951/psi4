@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -48,18 +48,17 @@ namespace psi {
 ** Returns: dot product
 ** \ingroup QT
 */
-double dot_block(double **A, double **B, int rows, int cols, double alpha)
-{
+double dot_block(double **A, double **B, int rows, int cols, double alpha) {
     double value;
     long int size;
 
-    size = ((long) rows) * ((long) cols);
+    size = ((long)rows) * ((long)cols);
 
-    if(!size) return 0.0;
+    if (!size) return 0.0;
 
     C_DGEMM('T', 'N', 1, 1, size, alpha, A[0], 1, B[0], 1, 0.0, &value, 1);
 
     return value;
 }
 
-}
+}  // namespace psi

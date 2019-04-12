@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -47,9 +47,9 @@ class DFOCC : public Wavefunction {
    public:
     DFOCC(SharedWavefunction ref_wfn, Options &options);
 
-    virtual ~DFOCC();
+    ~DFOCC() override;
 
-    virtual double compute_energy();
+    double compute_energy() override;
 
    protected:
     void mem_release();

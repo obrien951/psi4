@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -40,6 +40,7 @@
 #include "psi4/libmints/matrix.h"
 #include "psi4/libmints/basisset.h"
 #include "psi4/lib3index/cholesky.h"
+#include "psi4/lib3index/dfhelper.h"
 #include "psi4/libmints/petitelist.h"
 #include "psi4/libmints/integral.h"
 #include "psi4/libpsi4util/PsiOutStream.h"
@@ -55,16 +56,26 @@ using namespace psi;
 
 namespace psi {
 
+template<class T>
+void _set_dfjk_options(T* jk, Options& options){
+    if (options["INTS_TOLERANCE"].has_changed()) jk->set_cutoff(options.get_double("INTS_TOLERANCE"));
+    if (options["PRINT"].has_changed()) jk->set_print(options.get_int("PRINT"));
+    if (options["DEBUG"].has_changed()) jk->set_debug(options.get_int("DEBUG"));
+    if (options["BENCH"].has_changed()) jk->set_bench(options.get_int("BENCH"));
+    jk->set_condition(options.get_double("DF_FITTING_CONDITION"));
+    if (options["DF_INTS_NUM_THREADS"].has_changed())
+        jk->set_df_ints_num_threads(options.get_int("DF_INTS_NUM_THREADS"));
+}
+
 JK::JK(std::shared_ptr<BasisSet> primary) : primary_(primary) { common_init(); }
 JK::~JK() {}
 std::shared_ptr<JK> JK::build_JK(std::shared_ptr<BasisSet> primary, std::shared_ptr<BasisSet> auxiliary,
                                  Options& options, std::string jk_type) {
-
     // Throw small DF warning
     if (jk_type == "DF") {
         outfile->Printf("\n  Warning: JK type 'DF' found in simple constructor, defaulting to DiskDFJK.\n");
         outfile->Printf("           Please use the build_JK(primary, auxiliary, options, do_wK, memory)\n");
-        outfile->Printf("           constructor as DiskDFJK non-optimal performance.\n\n");
+        outfile->Printf("           constructor as DiskDFJK has non-optimal performance for many workloads.\n\n");
         jk_type = "DISK_DF";
     }
 
@@ -76,8 +87,7 @@ std::shared_ptr<JK> JK::build_JK(std::shared_ptr<BasisSet> primary, std::shared_
         if (options["DEBUG"].has_changed()) jk->set_debug(options.get_int("DEBUG"));
         if (options["BENCH"].has_changed()) jk->set_bench(options.get_int("BENCH"));
         if (options["DF_INTS_IO"].has_changed()) jk->set_df_ints_io(options.get_str("DF_INTS_IO"));
-        if (options["DF_FITTING_CONDITION"].has_changed())
-            jk->set_condition(options.get_double("DF_FITTING_CONDITION"));
+        jk->set_condition(options.get_double("DF_FITTING_CONDITION"));
         if (options["DF_INTS_NUM_THREADS"].has_changed())
             jk->set_df_ints_num_threads(options.get_int("DF_INTS_NUM_THREADS"));
 
@@ -85,31 +95,14 @@ std::shared_ptr<JK> JK::build_JK(std::shared_ptr<BasisSet> primary, std::shared_
 
     } else if (jk_type == "DISK_DF") {
         DiskDFJK* jk = new DiskDFJK(primary, auxiliary);
-
-        if (options["INTS_TOLERANCE"].has_changed()) jk->set_cutoff(options.get_double("INTS_TOLERANCE"));
-        if (options["PRINT"].has_changed()) jk->set_print(options.get_int("PRINT"));
-        if (options["DEBUG"].has_changed()) jk->set_debug(options.get_int("DEBUG"));
-        if (options["BENCH"].has_changed()) jk->set_bench(options.get_int("BENCH"));
+        _set_dfjk_options<DiskDFJK>(jk, options);
         if (options["DF_INTS_IO"].has_changed()) jk->set_df_ints_io(options.get_str("DF_INTS_IO"));
-        if (options["DF_FITTING_CONDITION"].has_changed())
-            jk->set_condition(options.get_double("DF_FITTING_CONDITION"));
-        if (options["DF_INTS_NUM_THREADS"].has_changed())
-            jk->set_df_ints_num_threads(options.get_int("DF_INTS_NUM_THREADS"));
 
         return std::shared_ptr<JK>(jk);
 
     } else if (jk_type == "MEM_DF") {
         MemDFJK* jk = new MemDFJK(primary, auxiliary);
-
-        if (options["INTS_TOLERANCE"].has_changed()) jk->set_cutoff(options.get_double("INTS_TOLERANCE"));
-        if (options["PRINT"].has_changed()) jk->set_print(options.get_int("PRINT"));
-        if (options["DEBUG"].has_changed()) jk->set_debug(options.get_int("DEBUG"));
-        if (options["BENCH"].has_changed()) jk->set_bench(options.get_int("BENCH"));
-        //if (options["DF_INTS_IO"].has_changed()) jk->set_df_ints_io(options.get_str("DF_INTS_IO"));
-        if (options["DF_FITTING_CONDITION"].has_changed())
-            jk->set_condition(options.get_double("DF_FITTING_CONDITION"));
-        if (options["DF_INTS_NUM_THREADS"].has_changed())
-            jk->set_df_ints_num_threads(options.get_int("DF_INTS_NUM_THREADS"));
+        _set_dfjk_options<MemDFJK>(jk, options);
 
         return std::shared_ptr<JK>(jk);
 
@@ -157,35 +150,31 @@ std::shared_ptr<JK> JK::build_JK(std::shared_ptr<BasisSet> primary, std::shared_
 }
 std::shared_ptr<JK> JK::build_JK(std::shared_ptr<BasisSet> primary, std::shared_ptr<BasisSet> auxiliary,
                                  Options& options, bool do_wK, size_t doubles) {
-
     std::string jk_type = options.get_str("SCF_TYPE");
-    if (do_wK and jk_type == "MEM_DF") { // throw instead of auto fallback?
+    if (do_wK && jk_type == "MEM_DF") {  // throw instead of auto fallback?
         std::stringstream error;
         error << "Cannot do SCF_TYPE == 'MEM_DF' and do_wK (yet), please set SCF_TYPE = 'DISK_DF' ";
         throw PSIEXCEPTION(error.str().c_str());
     }
 
     if (jk_type == "DF") {
-
         // logic for MemDFJK vs DiskDFJK
-        if (do_wK || !auxiliary->has_puream() || options["DF_INTS_IO"].has_changed()) {
+        if (do_wK || options["DF_INTS_IO"].has_changed()) {
             return build_JK(primary, auxiliary, options, "DISK_DF");
-            
+
         } else {
-
-            // conservative estimate for size of 3-center AOs
-            size_t nbf = primary->nbf();
-            size_t naux = auxiliary->nbf();
-            size_t required = naux * nbf * nbf; // + nthreads_ * nbf * nbf TODO
-
-            if (required > doubles) {
-                return build_JK(primary, auxiliary, options, "DISK_DF");
-            } else {
-                return build_JK(primary, auxiliary, options, "MEM_DF");
+            // Build exact estimate via Schwarz metrics
+            auto jk = build_JK(primary, auxiliary, options, "MEM_DF");
+            if (jk->memory_estimate() < doubles) {
+                return jk;
             }
+            jk.reset();
+
+            // Use Disk DFJK
+            return build_JK(primary, auxiliary, options, "DISK_DF");
         }
 
-    } else { // otherwise it has already been set
+    } else {  // otherwise it has already been set
         return build_JK(primary, auxiliary, options, options.get_str("SCF_TYPE"));
     }
 

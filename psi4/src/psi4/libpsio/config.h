@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -41,36 +41,38 @@ namespace psi {
 #define PSIO_MAXUNIT 500
 #define PSIO_PAGELEN 65536
 
-#define PSIO_ERROR_INIT       1
-#define PSIO_ERROR_DONE       2
-#define PSIO_ERROR_MAXVOL     3
-#define PSIO_ERROR_NOVOLPATH  4
-#define PSIO_ERROR_OPEN       5
-#define PSIO_ERROR_REOPEN     6
-#define PSIO_ERROR_CLOSE      7
-#define PSIO_ERROR_RECLOSE    8
-#define PSIO_ERROR_OSTAT      9
-#define PSIO_ERROR_LSEEK     10
-#define PSIO_ERROR_READ      11
-#define PSIO_ERROR_WRITE     12
-#define PSIO_ERROR_NOTOCENT  13
-#define PSIO_ERROR_TOCENTSZ  14
-#define PSIO_ERROR_KEYLEN    15
-#define PSIO_ERROR_BLKSIZ    16
-#define PSIO_ERROR_BLKSTART  17
-#define PSIO_ERROR_BLKEND    18
+#define PSIO_ERROR_INIT 1
+#define PSIO_ERROR_DONE 2
+#define PSIO_ERROR_MAXVOL 3
+#define PSIO_ERROR_NOVOLPATH 4
+#define PSIO_ERROR_OPEN 5
+#define PSIO_ERROR_REOPEN 6
+#define PSIO_ERROR_CLOSE 7
+#define PSIO_ERROR_RECLOSE 8
+#define PSIO_ERROR_OSTAT 9
+#define PSIO_ERROR_LSEEK 10
+#define PSIO_ERROR_READ 11
+#define PSIO_ERROR_WRITE 12
+#define PSIO_ERROR_NOTOCENT 13
+#define PSIO_ERROR_TOCENTSZ 14
+#define PSIO_ERROR_KEYLEN 15
+#define PSIO_ERROR_BLKSIZ 16
+#define PSIO_ERROR_BLKSTART 17
+#define PSIO_ERROR_BLKEND 18
 #define PSIO_ERROR_IDENTVOLPATH 19
-#define PSIO_ERROR_MAXUNIT   20
+#define PSIO_ERROR_MAXUNIT 20
 
-typedef struct {
-    size_t page; /* First page of entry */
-    size_t offset; /* Starting byte offset on fpage */
-} psio_address;
+struct psio_address {
+    /*! First page of entry */
+    size_t page;
+    /*! Starting byte offset on fpage */
+    size_t offset;
+};
 
-typedef struct {
+struct psio_vol {
     char *path;
     int stream;
-} psio_vol;
+};
 
 typedef struct psio_entry {
     char key[PSIO_KEYLEN];
@@ -80,16 +82,15 @@ typedef struct psio_entry {
     struct psio_entry *last;
 } psio_tocentry;
 
-typedef struct {
+struct psio_ud {
     size_t numvols;
     psio_vol vol[PSIO_MAXVOL];
     size_t toclen;
     psio_tocentry *toc;
-} psio_ud;
+};
 
 /** A convenient address initialization struct */
 extern PSI_API psio_address PSIO_ZERO;
-
 }
 
 #endif /* header guard */

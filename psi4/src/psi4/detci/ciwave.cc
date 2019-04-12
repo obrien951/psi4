@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -51,19 +51,13 @@ PRAGMA_WARNING_POP
 namespace psi {
 namespace detci {
 
-CIWavefunction::CIWavefunction(std::shared_ptr<Wavefunction> ref_wfn) : Wavefunction(Process::environment.options) {
-    // Copy the wavefuntion then update
-    shallow_copy(ref_wfn);
-    set_reference_wavefunction(ref_wfn);
+CIWavefunction::CIWavefunction(std::shared_ptr<Wavefunction> ref_wfn, Options& options)
+    : Wavefunction{ref_wfn, options} {
     common_init();
 }
 
-CIWavefunction::CIWavefunction(std::shared_ptr<Wavefunction> ref_wfn, Options& options) : Wavefunction(options) {
-    // Copy the wavefuntion then update
-    shallow_copy(ref_wfn);
-    set_reference_wavefunction(ref_wfn);
-    common_init();
-}
+CIWavefunction::CIWavefunction(std::shared_ptr<Wavefunction> ref_wfn)
+    : CIWavefunction{ref_wfn, Process::environment.options} {}
 
 CIWavefunction::~CIWavefunction() {
     cleanup_ci();
@@ -141,10 +135,10 @@ double CIWavefunction::compute_energy() {
     if (Parameters_->istop) { /* Print size of space, other stuff, only   */
         cleanup_ci();
         cleanup_dpd();
-        Process::environment.globals["CURRENT ENERGY"] = 0.0;
-        Process::environment.globals["CURRENT CORRELATION ENERGY"] = 0.0;
-        Process::environment.globals["CI TOTAL ENERGY"] = 0.0;
-        Process::environment.globals["CI CORRELATION ENERGY"] = 0.0;
+        set_scalar_variable("CURRENT ENERGY", 0.0);
+        set_scalar_variable("CURRENT CORRELATION ENERGY", 0.0);
+        set_scalar_variable("CI TOTAL ENERGY", 0.0);
+        set_scalar_variable("CI CORRELATION ENERGY", 0.0);
 
         return 0.0;
     }
@@ -171,7 +165,7 @@ double CIWavefunction::compute_energy() {
     // cleanup_ci();
     // cleanup_dpd();
 
-    return Process::environment.globals["CURRENT ENERGY"];
+    return scalar_variable("CURRENT ENERGY");
 }
 
 void CIWavefunction::orbital_locations(const std::string& orbitals, int* start, int* end) {
@@ -264,12 +258,12 @@ void CIWavefunction::orbital_locations(const std::string& orbitals, int* start, 
 
 SharedMatrix CIWavefunction::get_orbitals(const std::string& orbital_name) {
     /// Figure out orbital positions
-    int* start = new int[nirrep_];
-    int* end = new int[nirrep_];
+    auto* start = new int[nirrep_];
+    auto* end = new int[nirrep_];
 
     orbital_locations(orbital_name, start, end);
 
-    int* spread = new int[nirrep_];
+    auto* spread = new int[nirrep_];
     for (int h = 0; h < nirrep_; h++) {
         spread[h] = end[h] - start[h];
     }
@@ -292,12 +286,12 @@ SharedMatrix CIWavefunction::get_orbitals(const std::string& orbital_name) {
 
 void CIWavefunction::set_orbitals(const std::string& orbital_name, SharedMatrix orbitals) {
     /// Figure out orbital positions
-    int* start = new int[nirrep_];
-    int* end = new int[nirrep_];
+    auto* start = new int[nirrep_];
+    auto* end = new int[nirrep_];
 
     orbital_locations(orbital_name, start, end);
 
-    int* spread = new int[nirrep_];
+    auto* spread = new int[nirrep_];
     for (int h = 0; h < nirrep_; h++) {
         spread[h] = end[h] - start[h];
     }
@@ -317,8 +311,8 @@ void CIWavefunction::set_orbitals(const std::string& orbital_name, SharedMatrix 
 
 Dimension CIWavefunction::get_dimension(const std::string& orbital_name) {
     /// Figure out orbital positions
-    int* start = new int[nirrep_];
-    int* end = new int[nirrep_];
+    auto* start = new int[nirrep_];
+    auto* end = new int[nirrep_];
     orbital_locations(orbital_name, start, end);
 
     Dimension dim = Dimension(nirrep_);
@@ -448,7 +442,7 @@ SharedMatrix CIWavefunction::get_tpdm(const std::string& spin, bool symmetrize) 
 /*
 ** cleanup(): Free any allocated memory that wasn't already freed elsewhere
 */
-void CIWavefunction::cleanup_ci(void) {
+void CIWavefunction::cleanup_ci() {
     // Make sure we dont double clean
     if (!cleaned_up_ci_) {
         // Free Bendazzoli OV arrays
@@ -481,7 +475,7 @@ void CIWavefunction::cleanup_ci(void) {
         cleaned_up_ci_ = true;
     }
 }
-void CIWavefunction::cleanup_dpd(void) {
+void CIWavefunction::cleanup_dpd() {
     if (ints_init_) {
         ints_.reset();
         ints_init_ = false;
@@ -776,9 +770,9 @@ void CIWavefunction::semicanonical_orbs() {
     }
 
     // rotate MOs and push them to the ciwfn
-    SharedMatrix Cnew = Matrix::doublet(get_orbitals("ROT"), U, false, false);
+    SharedMatrix Cnew = linalg::doublet(get_orbitals("ROT"), U, false, false);
     set_orbitals("ROT", Cnew);
     Cb_ = Ca_;
 }
-}
-}  // End Psi and CIWavefunction spaces
+}  // namespace detci
+}  // namespace psi

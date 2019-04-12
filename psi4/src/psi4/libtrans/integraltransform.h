@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -178,6 +178,8 @@ class PSI_API IntegralTransform {
     void set_write_dpd_so_tpdm(bool t_f) { write_dpd_so_tpdm_ = t_f; }
     /// Set the level of printing used during transformations (0 -> 6)
     void set_print(int n) { print_ = n; }
+    /// Whether to build the Fock matrix in the MO basis during integral presort
+    void set_build_mo_fock(bool t_f) { buildMOFock_ = t_f; }
     /// Sets the orbitals to the given C matrix. This is a hack for MCSCF wavefunctions.
     /// Use with caution.
     void set_orbitals(SharedMatrix C);
@@ -418,10 +420,12 @@ class PSI_API IntegralTransform {
     bool useDPD_;
     // Has this object already pre-sorted?
     bool tpdmAlreadyPresorted_;
+    // Whether to form the MO basis Fock matrix during TEI presort
+    bool buildMOFock_;
     // This keeps track of which labels have been assigned by other spaces
     std::map<char, int> labelsUsed_;
 };
 
-}  // End namespaces
+}  // namespace psi
 
 #endif  // Header guard

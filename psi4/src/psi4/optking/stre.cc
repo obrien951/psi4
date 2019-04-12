@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -50,7 +50,7 @@ using std::ostringstream;
 STRE::STRE(int A_in, int B_in, bool freeze_in) : SIMPLE_COORDINATE(stre_type, 2, freeze_in) {
   //fprintf(stdout,"constructing STRE A_in:%d B_in:%d, frozen %d\n",
   //  A_in, B_in, freeze_in);
-  if (A_in == B_in) throw(INTCO_EXCEPT("STRE::STRE() atoms defining strech are not unique."));
+  if (A_in == B_in) throw(INTCO_EXCEPT("STRE::STRE() atoms defining stretch are not unique."));
 
   if (A_in < B_in) {
     s_atom[0] = A_in;

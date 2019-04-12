@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -76,8 +76,7 @@ std::shared_ptr<JKGrad> JKGrad::build_JKGrad(int deriv, std::shared_ptr<BasisSet
             jk->set_debug(options.get_int("DEBUG"));
         if (options["BENCH"].has_changed())
             jk->set_bench(options.get_int("BENCH"));
-        if (options["DF_FITTING_CONDITION"].has_changed())
-            jk->set_condition(options.get_double("DF_FITTING_CONDITION"));
+        jk->set_condition(options.get_double("DF_FITTING_CONDITION"));
         if (options["DF_INTS_NUM_THREADS"].has_changed())
             jk->set_df_ints_num_threads(options.get_int("DF_INTS_NUM_THREADS"));
 
@@ -156,7 +155,7 @@ void DFJKGrad::print_header() const
             outfile->Printf( "    Omega:             %11.3E\n", omega_);
         outfile->Printf( "    OpenMP threads:    %11d\n", omp_num_threads_);
         outfile->Printf( "    Integrals threads: %11d\n", df_ints_num_threads_);
-        outfile->Printf( "    Memory (MB):       %11ld\n", (memory_ *8L) / (1024L * 1024L));
+        outfile->Printf( "    Memory [MiB]:      %11ld\n", (memory_ *8L) / (1024L * 1024L));
         outfile->Printf( "    Schwarz Cutoff:    %11.0E\n", cutoff_);
         outfile->Printf( "    Fitting Condition: %11.0E\n\n", condition_);
 
@@ -646,7 +645,7 @@ void DFJKGrad::build_AB_inv_terms()
     // => Fitting Metric Full Inverse <= //
 
     auto metric = std::make_shared<FittingMetric>(auxiliary_, true);
-    metric->form_full_eig_inverse();
+    metric->form_full_eig_inverse(condition_);
     SharedMatrix J = metric->get_metric();
     double** Jp = J->pointer();
 
@@ -1014,7 +1013,7 @@ void DFJKGrad::build_AB_x_terms()
         }
     }
 
-    //gradients_["Coulomb"]->print();
+    // gradients_["Coulomb"]->print();
     // gradients_["Exchange"]->print();
     // gradients_["Exchange,LR"]->print();
 }
@@ -1149,17 +1148,17 @@ void DFJKGrad::build_Amn_x_terms()
     // => Figure out required transforms <= //
 
     // unit, disk buffer name, nmo_size, psio_address, output_buffer
-    std::vector<std::tuple<size_t, std::string, double**, size_t, psio_address, double**>> transforms;
+    std::vector<std::tuple<size_t, std::string, double**, size_t, psio_address*, double**>> transforms;
     if (do_K_ || do_wK_) {
-        transforms.push_back(std::make_tuple(unit_a_, "(A|ij)", Cap, na, next_Aija, Kmnp));
+        transforms.push_back(std::make_tuple(unit_a_, "(A|ij)", Cap, na, &next_Aija, Kmnp));
         if (!restricted) {
-            transforms.push_back(std::make_tuple(unit_b_, "(A|ij)", Cbp, nb, next_Aijb, Kmnp));
+            transforms.push_back(std::make_tuple(unit_b_, "(A|ij)", Cbp, nb, &next_Aijb, Kmnp));
         }
     }
     if (do_wK_) {
-        transforms.push_back(std::make_tuple(unit_a_, "(A|w|ij)", Cap, na, next_Awija, wKmnp));
+        transforms.push_back(std::make_tuple(unit_a_, "(A|w|ij)", Cap, na, &next_Awija, wKmnp));
         if (!restricted) {
-            transforms.push_back(std::make_tuple(unit_b_, "(A|w|ij)", Cbp, nb, next_Awijb, wKmnp));
+            transforms.push_back(std::make_tuple(unit_b_, "(A|w|ij)", Cbp, nb, &next_Awijb, wKmnp));
         }
     }
 
@@ -1188,14 +1187,16 @@ void DFJKGrad::build_Amn_x_terms()
             std::string buffer = std::get<1>(trans);
             double** Cp = std::get<2>(trans);
             size_t nmo = std::get<3>(trans);
-            psio_address address = std::get<4>(trans);
+            psio_address* address = std::get<4>(trans);
             double** retp = std::get<5>(trans);
-            // printf("%4.2lf : %zu  %s %zu\n", factor, unit, buffer.c_str(), nmo);
+            // printf("%4.2lf : %zu  %s %zu | %zu %zu\n", factor, unit, buffer.c_str(), nmo, address->page, address->offset);
 
             size_t nmo2 = nmo * nmo;
 
             // > Stripe < //
-            psio_->read(unit, buffer.c_str(), (char*)Aijp[0], sizeof(double) * np * nmo2, address, &address);
+            psio_->read(unit, buffer.c_str(), (char*)Aijp[0], sizeof(double) * np * nmo2, *address, address);
+            // printf("%4.2lf : %zu  %s %zu | %zu %zu\n", factor, unit, buffer.c_str(), nmo, address->page, address->offset);
+            // printf("\n");
 
             // > (A|ij) C_mi -> (A|mj) < //
 #pragma omp parallel for
@@ -1470,7 +1471,7 @@ void DFJKGrad::compute_hessian()
 
     int na = Ca_->colspi()[0];
     auto metric = std::make_shared<FittingMetric>(auxiliary_, true);
-    metric->form_full_eig_inverse();
+    metric->form_full_eig_inverse(condition_);
     SharedMatrix PQ = metric->get_metric();
     double** PQp = PQ->pointer();
 
@@ -1620,7 +1621,7 @@ void DFJKGrad::compute_hessian()
                 //
                 // T[p][m,j] <- (p|mn) C[n][j]
                 // dAij[x][p,i,j] <- C[m][i] T[p][m,j]
-                double *ptr = const_cast<double*>(buffer);
+                auto *ptr = const_cast<double*>(buffer);
                 C_DGEMM('n', 'n', nP*nM, na, nN, 1.0, ptr+0*stride, nN, Cap[oN], na, 0.0, Tp[0], na);
                 #pragma omp parallel for
                 for(int p = 0; p < nP; ++p)
@@ -1704,7 +1705,7 @@ void DFJKGrad::compute_hessian()
             }
             // K term intermediates
             // deij[x][A,i,j] <- (A|B)^x Bij[B,i,j]
-            double *ptr = const_cast<double*>(buffer);
+            auto *ptr = const_cast<double*>(buffer);
             C_DGEMM('n', 'n', nP, na*na, nQ, 1.0, ptr+0*stride, nQ, Bijp[oQ], na*na, 1.0, &deijp[Px][oP*na*na], na*na);
             C_DGEMM('n', 'n', nP, na*na, nQ, 1.0, ptr+1*stride, nQ, Bijp[oQ], na*na, 1.0, &deijp[Py][oP*na*na], na*na);
             C_DGEMM('n', 'n', nP, na*na, nQ, 1.0, ptr+2*stride, nQ, Bijp[oQ], na*na, 1.0, &deijp[Pz][oP*na*na], na*na);

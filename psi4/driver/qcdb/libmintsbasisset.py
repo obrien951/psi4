@@ -3,7 +3,7 @@
 #
 # Psi4: an open-source quantum chemistry software package
 #
-# Copyright (c) 2007-2018 The Psi4 Developers.
+# Copyright (c) 2007-2019 The Psi4 Developers.
 #
 # The copyrights for code used from other parties are included in
 # the corresponding files.
@@ -26,25 +26,21 @@
 # @END LICENSE
 #
 
-from __future__ import absolute_import
-from __future__ import print_function
-from __future__ import division
 import os
 import sys
 import hashlib
 import itertools
 import collections
 
+import qcelemental as qcel
+
 from .exceptions import *
 from .psiutil import search_file
 from .molecule import Molecule
-from .periodictable import *
 from .libmintsgshell import ShellInfo
 from .libmintsbasissetparser import Gaussian94BasisSetParser
 from .basislist import corresponding_basis, corresponding_zeta
 
-if sys.version_info >= (3,0):
-    basestring = str
 
 basishorde = {}
 
@@ -138,12 +134,12 @@ class BasisSet(object):
             isinstance(args[1], int):
             self.constructor_basisset_center(*args)
         elif len(args) == 3 and \
-            isinstance(args[0], basestring) and \
+            isinstance(args[0], str) and \
             isinstance(args[1], Molecule) and \
             isinstance(args[2], collections.OrderedDict):
             self.constructor_role_mol_shellmap(*args)
         elif len(args) == 4 and \
-            isinstance(args[0], basestring) and \
+            isinstance(args[0], str) and \
             isinstance(args[1], Molecule) and \
             isinstance(args[2], collections.OrderedDict) and \
             isinstance(args[3], bool):
@@ -193,7 +189,7 @@ class BasisSet(object):
 
         # Add a dummy atom at the origin, to hold this basis function
         self.molecule = Molecule()
-        self.molecule.add_atom(0, 0.0, 0.0, 0.0)
+        self.molecule.add_atom(0, 0.0, 0.0, 0.0, 'X')
         # Fill with data representing a single S function, at the origin, with 0 exponent
         self.n_uprimitive = 1
         self.n_shells = 1
@@ -653,7 +649,7 @@ class BasisSet(object):
         elif orb in basishorde:
             basstrings['BASIS'] = basishorde[orb](mol, 'BASIS')
             callby = orb
-        elif isinstance(orb, basestring):
+        elif isinstance(orb, str):
             mol.set_basis_all_atoms(orb, role='BASIS')
             callby = orb
         else:
@@ -665,7 +661,7 @@ class BasisSet(object):
             elif callable(aux):
                 basstrings[fitrole] = aux(mol, fitrole)
                 callby = aux.__name__.replace('basisspec_psi4_yo__', '')
-            elif isinstance(aux, basestring):
+            elif isinstance(aux, str):
                 mol.set_basis_all_atoms(aux, role=fitrole)
                 callby = aux
             else:
@@ -748,18 +744,17 @@ class BasisSet(object):
         # Paths to search for gbs files: here + PSIPATH + library
         try:
             from psi4 import core
-            psidatadir = core.get_datadir()
         except ImportError:
-            pass
+            libraryPath = ''
+        else:
+            psidatadir = core.get_datadir()
+            libraryPath = os.pathsep + os.path.join(os.path.abspath(psidatadir), 'basis')
         #nolongerenvvar psidatadir = os.environ.get('PSIDATADIR', None)
         #nolongerpredicatble psidatadir = __file__ + '/../../..' if psidatadir is None else psidatadir
-        if psidatadir:
-            libraryPath = ':' + os.path.abspath(psidatadir) + '/basis'
-        else:
-            libraryPath = ''
-        basisPath = os.path.abspath('.') + \
-            ':' + ':'.join([os.path.abspath(x) for x in os.environ.get('PSIPATH', '').split(':')]) + \
-            libraryPath
+
+        basisPath = os.path.abspath('.') + os.pathsep
+        basisPath += os.pathsep.join([os.path.abspath(x) for x in os.environ.get('PSIPATH', '').split(os.pathsep)])
+        basisPath += libraryPath
 
         # Validate deffit for key
         univdef_zeta = 4
@@ -833,7 +828,7 @@ class BasisSet(object):
             if verbose >= 2:
                 print("""  Shell Entries: %s""" % (seek['entry']))
                 print("""  Basis Sets: %s""" % (seek['basis']))
-                print("""  File Path: %s""" % (', '.join(map(str, seek['path'].split(':')))))
+                print("""  File Path: %s""" % (', '.join(map(str, seek['path'].split(os.pathsep)))))
                 print("""  Input Blocks: %s\n""" % (', '.join(seek['strings'])))
 
             # Search through paths, bases, entries
@@ -896,7 +891,7 @@ class BasisSet(object):
                 # Ne'er found :-(
                 text2  = """  Shell Entries: %s\n""" % (seek['entry'])
                 text2 += """  Basis Sets: %s\n""" % (seek['basis'])
-                text2 += """  File Path: %s\n""" % (', '.join(map(str, seek['path'].split(':'))))
+                text2 += """  File Path: %s\n""" % (', '.join(map(str, seek['path'].split(os.pathsep))))
                 text2 += """  Input Blocks: %s\n""" % (', '.join(seek['strings']))
                 raise BasisSetNotFound('BasisSet::construct: Unable to find a basis set for atom %d for key %s among:\n%s' % \
                     (at + 1, key, text2))
@@ -948,7 +943,7 @@ class BasisSet(object):
         text += '\n'
 
         if return_atomlist:
-            return atom_basis_list, text, None
+            return atom_basis_list, text, ecpbasisset
         else:
             return basisset, text, ecpbasisset
 
@@ -1081,7 +1076,7 @@ class BasisSet(object):
             si += self.center_to_shell[center]
         if si < 0 or si > self.nshell():
             text = """BasisSet::shell(si = %d), requested a shell out-of-bound.\n   Max shell size: %d\n   Name: %s\n""" % \
-                (si, self.nshell(), self.name())
+                (si, self.nshell(), self.name)
             raise ValidationError("BasisSet::shell: requested shell is out-of-bounds:\n%s" % (text))
         return self.shells[si]
 
@@ -1278,7 +1273,7 @@ class BasisSet(object):
         for uA in range(self.molecule.nunique()):
             A = self.molecule.unique(uA)
             if not numbersonly:
-                text += """%s\n""" % (z2element[self.molecule.Z(A)])
+                text += """%s\n""" % (qcel.periodictable.to_element(self.molecule.Z(A)))
             first_shell = self.center_to_shell[A]
             n_shell = self.center_to_nshell[A]
 

@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -31,34 +31,30 @@
     \brief String parsing code for orbital indices, taken from Justin Turney's AMBIT code.
 */
 
+#include <cctype>
 #include <algorithm>
 #include <iterator>
 #include <string>
 #include <sstream>
 #include <vector>
-
+#include <functional>
 
 namespace psi {
 
 // trim from start
-static inline std::string &dpd_ltrim(std::string &s)
-{
-    s.erase(s.begin(), find_if(s.begin(), s.end(), not1(std::ptr_fun<int, int>(isspace))));
+static inline std::string &dpd_ltrim(std::string &s) {
+    s.erase(s.begin(), find_if(s.begin(), s.end(), [](int c) {return !std::isspace(c);}));
     return s;
 }
 
 // trim from end
-static inline std::string &dpd_rtrim(std::string &s)
-{
-    s.erase(find_if(s.rbegin(), s.rend(), not1(std::ptr_fun<int, int>(isspace))).base(), s.end());
+static inline std::string &dpd_rtrim(std::string &s) {
+    s.erase(find_if(s.rbegin(), s.rend(), [](int c) {return !std::isspace(c);}).base(), s.end());
     return s;
 }
 
 // trim from both ends
-static inline std::string &dpd_trim(std::string &s)
-{
-    return dpd_ltrim(dpd_rtrim(s));
-}
+static inline std::string &dpd_trim(std::string &s) { return dpd_ltrim(dpd_rtrim(s)); }
 
 /** Takes a string of indices and splits them into a vector of strings.
  *
@@ -66,8 +62,7 @@ static inline std::string &dpd_trim(std::string &s)
  * If no comma is found it assumes the indices are one character in length.
  *
  */
-std::vector<std::string> dpd_split(const std::string &indices)
-{
+std::vector<std::string> dpd_split(const std::string &indices) {
     std::istringstream f(indices);
     std::string s;
     std::vector<std::string> v;
@@ -77,14 +72,12 @@ std::vector<std::string> dpd_split(const std::string &indices)
             std::string trimmed = dpd_trim(s);
             v.push_back(trimmed);
         }
-    }
-    else {
+    } else {
         // simply split the string up
-        for (size_t i = 0; i < indices.size(); ++i)
-            v.push_back(std::string(1, indices[i]));
+        for (size_t i = 0; i < indices.size(); ++i) v.push_back(std::string(1, indices[i]));
     }
 
     return v;
 }
 
-} // namespace psi
+}  // namespace psi

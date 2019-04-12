@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -27,11 +27,18 @@
  */
 
 #include "sapt2.h"
+#include "psi4/lib3index/3index.h"
 #include "psi4/physconst.h"
+#include "psi4/libciomr/libciomr.h"
+#include "psi4/libpsi4util/process.h"
+#include "psi4/libpsio/psio.hpp"
 #include "psi4/libmints/basisset.h"
 #include "psi4/libmints/twobody.h"
 #include "psi4/libmints/integral.h"
 #include "psi4/libmints/matrix.h"
+#include "psi4/libpsio/psio.hpp"
+#include "psi4/libpsio/psio.h"
+#include "psi4/libqt/qt.h"
 
 namespace psi {
 namespace sapt {
@@ -201,7 +208,7 @@ void SAPT2::print_header() {
     outfile->Printf("    NVIR B     = %9d\n", nvirB_);
     outfile->Printf("\n");
 
-    long int mem = (long int)memory_;
+    auto mem = (long int)memory_;
     mem /= 8L;
     long int occ = noccA_;
     if (noccB_ > noccA_) occ = noccB_;
@@ -376,7 +383,7 @@ void SAPT2::print_results() {
 void SAPT2::df_integrals() {
     // Get fitting metric
     auto metric = std::make_shared<FittingMetric>(ribasis_);
-    metric->form_eig_inverse();
+    metric->form_eig_inverse(options_.get_double("DF_FITTING_CONDITION"));
     double **J_temp = metric->get_metric()->pointer();
     double **J_mhalf = block_matrix(ndf_, ndf_);
     C_DCOPY(ndf_ * ndf_, J_temp[0], 1, J_mhalf[0], 1);
@@ -435,8 +442,8 @@ void SAPT2::df_integrals() {
 #endif
     int rank = 0;
 
-    std::shared_ptr<TwoBodyAOInt> *eri = new std::shared_ptr<TwoBodyAOInt>[ nthreads ];
-    const double **buffer = new const double *[nthreads];
+    std::shared_ptr<TwoBodyAOInt> *eri = new std::shared_ptr<TwoBodyAOInt>[nthreads];
+    const auto **buffer = new const double *[nthreads];
     for (int i = 0; i < nthreads; ++i) {
         eri[i] = std::shared_ptr<TwoBodyAOInt>(rifactory->eri());
         buffer[i] = eri[i]->buffer();
@@ -1050,5 +1057,5 @@ void SAPT2::natural_orbitalify_df_ints() {
     free_block(C_p_SS);
     free_block(D_p_SS);
 }
-}
-}
+}  // namespace sapt
+}  // namespace psi

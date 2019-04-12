@@ -3,7 +3,7 @@
 #
 # Psi4: an open-source quantum chemistry software package
 #
-# Copyright (c) 2007-2018 The Psi4 Developers.
+# Copyright (c) 2007-2019 The Psi4 Developers.
 #
 # The copyrights for code used from other parties are included in
 # the corresponding files.
@@ -32,8 +32,6 @@ Also calls to qcdb module are here and not elsewhere in driver.
 Organizationally, this module isolates qcdb code from psi4 code.
 
 """
-from __future__ import print_function
-from __future__ import absolute_import
 import os
 import re
 import glob
@@ -507,9 +505,9 @@ def vpt2_sow_files(item, linkage, isC4notP4, isC4fully, zmat, inputSansMol, inpu
     inputReapOrders = r"""
 print_variables()
 
-print_out('VPT2 RESULT: linkage {0} for item {1} yields CURRENT ENERGY being %r\n' % (get_variable('CURRENT ENERGY')))
+print_out('VPT2 RESULT: linkage {0} for item {1} yields CURRENT ENERGY being %r\n' % (variable('CURRENT ENERGY')))
 print_out('VPT2 RESULT: linkage {0} for item {1} yields CURRENT GRADIENT being %r\n' % (p4util.mat2arr(core.get_gradient())))
-print_out('VPT2 RESULT: linkage {0} for item {1} yields CURRENT DIPOLE being [%r, %r, %r]\n' % (get_variable('CURRENT DIPOLE X'), get_variable('CURRENT DIPOLE Y'), get_variable('CURRENT DIPOLE Z')))
+print_out('VPT2 RESULT: linkage {0} for item {1} yields CURRENT DIPOLE being [%r, %r, %r]\n' % (variable('CURRENT DIPOLE X'), variable('CURRENT DIPOLE Y'), variable('CURRENT DIPOLE Z')))
 """.format(linkage, item)
 
     # Direct Cfour for gradients
@@ -597,11 +595,11 @@ def vpt2_reaprun_files(item, linkage, isSowReap, isC4notP4, isC4fully, zmat, out
             energy('cfour', path=c4scrdir + '/scr.' + item)
 #            os.chdir(scrdir + '/scr.' + item)
 
-            fje = core.get_variable('CURRENT ENERGY')
+            fje = core.variable('CURRENT ENERGY')
             fjgrd = p4util.mat2arr(core.get_gradient())
-            fjdip = [core.get_variable('CURRENT DIPOLE X') / constants.dipmom_au2debye,
-                     core.get_variable('CURRENT DIPOLE Y') / constants.dipmom_au2debye,
-                     core.get_variable('CURRENT DIPOLE Z') / constants.dipmom_au2debye]
+            fjdip = [core.variable('CURRENT DIPOLE X') / constants.dipmom_au2debye,
+                     core.variable('CURRENT DIPOLE Y') / constants.dipmom_au2debye,
+                     core.variable('CURRENT DIPOLE Z') / constants.dipmom_au2debye]
             c4mol = qcdb.Molecule(core.get_active_molecule().create_psi4_string_from_molecule())
             c4mol.update_geometry()
 
@@ -647,11 +645,11 @@ def vpt2_reaprun_files(item, linkage, isSowReap, isC4notP4, isC4fully, zmat, out
             molecule.update_geometry()
             gradient(lowername, **kwargs)
 
-            fje = core.get_variable('CURRENT ENERGY')
+            fje = core.variable('CURRENT ENERGY')
             fjgrd = p4util.mat2arr(core.get_gradient())
-            fjdip = [core.get_variable('CURRENT DIPOLE X') / constants.dipmom_au2debye,
-                     core.get_variable('CURRENT DIPOLE Y') / constants.dipmom_au2debye,
-                     core.get_variable('CURRENT DIPOLE Z') / constants.dipmom_au2debye]
+            fjdip = [core.variable('CURRENT DIPOLE X') / constants.dipmom_au2debye,
+                     core.variable('CURRENT DIPOLE Y') / constants.dipmom_au2debye,
+                     core.variable('CURRENT DIPOLE Z') / constants.dipmom_au2debye]
 
         # Transform results into C4 orientation (defined by c4mol) & forge FJOBARC file
         fjobarc = qcdb.cfour.format_fjobarc(fje,

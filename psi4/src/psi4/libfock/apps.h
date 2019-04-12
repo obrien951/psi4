@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -40,9 +40,7 @@ class VBase;
 // => BASE CLASSES <= //
 
 class RBase : public Wavefunction {
-
-protected:
-
+   protected:
     int print_;
     int bench_;
 
@@ -70,27 +68,26 @@ protected:
     bool use_symmetry_;
     double Eref_;
 
-public:
-
-    RBase(SharedWavefunction ref_wfn, Options& options, bool use_symmetry=true);
+   public:
+    RBase(SharedWavefunction ref_wfn, Options& options, bool use_symmetry = true);
     // TODO: Remove AS SOON AS POSSIBLE, such a dirty hack
     RBase(bool flag);
-    virtual ~RBase();
+    ~RBase() override;
 
     virtual bool same_a_b_orbs() const { return true; }
     virtual bool same_a_b_dens() const { return true; }
 
     // TODO: Remove AS SOON AS POSSIBLE, such a dirty hack
-    virtual double compute_energy() { return 0.0; }
+    double compute_energy() override { return 0.0; }
 
     void set_print(int print) { print_ = print; }
 
     /// Gets a handle to the JK object, if built by preiterations
-    std::shared_ptr<JK> jk() const { return jk_;}
+    std::shared_ptr<JK> jk() const { return jk_; }
     /// Set the JK object, say from SCF
     void set_jk(std::shared_ptr<JK> jk) { jk_ = jk; }
     /// Gets a handle to the VBase object, if built by preiterations
-    std::shared_ptr<VBase> v() const { return v_;}
+    std::shared_ptr<VBase> v() const { return v_; }
     /// Set the VBase object, say from SCF (except that wouldn't work, right?)
     void set_jk(std::shared_ptr<VBase> v) { v_ = v; }
     /// Builds JK object, if needed
@@ -124,12 +121,10 @@ public:
 // => APPLIED CLASSES <= //
 
 class RCIS : public RBase {
-
-protected:
-
+   protected:
     std::vector<std::tuple<double, int, int, int> > states_;
-    std::vector<SharedMatrix > singlets_;
-    std::vector<SharedMatrix > triplets_;
+    std::vector<SharedMatrix> singlets_;
+    std::vector<SharedMatrix> triplets_;
     std::vector<double> E_singlets_;
     std::vector<double> E_triplets_;
 
@@ -153,43 +148,37 @@ protected:
     virtual std::pair<SharedMatrix, std::shared_ptr<Vector> > Nso(SharedMatrix T1, bool diff = false);
     virtual std::pair<SharedMatrix, std::shared_ptr<Vector> > Nao(SharedMatrix T1, bool diff = false);
 
-    virtual std::pair<SharedMatrix, SharedMatrix > ADmo(SharedMatrix T1);
-    virtual std::pair<SharedMatrix, SharedMatrix > ADso(SharedMatrix T1);
-    virtual std::pair<SharedMatrix, SharedMatrix > ADao(SharedMatrix T1);
+    virtual std::pair<SharedMatrix, SharedMatrix> ADmo(SharedMatrix T1);
+    virtual std::pair<SharedMatrix, SharedMatrix> ADso(SharedMatrix T1);
+    virtual std::pair<SharedMatrix, SharedMatrix> ADao(SharedMatrix T1);
 
-public:
+   public:
     RCIS(SharedWavefunction ref_wfn, Options& options);
-    virtual ~RCIS();
+    ~RCIS() override;
 
-    virtual double compute_energy();
-
+    double compute_energy() override;
 };
 
 class RTDHF : public RBase {
-
-protected:
-
-    std::vector<SharedMatrix > singlets_X_;
-    std::vector<SharedMatrix > triplets_X_;
-    std::vector<SharedMatrix > singlets_Y_;
-    std::vector<SharedMatrix > triplets_Y_;
+   protected:
+    std::vector<SharedMatrix> singlets_X_;
+    std::vector<SharedMatrix> triplets_X_;
+    std::vector<SharedMatrix> singlets_Y_;
+    std::vector<SharedMatrix> triplets_Y_;
     std::vector<double> E_singlets_;
     std::vector<double> E_triplets_;
 
     virtual void print_header();
 
-public:
+   public:
     RTDHF(SharedWavefunction ref_wfn, Options& options);
-    virtual ~RTDHF();
+    ~RTDHF() override;
 
-    virtual double compute_energy();
-
+    double compute_energy() override;
 };
 
 class RCPHF : public RBase {
-
-protected:
-
+   protected:
     // OV-Rotations
     std::map<std::string, SharedMatrix> x_;
     // OV-Perturbations
@@ -205,12 +194,12 @@ protected:
 
     std::set<std::string> tasks_;
 
-public:
-    RCPHF(SharedWavefunction ref_wfn, Options& options, bool use_symmetry=true);
-    virtual ~RCPHF();
+   public:
+    RCPHF(SharedWavefunction ref_wfn, Options& options, bool use_symmetry = true);
+    ~RCPHF() override;
 
     /// Solve for all perturbations currently in b
-    virtual double compute_energy();
+    double compute_energy() override;
 
     /// Perturbation vector queue, shove tasks onto this guy before compute_energy
     std::map<std::string, SharedMatrix>& b() { return b_; }
@@ -219,44 +208,39 @@ public:
 
     /// Add a named task
     void add_task(const std::string& task);
-
 };
 
 class RCPKS : public RCPHF {
+   protected:
+    void print_header() override;
 
-protected:
-    virtual void print_header();
-
-public:
+   public:
     RCPKS(SharedWavefunction ref_wfn, Options& options);
-    virtual ~RCPKS();
+    ~RCPKS() override;
 
-    virtual double compute_energy();
+    double compute_energy() override;
 };
 
 class RTDA : public RCIS {
+   protected:
+    void print_header() override;
 
-protected:
-    virtual void print_header();
-
-public:
+   public:
     RTDA(SharedWavefunction ref_wfn, Options& options);
-    virtual ~RTDA();
+    ~RTDA() override;
 
-    virtual double compute_energy();
+    double compute_energy() override;
 };
 
 class RTDDFT : public RTDHF {
+   protected:
+    void print_header() override;
 
-protected:
-    virtual void print_header();
-
-public:
+   public:
     RTDDFT(SharedWavefunction ref_wfn, Options& options);
-    virtual ~RTDDFT();
+    ~RTDDFT() override;
 
-    virtual double compute_energy();
+    double compute_energy() override;
 };
-
 }
 #endif

@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -38,7 +38,6 @@ class BasisSet;
 class GaussianShell;
 class OneBodyAOInt;
 class SphericalTransform;
-
 
 /*! \ingroup MINTS
  *  \class MultipolePotentialInt
@@ -80,22 +79,21 @@ class SphericalTransform;
  *     19    |      XYZ       |    6/15
  *
  */
-class EFPMultipolePotentialInt : public OneBodyAOInt
-{
+class EFPMultipolePotentialInt : public OneBodyAOInt {
     // OS Recursion for this type of potential integral
     ObaraSaikaTwoCenterEFPRecursion mvi_recur_;
 
     //! Computes the electric field between two gaussian shells.
-    void compute_pair(const GaussianShell&, const GaussianShell&);
+    void compute_pair(const GaussianShell&, const GaussianShell&) override;
 
-public:
+   public:
     //! Constructor. Do not call directly use an IntegralFactory.
-    EFPMultipolePotentialInt(std::vector<SphericalTransform>&, std::shared_ptr<BasisSet>, std::shared_ptr<BasisSet>, int deriv=0);
+    EFPMultipolePotentialInt(std::vector<SphericalTransform>&, std::shared_ptr<BasisSet>, std::shared_ptr<BasisSet>,
+                             int deriv = 0);
     //! Virtual destructor
-    virtual ~EFPMultipolePotentialInt();
-
+    ~EFPMultipolePotentialInt() override;
 };
 
-}
+}  // namespace psi
 
 #endif

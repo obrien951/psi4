@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -36,19 +36,16 @@
 #include "psi4/liboptions/liboptions.h"
 #include "debugging.h"
 
-namespace psi{ namespace psimrcc{
+namespace psi {
+namespace psimrcc {
 
-        Debugging::Debugging(Options &options):
-                options_(options)
-{
-  level = new bool[11];
-  for(int n=0;n<=10;n++)
-    level[n]=false;
+Debugging::Debugging(Options &options) : options_(options) {
+    level = new bool[11];
+    for (int n = 0; n <= 10; n++) level[n] = false;
 
-  int maxn = options_.get_int("DEBUG");
-  if(maxn>10)
-    maxn = 10;
-  for(int n=0;n<=maxn;n++)
-    level[n]=true;
+    int maxn = options_.get_int("DEBUG");
+    if (maxn > 10) maxn = 10;
+    for (int n = 0; n <= maxn; n++) level[n] = true;
 }
-}} /* End Namespaces */
+}  // namespace psimrcc
+}  // namespace psi

@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -37,11 +37,10 @@
 
 namespace psi {
 
-int DPD::file4_mat_irrep_row_init(dpdfile4 *File, int irrep)
-{
+int DPD::file4_mat_irrep_row_init(dpdfile4 *File, int irrep) {
     int my_irrep;
 
-    if(File->incore) return 0;  /* We already have the whole matrix in core */
+    if (File->incore) return 0; /* We already have the whole matrix in core */
 
 #ifdef DPD_TIMER
     timer_on("f4_rowinit");
@@ -49,7 +48,7 @@ int DPD::file4_mat_irrep_row_init(dpdfile4 *File, int irrep)
 
     my_irrep = File->my_irrep;
 
-    File->matrix[irrep] = dpd_block_matrix(1, File->params->coltot[irrep^my_irrep]);
+    File->matrix[irrep] = dpd_block_matrix(1, File->params->coltot[irrep ^ my_irrep]);
 
 #ifdef DPD_TIMER
     timer_off("f4_rowinit");
@@ -58,4 +57,4 @@ int DPD::file4_mat_irrep_row_init(dpdfile4 *File, int irrep)
     return 0;
 }
 
-}
+}  // namespace psi

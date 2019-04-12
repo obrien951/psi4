@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -209,8 +209,8 @@ bool DIISManager::add_entry(int numQuantities, ...) {
     double *array;
     va_list args;
     va_start(args, numQuantities);
-    double *errorVectorPtr = new double[_errorVectorSize];
-    double *vectorPtr = new double[_vectorSize];
+    auto *errorVectorPtr = new double[_errorVectorSize];
+    auto *vectorPtr = new double[_vectorSize];
     double *arrayPtr = errorVectorPtr;
     for (int i = 0; i < numQuantities; ++i) {
         DIISEntry::InputType type = _componentTypes[i];
@@ -545,4 +545,4 @@ DIISManager::~DIISManager() {
     if (_psio->open_check(PSIF_LIBDIIS)) _psio->close(PSIF_LIBDIIS, 1);
 }
 
-}  // Namespace
+}  // namespace psi

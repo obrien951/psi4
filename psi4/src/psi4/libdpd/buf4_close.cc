@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -43,8 +43,7 @@ namespace psi {
 **   dpdbuf4 *Buf: A pointer to the dpdbuf4 to be closed.
 */
 
-int DPD::buf4_close(dpdbuf4 *Buf)
-{
+int DPD::buf4_close(dpdbuf4 *Buf) {
     int nirreps;
 
     nirreps = Buf->params->nirreps;
@@ -64,4 +63,4 @@ int DPD::buf4_close(dpdbuf4 *Buf)
     return 0;
 }
 
-}
+}  // namespace psi

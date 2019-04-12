@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -68,6 +68,24 @@ void DiskDFJK::common_init() {
     unit_ = PSIF_DFSCF_BJ;
     is_core_ = true;
     psio_ = PSIO::shared_object();
+}
+size_t DiskDFJK::memory_estimate() {
+    // DF requires constant sieve, must be static throughout object life
+    if (!sieve_) {
+        sieve_ = std::make_shared<ERISieve>(primary_, cutoff_);
+    }
+
+    size_t ntri = sieve_->function_pairs().size();
+    size_t three_memory = ((size_t)auxiliary_->nbf()) * ntri;
+    size_t two_memory = 2 * ((size_t)auxiliary_->nbf()) * auxiliary_->nbf();
+
+    if (do_wK_) { three_memory *= 3; }
+
+    size_t memory = three_memory + two_memory;
+    memory += memory_overhead();
+    memory += memory_temp();
+
+    return memory;
 }
 SharedVector DiskDFJK::iaia(SharedMatrix Ci, SharedMatrix Ca) {
     // Target quantity
@@ -257,7 +275,7 @@ void DiskDFJK::print_header() const {
         if (do_wK_) outfile->Printf("    Omega:             %11.3E\n", omega_);
         outfile->Printf("    OpenMP threads:    %11d\n", omp_nthread_);
         outfile->Printf("    Integrals threads: %11d\n", df_ints_num_threads_);
-        outfile->Printf("    Memory (MB):       %11ld\n", (memory_ * 8L) / (1024L * 1024L));
+        outfile->Printf("    Memory [MiB]:      %11ld\n", (memory_ * 8L) / (1024L * 1024L));
         outfile->Printf("    Algorithm:         %11s\n", (is_core_ ? "Core" : "Disk"));
         outfile->Printf("    Integral Cache:    %11s\n", df_ints_io_.c_str());
         outfile->Printf("    Schwarz Cutoff:    %11.0E\n", cutoff_);
@@ -267,20 +285,8 @@ void DiskDFJK::print_header() const {
         auxiliary_->print_by_level("outfile", print_);
     }
 }
-bool DiskDFJK::is_core() const {
-    size_t ntri = sieve_->function_pairs().size();
-    size_t three_memory = ((size_t)auxiliary_->nbf()) * ntri;
-    size_t two_memory = ((size_t)auxiliary_->nbf()) * auxiliary_->nbf();
-
-    size_t mem = memory_;
-    mem -= memory_overhead();
-    mem -= memory_temp();
-
-    // Two is for buffer space in fitting
-    if (do_wK_)
-        return (3L * three_memory + 2L * two_memory < memory_);
-    else
-        return (three_memory + 2L * two_memory < memory_);
+bool DiskDFJK::is_core() {
+    return memory_estimate() < memory_;
 }
 size_t DiskDFJK::memory_temp() const {
     size_t mem = 0L;
@@ -391,6 +397,7 @@ void DiskDFJK::free_w_temps() {
     Q_temp_.clear();
 }
 void DiskDFJK::preiterations() {
+
     // DF requires constant sieve, must be static throughout object life
     if (!sieve_) {
         sieve_ = std::make_shared<ERISieve>(primary_, cutoff_);
@@ -478,7 +485,7 @@ void DiskDFJK::initialize_JK_core() {
     std::shared_ptr<BasisSet> zero = BasisSet::zero_ao_basis_set();
     std::shared_ptr<IntegralFactory> rifactory =
         std::make_shared<IntegralFactory>(auxiliary_, zero, primary_, primary_);
-    const double** buffer = new const double*[nthread];
+    const auto** buffer = new const double*[nthread];
     std::shared_ptr<TwoBodyAOInt>* eri = new std::shared_ptr<TwoBodyAOInt>[ nthread ];
     eri[0] = std::shared_ptr<TwoBodyAOInt>(rifactory->eri());
     buffer[0] = eri[0]->buffer();
@@ -590,7 +597,7 @@ void DiskDFJK::initialize_JK_core() {
     timer_on("JK: (A|Q)^-1/2");
 
     auto Jinv = std::make_shared<FittingMetric>(auxiliary_, true);
-    Jinv->form_eig_inverse();
+    Jinv->form_eig_inverse(condition_);
     double** Jinvp = Jinv->get_metric()->pointer();
 
     timer_off("JK: (A|Q)^-1/2");
@@ -847,7 +854,7 @@ void DiskDFJK::initialize_JK_disk() {
 
     // Form the J symmetric inverse
     auto Jinv = std::make_shared<FittingMetric>(auxiliary_, true);
-    Jinv->form_eig_inverse();
+    Jinv->form_eig_inverse(condition_);
     double** Jinvp = Jinv->get_metric()->pointer();
 
     // Synch up
@@ -865,7 +872,7 @@ void DiskDFJK::initialize_JK_disk() {
     std::shared_ptr<BasisSet> zero = BasisSet::zero_ao_basis_set();
     std::shared_ptr<IntegralFactory> rifactory =
         std::make_shared<IntegralFactory>(auxiliary_, zero, primary_, primary_);
-    const double** buffer = new const double*[nthread];
+    const auto** buffer = new const double*[nthread];
     std::shared_ptr<TwoBodyAOInt>* eri = new std::shared_ptr<TwoBodyAOInt>[ nthread ];
     for (int Q = 0; Q < nthread; Q++) {
         eri[Q] = std::shared_ptr<TwoBodyAOInt>(rifactory->eri());
@@ -996,7 +1003,7 @@ void DiskDFJK::initialize_wK_core() {
     std::shared_ptr<BasisSet> zero = BasisSet::zero_ao_basis_set();
     std::shared_ptr<IntegralFactory> rifactory =
         std::make_shared<IntegralFactory>(auxiliary_, zero, primary_, primary_);
-    const double** buffer = new const double*[nthread];
+    const auto** buffer = new const double*[nthread];
     std::shared_ptr<TwoBodyAOInt>* eri = new std::shared_ptr<TwoBodyAOInt>[ nthread ];
     for (int Q = 0; Q < nthread; Q++) {
         eri[Q] = std::shared_ptr<TwoBodyAOInt>(rifactory->eri());
@@ -1053,7 +1060,7 @@ void DiskDFJK::initialize_wK_core() {
 
     // Fitting metric
     auto Jinv = std::make_shared<FittingMetric>(auxiliary_, true);
-    Jinv->form_full_eig_inverse();
+    Jinv->form_full_eig_inverse(condition_);
     double** Jinvp = Jinv->get_metric()->pointer();
 
     timer_off("JK: (A|Q)^-1");
@@ -1067,7 +1074,7 @@ void DiskDFJK::initialize_wK_core() {
 
     // => Right Integrals <= //
 
-    const double** buffer2 = new const double*[nthread];
+    const auto** buffer2 = new const double*[nthread];
     std::shared_ptr<TwoBodyAOInt>* eri2 = new std::shared_ptr<TwoBodyAOInt>[ nthread ];
     for (int Q = 0; Q < nthread; Q++) {
         eri2[Q] = std::shared_ptr<TwoBodyAOInt>(rifactory->erf_eri(omega_));
@@ -1342,7 +1349,7 @@ void DiskDFJK::initialize_wK_disk() {
 
     // Form the J full inverse
     auto Jinv = std::make_shared<FittingMetric>(auxiliary_, true);
-    Jinv->form_full_eig_inverse();
+    Jinv->form_full_eig_inverse(condition_);
     double** Jinvp = Jinv->get_metric()->pointer();
 
     // Synch up
@@ -1358,7 +1365,7 @@ void DiskDFJK::initialize_wK_disk() {
     std::shared_ptr<BasisSet> zero = BasisSet::zero_ao_basis_set();
     std::shared_ptr<IntegralFactory> rifactory =
         std::make_shared<IntegralFactory>(auxiliary_, zero, primary_, primary_);
-    const double** buffer = new const double*[nthread];
+    const auto** buffer = new const double*[nthread];
     std::shared_ptr<TwoBodyAOInt>* eri = new std::shared_ptr<TwoBodyAOInt>[ nthread ];
     for (int Q = 0; Q < nthread; Q++) {
         eri[Q] = std::shared_ptr<TwoBodyAOInt>(rifactory->eri());
@@ -1444,7 +1451,7 @@ void DiskDFJK::initialize_wK_disk() {
 
     // => Right Integrals <= //
 
-    const double** buffer2 = new const double*[nthread];
+    const auto** buffer2 = new const double*[nthread];
     std::shared_ptr<TwoBodyAOInt>* eri2 = new std::shared_ptr<TwoBodyAOInt>[ nthread ];
     for (int Q = 0; Q < nthread; Q++) {
         eri2[Q] = std::shared_ptr<TwoBodyAOInt>(rifactory->erf_eri(omega_));
@@ -1567,7 +1574,7 @@ void DiskDFJK::rebuild_wK_disk() {
     std::shared_ptr<BasisSet> zero = BasisSet::zero_ao_basis_set();
     std::shared_ptr<IntegralFactory> rifactory =
         std::make_shared<IntegralFactory>(auxiliary_, zero, primary_, primary_);
-    const double** buffer2 = new const double*[nthread];
+    const auto** buffer2 = new const double*[nthread];
     std::shared_ptr<TwoBodyAOInt>* eri2 = new std::shared_ptr<TwoBodyAOInt>[ nthread ];
     for (int Q = 0; Q < nthread; Q++) {
         eri2[Q] = std::shared_ptr<TwoBodyAOInt>(rifactory->erf_eri(omega_));

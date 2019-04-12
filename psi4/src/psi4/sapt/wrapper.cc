@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -35,8 +35,10 @@
 #include "psi4/libsapt_solver/sapt2p.h"
 #include "psi4/libsapt_solver/sapt2p3.h"
 
+#include "psi4/libciomr/libciomr.h"
 #include "psi4/liboptions/liboptions.h"
 #include "psi4/libpsi4util/PsiOutStream.h"
+#include "psi4/libpsio/psio.hpp"
 
 //#include <libsapt_solver/sapt_dft.h>
 
@@ -64,8 +66,8 @@ PsiReturnType sapt(SharedWavefunction Dimer, SharedWavefunction MonomerA, Shared
             SAPT0 sapt(Dimer, MonomerA, MonomerB, options, psio);
             sapt.compute_energy();
             // Copy back over the variables
-            for (const auto& kv : sapt.variables()) {
-                Dimer->set_variable(kv.first, kv.second);
+            for (const auto& kv : sapt.scalar_variables()) {
+                Dimer->set_scalar_variable(kv.first, kv.second);
             }
 
         } else {

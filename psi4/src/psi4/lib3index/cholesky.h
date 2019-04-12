@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -39,8 +39,7 @@ class TwoBodyAOInt;
 class BasisSet;
 
 class Cholesky {
-
-protected:
+   protected:
     /// Maximum Chebyshev error allowed in the decomposition
     double delta_;
     /// Maximum memory to use, in doubles
@@ -50,7 +49,7 @@ protected:
     /// Number of columns required, if choleskify() called
     size_t Q_;
 
-public:
+   public:
     /*!
      * Constructor, does not build decomposition.
      * \param delta maximum Chebyshev error allowed in the decomposition
@@ -76,84 +75,79 @@ public:
     virtual void compute_diagonal(double* target) = 0;
     /// Row row of the original square tensor, provided by the subclass
     virtual void compute_row(int row, double* target) = 0;
-
 };
 
 class CholeskyMatrix : public Cholesky {
-
-protected:
+   protected:
     SharedMatrix A_;
-public:
-    CholeskyMatrix(SharedMatrix A, double delta, size_t memory);
-    virtual ~CholeskyMatrix();
 
-    virtual size_t N();
-    virtual void compute_diagonal(double* target);
-    virtual void compute_row(int row, double* target);
+   public:
+    CholeskyMatrix(SharedMatrix A, double delta, size_t memory);
+    ~CholeskyMatrix() override;
+
+    size_t N() override;
+    void compute_diagonal(double* target) override;
+    void compute_row(int row, double* target) override;
 };
 
 class PSI_API CholeskyERI : public Cholesky {
-
-protected:
+   protected:
     double schwarz_;
     std::shared_ptr<BasisSet> basisset_;
     std::shared_ptr<TwoBodyAOInt> integral_;
-public:
-    CholeskyERI(std::shared_ptr<TwoBodyAOInt> integral, double schwarz, double delta, size_t memory);
-    virtual ~CholeskyERI();
 
-    virtual size_t N();
-    virtual void compute_diagonal(double* target);
-    virtual void compute_row(int row, double* target);
+   public:
+    CholeskyERI(std::shared_ptr<TwoBodyAOInt> integral, double schwarz, double delta, size_t memory);
+    ~CholeskyERI() override;
+
+    size_t N() override;
+    void compute_diagonal(double* target) override;
+    void compute_row(int row, double* target) override;
 };
 
 class CholeskyMP2 : public Cholesky {
-
-protected:
+   protected:
     bool symmetric_;
     SharedMatrix Qia_;
     std::shared_ptr<Vector> eps_aocc_;
     std::shared_ptr<Vector> eps_avir_;
-public:
-    CholeskyMP2(SharedMatrix Qia, std::shared_ptr<Vector> eps_aocc,
-        std::shared_ptr<Vector> eps_avir, bool symmetric,
-        double delta, size_t memory);
-    virtual ~CholeskyMP2();
 
-    virtual size_t N();
-    virtual void compute_diagonal(double* target);
-    virtual void compute_row(int row, double* target);
+   public:
+    CholeskyMP2(SharedMatrix Qia, std::shared_ptr<Vector> eps_aocc, std::shared_ptr<Vector> eps_avir, bool symmetric,
+                double delta, size_t memory);
+    ~CholeskyMP2() override;
+
+    size_t N() override;
+    void compute_diagonal(double* target) override;
+    void compute_row(int row, double* target) override;
 };
 
 class CholeskyDelta : public Cholesky {
-
-protected:
+   protected:
     std::shared_ptr<Vector> eps_aocc_;
     std::shared_ptr<Vector> eps_avir_;
-public:
-    CholeskyDelta(std::shared_ptr<Vector> eps_aocc,
-        std::shared_ptr<Vector> eps_avir,
-        double delta, size_t memory);
-    virtual ~CholeskyDelta();
 
-    virtual size_t N();
-    virtual void compute_diagonal(double* target);
-    virtual void compute_row(int row, double* target);
+   public:
+    CholeskyDelta(std::shared_ptr<Vector> eps_aocc, std::shared_ptr<Vector> eps_avir, double delta, size_t memory);
+    ~CholeskyDelta() override;
+
+    size_t N() override;
+    void compute_diagonal(double* target) override;
+    void compute_row(int row, double* target) override;
 };
 
 class CholeskyLocal : public Cholesky {
-
-protected:
+   protected:
     SharedMatrix C_;
-public:
-    CholeskyLocal(SharedMatrix C,
-        double delta, size_t memory);
-    virtual ~CholeskyLocal();
 
-    virtual size_t N();
-    virtual void compute_diagonal(double* target);
-    virtual void compute_row(int row, double* target);
+   public:
+    CholeskyLocal(SharedMatrix C, double delta, size_t memory);
+    ~CholeskyLocal() override;
+
+    size_t N() override;
+    void compute_diagonal(double* target) override;
+    void compute_row(int row, double* target) override;
 };
 
-} // Namespace psi
+}  // Namespace psi
 #endif

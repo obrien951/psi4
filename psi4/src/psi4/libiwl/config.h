@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -38,7 +38,6 @@ typedef double Value;
 #define IWL_KEY_ONEL "IWL One-electron matrix elements"
 
 #define IWL_INTS_PER_BUF 2980
-
 }
 
 #endif

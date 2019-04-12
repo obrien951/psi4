@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -33,10 +33,29 @@
 */
 
 namespace psi {
-	
+
+/*!
+** factorial(): Returns n!
+**
+** Parameters:
+**    \param n  = number to take factorial of
+**
+** Returns:
+**    n factorial, as a double word (since n! can get very large).
+** \ingroup QT
+*/
+double factorial(int n) {
+    if (n == 0 || n == 1) return (1.0);
+    if (n < 0)
+        return (0.0);
+    else {
+        return ((double)n * factorial(n - 1));
+    }
+}
+
 /*!
 ** combinations() : Calculates the number of ways to choose k objects
-**    from n objects, or "n choose k" 
+**    from n objects, or "n choose k"
 **
 ** Parameters:
 **   \param n   =  number of objects in total
@@ -48,41 +67,19 @@ namespace psi {
 **
 ** \ingroup QT
 */
-double combinations(int n, int k)
-{
-   double factorial(int) ;
-   double comb ;
+double combinations(int n, int k) {
+    double comb;
 
-   if (n == k) return (1.0) ;
-   else if (k > n) return(0.0) ;
-   else if (k == 0) return(1.0) ; 
-   comb = factorial(n) / (factorial(k) * factorial(n-k)) ;
- 
-   return(comb) ;
+    if (n == k)
+        return (1.0);
+    else if (k > n)
+        return (0.0);
+    else if (k == 0)
+        return (1.0);
+    comb = factorial(n) / (factorial(k) * factorial(n - k));
+
+    return (comb);
 }
-
-
-/*!
-** factorial(): Returns n!
-** 
-** Parameters:
-**    \param n  = number to take factorial of
-**
-** Returns:
-**    n factorial, as a double word (since n! can get very large).
-** \ingroup QT
-*/
-double factorial(int n)
-{
-
-   if (n == 0 || n == 1) return(1.0);
-   if (n < 0) return(0.0) ;
-   else {
-      return ((double) n * factorial(n-1)) ;
-      }
-}
-
-
 
 /*
 ** test combinations routines
@@ -104,4 +101,4 @@ main()
 **
 */
 
-}
+}  // namespace psi

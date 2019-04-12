@@ -3,7 +3,7 @@
 #
 # Psi4: an open-source quantum chemistry software package
 #
-# Copyright (c) 2007-2018 The Psi4 Developers.
+# Copyright (c) 2007-2019 The Psi4 Developers.
 #
 # The copyrights for code used from other parties are included in
 # the corresponding files.
@@ -31,22 +31,15 @@ module calls that access the C++ side of Psi4.
 
 """
 
-## Force Python 3 print syntax, if this is python 2.X
-#if sys.hexversion < 0x03000000:
-from __future__ import print_function
-from __future__ import absolute_import
 import re
 import os
 import sys
 import uuid
 
 from psi4 import core
-from psi4.driver.qcdb.molparse import pubchem
 from psi4.driver.p4util.util import set_memory
 from psi4.driver.p4util.exceptions import *
 
-# globally available regex strings
-pubchemre = re.compile(r'^(\s*pubchem\s*:\s*(.*)\n)$', re.MULTILINE | re.IGNORECASE)
 
 # inputfile contents to be preserved from the processor
 literals = {}
@@ -190,65 +183,18 @@ def process_from_file_command(matchobj):
     return mol
 
 
-def process_pubchem_command(matchobj):
-    """Function to process match of ``pubchem`` in molecule block."""
-    string = matchobj.group(2)
-    if re.match(r'^\s*[0-9]+\s*$', string):
-        # This is just a number - must be a CID
-        pcobj = pubchem.PubChemObj(int(string), '', '')
-        try:
-            return pcobj.getMoleculeString()
-        except Exception as e:
-            return e.message
-    else:
-        # Search pubchem for the provided string
-        try:
-            results = pubchem.getPubChemResults(string)
-        except Exception as e:
-            return e.message
-
-        # N.B. Anything starting with PubchemError will be handled correctly by the molecule parser
-        # in libmints, which will just print the rest of the string and exit gracefully.
-        if not results:
-            # Nothing!
-            return "PubchemError\n\tNo results were found when searching PubChem for %s.\n" % (string)
-        elif len(results) == 1:
-            # There's only 1 result - use it
-            return results[0].getMoleculeString()
-        else:
-            # There are multiple results. Print and exit
-            msg = "\tPubchemError\n"
-            msg += "\tMultiple pubchem results were found. Replace\n\n\t\tpubchem:%s\n\n" % (string)
-            msg += "\twith the Chemical ID number or exact name from one of the following and re-run.\n\n"
-            msg += "\t Chemical ID     IUPAC Name\n\n"
-            for result in results:
-                msg += "%s" % (result)
-                if result.name().lower() == string.lower():
-                    #We've found an exact match!
-                    return result.getMoleculeString()
-            return msg
-
-
 def process_molecule_command(matchobj):
     """Function to process match of ``molecule name? { ... }``."""
     spaces = matchobj.group(1)
     name = matchobj.group(2)
     geometry = matchobj.group(3)
-    geometry = pubchemre.sub(process_pubchem_command, geometry)
     from_filere = re.compile(r'^(\s*from_file\s*:\s*(.*)\n)$', re.MULTILINE | re.IGNORECASE)
     geometry = from_filere.sub(process_from_file_command, geometry)
     molecule = spaces
 
     if name != "":
-        if sys.version_info >= (3, 0):
-            if not name.isidentifier():
-                raise ValidationError('Molecule name not valid Python identifier: ' + name)
-        else:
-            if not re.match(r'^[^\d\W]\w*\Z', name):
-                raise ValidationError('Molecule name not valid Python identifier: ' + name)
-
-    molecule += 'core.efp_init()\n'  # clear EFP object before Molecule read in
-    molecule += spaces
+        if not name.isidentifier():
+            raise ValidationError('Molecule name not valid Python identifier: ' + name)
 
     if name != "":
         molecule += '%s = ' % (name)
@@ -402,7 +348,7 @@ def process_pcm_command(matchobj):
     write_input_for_pcm = "parsedFile = os.path.join(os.getcwd(), '{}')\n".format(pcmsolver_parsed_fname)
     write_input_for_pcm += "with open(parsedFile, 'w') as tmp:\n"
     write_input_for_pcm += "    tmp.write('\\n'.join({}))\n\n".format(parsed_pcm)
-    write_input_for_pcm += "core.set_global_option(\'PCMSOLVER_PARSED_FNAME\', \'{}\')\n\n".format(
+    write_input_for_pcm += "core.set_local_option(\'PCM\', \'PCMSOLVER_PARSED_FNAME\', \'{}\')\n\n".format(
         pcmsolver_parsed_fname)
     return write_input_for_pcm
 
@@ -780,7 +726,6 @@ def process_input(raw_input, print_level=1):
     imports += 'from psi4.driver.driver_cbs import *\n'
     imports += 'from psi4.driver.wrapper_database import database, db, DB_RGT, DB_RXN\n'
     imports += 'from psi4.driver.wrapper_autofrag import auto_fragments\n'
-    imports += 'from psi4.driver.constants.physconst import *\n'
     imports += 'psi4_io = core.IOManager.shared_object()\n'
 
     # psirc (a baby PSIthon script that might live in ~/.psi4rc)
@@ -794,7 +739,7 @@ def process_input(raw_input, print_level=1):
         psirc = ''
 
     blank_mol = 'geometry("""\n'
-    blank_mol += '0 1\nH\nH 1 0.74\n'
+    blank_mol += '0 1\nH 0 0 0\nH 0.74 0 0\n'
     blank_mol += '""","blank_molecule_psi4_yo")\n'
 
     temp = imports + psirc + blank_mol + temp
@@ -804,8 +749,8 @@ def process_input(raw_input, print_level=1):
         temp = temp.replace("psi4." + func, "psi4.core." + func)
 
     # Move pseudonamespace for physconst into proper namespace
-    from psi4.driver.p4util import constants
-    for pc in dir(constants.physconst):
+    from psi4.driver import constants
+    for pc in dir(constants):
         if not pc.startswith('__'):
             temp = temp.replace('psi_' + pc, 'psi4.constants.' + pc)
 

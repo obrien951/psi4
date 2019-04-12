@@ -3,7 +3,7 @@
 #
 # Psi4: an open-source quantum chemistry software package
 #
-# Copyright (c) 2007-2018 The Psi4 Developers.
+# Copyright (c) 2007-2019 The Psi4 Developers.
 #
 # The copyrights for code used from other parties are included in
 # the corresponding files.
@@ -31,7 +31,7 @@ import sys
 import numpy as np
 
 from psi4 import core
-from .exceptions import *
+from .exceptions import ValidationError
 
 ### Matrix and Vector properties
 
@@ -299,6 +299,7 @@ def _to_array(matrix, copy=True, dense=False):
     else:
         return _get_raw_views(matrix, copy=copy)[0]
 
+
 @property
 def _np_shape(self):
     """
@@ -377,11 +378,7 @@ def _np_read(self, filename, prefix=""):
 
     if isinstance(filename, np.lib.npyio.NpzFile):
         data = filename
-    elif (sys.version_info[0] == 2) and isinstance(filename, (str, unicode)):
-        if not filename.endswith('.npz'):
-            filename = filename + '.npz'
-        data = np.load(filename)
-    elif (sys.version_info[0] > 2) and isinstance(filename, str):
+    elif isinstance(filename, str):
         if not filename.endswith('.npz'):
             filename = filename + '.npz'
 
@@ -451,7 +448,7 @@ def _from_serial(self, json_data):
         raise ValidationError("_from_json did not recognize type option of %s." % str(json_data["type"]))
 
     for n in range(len(ret.nph)):
-        ret.nph[n].flat[:] = np.fromstring(json_data["data"][n], dtype=np.double)
+        ret.nph[n].flat[:] = np.frombuffer(json_data["data"][n], dtype=np.double)
 
     return ret
 
@@ -478,9 +475,17 @@ def _chain_dot(*args, **kwargs):
 
     # Run through
     for n, mat in enumerate(args[1:]):
-        ret = core.Matrix.doublet(ret, mat, False, trans[n + 1])
+        ret = core.doublet(ret, mat, False, trans[n + 1])
 
     return ret
+
+
+def _irrep_access(self, *args, **kwargs):
+    """
+    Warns user when iterating/accessing an irreped object.
+    """
+    raise ValidationError("Attempted to access by index/iteration a Psi4 data object that supports multiple"
+                          "irreps. Please use .np or .nph explicitly.")
 
 
 # Matrix attributes
@@ -496,6 +501,8 @@ core.Matrix.np_read = classmethod(_np_read)
 core.Matrix.to_serial = _to_serial
 core.Matrix.from_serial = classmethod(_from_serial)
 core.Matrix.chain_dot = _chain_dot
+core.Matrix.__iter__ = _irrep_access
+core.Matrix.__getitem__ = _irrep_access
 
 # Vector attributes
 core.Vector.from_array = classmethod(array_to_matrix)
@@ -509,6 +516,8 @@ core.Vector.np_write = _np_write
 core.Vector.np_read = classmethod(_np_read)
 core.Vector.to_serial = _to_serial
 core.Vector.from_serial = classmethod(_from_serial)
+core.Vector.__iter__ = _irrep_access
+core.Vector.__getitem__ = _irrep_access
 
 ### CIVector properties
 
@@ -578,3 +587,34 @@ def _dimension_iter(dim):
 core.Dimension.from_list = _dimension_from_list
 core.Dimension.to_tuple = _dimension_to_tuple
 core.Dimension.__iter__ = _dimension_iter
+
+
+# General functions for NumPy array manipulation
+def block_diagonal_array(*args):
+    """
+    Convert square NumPy array to a single block diagonal array.
+    Mimic of SciPy's block_diag.
+    """
+
+    # Validate the input matrices.
+    dim = 0
+    for matrix in args:
+        try:
+            shape = matrix.shape
+            dim += shape[0]
+        except (AttributeError, TypeError):
+            raise ValidationError("Cannot construct block diagonal from non-arrays.")
+        if len(shape) != 2:
+            raise ValidationError("Cannot construct block diagonal from non-2D arrays.")
+        if shape[0] != shape[1]:
+            raise ValidationError("Cannot construct block diagonal from non-square arrays.")
+
+    # If this is too slow, try a sparse matrix?
+    block_diag = np.zeros((dim, dim))
+    start = 0
+    for matrix in args:
+        next_block = slice(start, start + matrix.shape[0])
+        block_diag[next_block, next_block] = matrix
+        start += matrix.shape[0]
+
+    return block_diag

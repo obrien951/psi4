@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -28,27 +28,26 @@
 
 #include "sapt0.h"
 #include "sapt2.h"
+#include "psi4/libpsi4util/PsiOutStream.h"
+#include "psi4/libqt/qt.h"
 
-namespace psi { namespace sapt {
+namespace psi {
+namespace sapt {
 
-void SAPT0::elst10()
-{
-  e_elst10_ = 4.0*C_DDOT(ndf_+3,diagAA_,1,diagBB_,1);
-  
-  if (print_) {
-    outfile->Printf("    Elst10,r            = %18.12lf [Eh]\n",e_elst10_);
-    
-  }
+void SAPT0::elst10() {
+    e_elst10_ = 4.0 * C_DDOT(ndf_ + 3, diagAA_, 1, diagBB_, 1);
+
+    if (print_) {
+        outfile->Printf("    Elst10,r            = %18.12lf [Eh]\n", e_elst10_);
+    }
 }
 
-void SAPT2::elst10()
-{
-  e_elst10_ = 4.0*C_DDOT(ndf_+3,diagAA_,1,diagBB_,1);
-  
-  if (print_) {
-    outfile->Printf("    Elst10,r            = %18.12lf [Eh]\n",e_elst10_);
-    
-  }
-}
+void SAPT2::elst10() {
+    e_elst10_ = 4.0 * C_DDOT(ndf_ + 3, diagAA_, 1, diagBB_, 1);
 
-}}
+    if (print_) {
+        outfile->Printf("    Elst10,r            = %18.12lf [Eh]\n", e_elst10_);
+    }
+}
+}  // namespace sapt
+}  // namespace psi

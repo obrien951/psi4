@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -43,6 +43,9 @@ struct MinimalInterface {
 #ifdef ENABLE_GTFOCK
 namespace psi {
 GTFockJK::GTFockJK(std::shared_ptr<psi::BasisSet> Primary) : JK(Primary), Impl_(new MinimalInterface()) {}
+size_t GTFockJK::estimate_memory() {
+    return 0; // Effectively
+}
 void GTFockJK::compute_JK() {
     NMats_ = C_left_.size();
     Impl_->create_pfock(NMats_, lr_symmetric_);

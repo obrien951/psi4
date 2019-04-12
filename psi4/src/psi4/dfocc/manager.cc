@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -64,7 +64,7 @@ void DFOCC::omp2_manager() {
     if (reference_ == "RESTRICTED") {
         // mem for amplitudes
         cost_ampAA = 0.0;
-        cost_ampAA = nocc2AA * nvir2AA;
+        cost_ampAA = naocc2AA * nvir2AA;
         cost_ampAA /= 1024.0 * 1024.0;
         cost_ampAA *= sizeof(double);
         cost_amp = 3.0 * cost_ampAA;
@@ -124,13 +124,13 @@ void DFOCC::omp2_manager() {
     else if (reference_ == "UNRESTRICTED") {
         // memory requirements
         cost_ampAA = 0.0;
-        cost_ampAA = nocc2AA * nvir2AA;
+        cost_ampAA = naocc2AA * nvir2AA;
         cost_ampAA /= 1024.0 * 1024.0;
         cost_ampAA *= sizeof(double);
-        cost_ampBB = nocc2BB * nvir2BB;
+        cost_ampBB = naocc2BB * nvir2BB;
         cost_ampBB /= 1024.0 * 1024.0;
         cost_ampBB *= sizeof(double);
-        cost_ampAB = nocc2AB * nvir2AB;
+        cost_ampAB = naocc2AB * nvir2AB;
         cost_ampAB /= 1024.0 * 1024.0;
         cost_ampAB *= sizeof(double);
         cost_amp = MAX0(cost_ampAA, cost_ampBB);
@@ -179,21 +179,21 @@ void DFOCC::omp2_manager() {
     outfile->Printf("\tDF-MP2 Total Energy (a.u.)         : %20.14f\n", Emp2);
     outfile->Printf("\t======================================================================= \n");
 
-    Process::environment.globals["CURRENT ENERGY"] = Emp2;
-    Process::environment.globals["MP2 TOTAL ENERGY"] = Emp2;
+    variables_["CURRENT ENERGY"] = Emp2;
+    variables_["MP2 TOTAL ENERGY"] = Emp2;
     Process::environment.globals["SCS-MP2 TOTAL ENERGY"] = Escsmp2;
     Process::environment.globals["SOS-MP2 TOTAL ENERGY"] = Esosmp2;
     Process::environment.globals["SCSN-MP2 TOTAL ENERGY"] = Escsnmp2;
 
-    Process::environment.globals["CURRENT REFERENCE ENERGY"] = Escf;
-    Process::environment.globals["CURRENT CORRELATION ENERGY"] = Emp2 - Escf;
-    Process::environment.globals["MP2 CORRELATION ENERGY"] = Emp2 - Escf;
+    variables_["CURRENT REFERENCE ENERGY"] = Escf;
+    variables_["CURRENT CORRELATION ENERGY"] = Emp2 - Escf;
+    variables_["MP2 CORRELATION ENERGY"] = Emp2 - Escf;
     Process::environment.globals["SCS-MP2 CORRELATION ENERGY"] = Escsmp2 - Escf;
     Process::environment.globals["SOS-MP2 CORRELATION ENERGY"] = Esosmp2 - Escf;
     Process::environment.globals["SCSN-MP2 CORRELATION ENERGY"] = Escsnmp2 - Escf;
 
-    Process::environment.globals["MP2 OPPOSITE-SPIN CORRELATION ENERGY"] = Emp2AB;
-    Process::environment.globals["MP2 SAME-SPIN CORRELATION ENERGY"] = Emp2AA + Emp2BB;
+    variables_["MP2 OPPOSITE-SPIN CORRELATION ENERGY"] = Emp2AB;
+    variables_["MP2 SAME-SPIN CORRELATION ENERGY"] = Emp2AA + Emp2BB;
 
     // S2
     if (comput_s2_ == "TRUE" && reference_ == "UNRESTRICTED") s2_response();
@@ -292,9 +292,10 @@ void DFOCC::omp2_manager() {
         Process::environment.globals["SCS-OMP2 TOTAL ENERGY"] = Escsmp2;
         Process::environment.globals["SOS-OMP2 TOTAL ENERGY"] = Esosmp2;
         Process::environment.globals["SCSN-OMP2 TOTAL ENERGY"] = Escsnmp2;
-        Process::environment.globals["CURRENT ENERGY"] = Emp2L;
-        Process::environment.globals["CURRENT REFERENCE ENERGY"] = Escf;
-        Process::environment.globals["CURRENT CORRELATION ENERGY"] = Emp2L - Escf;
+        energy_ = Emp2L;
+        variables_["CURRENT ENERGY"] = Emp2L;
+        variables_["CURRENT REFERENCE ENERGY"] = Escf;
+        variables_["CURRENT CORRELATION ENERGY"] = Emp2L - Escf;
 
         Process::environment.globals["OMP2 CORRELATION ENERGY"] = Emp2L - Escf;
         Process::environment.globals["SCS-OMP2 CORRELATION ENERGY"] = Escsmp2 - Escf;
@@ -304,21 +305,24 @@ void DFOCC::omp2_manager() {
         // if scs on
         if (do_scs == "TRUE") {
             if (scs_type_ == "SCS") {
-                Process::environment.globals["CURRENT ENERGY"] = Escsmp2;
-                Process::environment.globals["CURRENT CORRELATION ENERGY"] = Escsmp2 - Escf;
+                energy_ = Escsmp2;
+                variables_["CURRENT ENERGY"] = Escsmp2;
+                variables_["CURRENT CORRELATION ENERGY"] = Escsmp2 - Escf;
             }
 
             else if (scs_type_ == "SCSN") {
-                Process::environment.globals["CURRENT ENERGY"] = Escsnmp2;
-                Process::environment.globals["CURRENT CORRELATION ENERGY"] = Escsnmp2 - Escf;
+                energy_ = Escsnmp2;
+                variables_["CURRENT ENERGY"] = Escsnmp2;
+                variables_["CURRENT CORRELATION ENERGY"] = Escsnmp2 - Escf;
             }
         }
 
         // else if sos on
         else if (do_sos == "TRUE") {
             if (sos_type_ == "SOS") {
-                Process::environment.globals["CURRENT ENERGY"] = Esosmp2;
-                Process::environment.globals["CURRENT CORRELATION ENERGY"] = Esosmp2 - Escf;
+                energy_ = Esosmp2;
+                variables_["CURRENT ENERGY"] = Esosmp2;
+                variables_["CURRENT CORRELATION ENERGY"] = Esosmp2 - Escf;
             }
         }
 
@@ -377,7 +381,7 @@ void DFOCC::mp2_manager() {
     if (reference_ == "RESTRICTED") {
         // mem for amplitudes
         cost_ampAA = 0.0;
-        cost_ampAA = nocc2AA * nvir2AA;
+        cost_ampAA = naocc2AA * nvir2AA;
         cost_ampAA /= 1024.0 * 1024.0;
         cost_ampAA *= sizeof(double);
         cost_amp = 3.0 * cost_ampAA;
@@ -439,13 +443,13 @@ void DFOCC::mp2_manager() {
     else if (reference_ == "UNRESTRICTED") {
         // memory requirements
         cost_ampAA = 0.0;
-        cost_ampAA = nocc2AA * nvir2AA;
+        cost_ampAA = naocc2AA * nvir2AA;
         cost_ampAA /= 1024.0 * 1024.0;
         cost_ampAA *= sizeof(double);
-        cost_ampBB = nocc2BB * nvir2BB;
+        cost_ampBB = naocc2BB * nvir2BB;
         cost_ampBB /= 1024.0 * 1024.0;
         cost_ampBB *= sizeof(double);
-        cost_ampAB = nocc2AB * nvir2AB;
+        cost_ampAB = naocc2AB * nvir2AB;
         cost_ampAB /= 1024.0 * 1024.0;
         cost_ampAB *= sizeof(double);
         cost_amp = MAX0(cost_ampAA, cost_ampBB);
@@ -501,24 +505,24 @@ void DFOCC::mp2_manager() {
     outfile->Printf("\tDF-MP2 Total Energy (a.u.)         : %20.14f\n", Emp2);
     outfile->Printf("\t======================================================================= \n");
 
-    Process::environment.globals["CURRENT ENERGY"] = Emp2;
-    Process::environment.globals["MP2 TOTAL ENERGY"] = Emp2;
+    variables_["CURRENT ENERGY"] = Emp2;
+    variables_["MP2 TOTAL ENERGY"] = Emp2;
     Process::environment.globals["SCS-MP2 TOTAL ENERGY"] = Escsmp2;
     Process::environment.globals["SOS-MP2 TOTAL ENERGY"] = Esosmp2;
     Process::environment.globals["SCSN-MP2 TOTAL ENERGY"] = Escsnmp2;
 
-    Process::environment.globals["CURRENT REFERENCE ENERGY"] = Escf;
-    Process::environment.globals["CURRENT CORRELATION ENERGY"] = Emp2 - Escf;
-    Process::environment.globals["MP2 CORRELATION ENERGY"] = Emp2 - Escf;
+    variables_["CURRENT REFERENCE ENERGY"] = Escf;
+    variables_["CURRENT CORRELATION ENERGY"] = Emp2 - Escf;
+    variables_["MP2 CORRELATION ENERGY"] = Emp2 - Escf;
     Process::environment.globals["SCS-MP2 CORRELATION ENERGY"] = Escsmp2 - Escf;
     Process::environment.globals["SOS-MP2 CORRELATION ENERGY"] = Esosmp2 - Escf;
     Process::environment.globals["SCSN-MP2 CORRELATION ENERGY"] = Escsnmp2 - Escf;
 
-    Process::environment.globals["MP2 OPPOSITE-SPIN CORRELATION ENERGY"] = Emp2AB;
-    Process::environment.globals["MP2 SAME-SPIN CORRELATION ENERGY"] = Emp2AA + Emp2BB;
+    variables_["MP2 OPPOSITE-SPIN CORRELATION ENERGY"] = Emp2AB;
+    variables_["MP2 SAME-SPIN CORRELATION ENERGY"] = Emp2AA + Emp2BB;
 
     /* updates the wavefunction for checkpointing */
-    energy_ = Process::environment.globals["MP2 TOTAL ENERGY"];
+    energy_ = Emp2;
     name_ = "DF-MP2";
 
     // S2
@@ -601,7 +605,7 @@ void DFOCC::ccsd_manager() {
 
         // Mem for amplitudes
         cost_ampAA = 0.0;
-        cost_ampAA = nocc2AA * nvir2AA;
+        cost_ampAA = naocc2AA * nvir2AA;
         cost_ampAA /= 1024.0 * 1024.0;
         cost_ampAA *= sizeof(double);
         cost_3amp = 3.0 * cost_ampAA;
@@ -714,13 +718,13 @@ void DFOCC::ccsd_manager() {
 
         // memory requirements
         cost_ampAA = 0.0;
-        cost_ampAA = nocc2AA * nvir2AA;
+        cost_ampAA = naocc2AA * nvir2AA;
         cost_ampAA /= 1024.0 * 1024.0;
         cost_ampAA *= sizeof(double);
-        cost_ampBB = nocc2BB * nvir2BB;
+        cost_ampBB = naocc2BB * nvir2BB;
         cost_ampBB /= 1024.0 * 1024.0;
         cost_ampBB *= sizeof(double);
-        cost_ampAB = nocc2AB * nvir2AB;
+        cost_ampAB = naocc2AB * nvir2AB;
         cost_ampAB /= 1024.0 * 1024.0;
         cost_ampAB *= sizeof(double);
         cost_amp = MAX0(cost_ampAA, cost_ampBB);
@@ -921,7 +925,7 @@ void DFOCC::ccsd_t_manager() {
 
         // Mem for amplitudes
         cost_ampAA = 0.0;
-        cost_ampAA = nocc2AA * nvir2AA;
+        cost_ampAA = naocc2AA * nvir2AA;
         cost_ampAA /= 1024.0 * 1024.0;
         cost_ampAA *= sizeof(double);
         cost_3amp = 3.0 * cost_ampAA;
@@ -1064,13 +1068,13 @@ void DFOCC::ccsd_t_manager() {
 
         // memory requirements
         cost_ampAA = 0.0;
-        cost_ampAA = nocc2AA * nvir2AA;
+        cost_ampAA = naocc2AA * nvir2AA;
         cost_ampAA /= 1024.0 * 1024.0;
         cost_ampAA *= sizeof(double);
-        cost_ampBB = nocc2BB * nvir2BB;
+        cost_ampBB = naocc2BB * nvir2BB;
         cost_ampBB /= 1024.0 * 1024.0;
         cost_ampBB *= sizeof(double);
-        cost_ampAB = nocc2AB * nvir2AB;
+        cost_ampAB = naocc2AB * nvir2AB;
         cost_ampAB /= 1024.0 * 1024.0;
         cost_ampAB *= sizeof(double);
         cost_amp = MAX0(cost_ampAA, cost_ampBB);
@@ -1303,7 +1307,7 @@ void DFOCC::ccsdl_t_manager() {
 
         // Mem for amplitudes
         cost_ampAA = 0.0;
-        cost_ampAA = nocc2AA * nvir2AA;
+        cost_ampAA = naocc2AA * nvir2AA;
         cost_ampAA /= 1024.0 * 1024.0;
         cost_ampAA *= sizeof(double);
         cost_3amp = 3.0 * cost_ampAA;
@@ -1463,13 +1467,13 @@ void DFOCC::ccsdl_t_manager() {
 
         // memory requirements
         cost_ampAA = 0.0;
-        cost_ampAA = nocc2AA * nvir2AA;
+        cost_ampAA = naocc2AA * nvir2AA;
         cost_ampAA /= 1024.0 * 1024.0;
         cost_ampAA *= sizeof(double);
-        cost_ampBB = nocc2BB * nvir2BB;
+        cost_ampBB = naocc2BB * nvir2BB;
         cost_ampBB /= 1024.0 * 1024.0;
         cost_ampBB *= sizeof(double);
-        cost_ampAB = nocc2AB * nvir2AB;
+        cost_ampAB = naocc2AB * nvir2AB;
         cost_ampAB /= 1024.0 * 1024.0;
         cost_ampAB *= sizeof(double);
         cost_amp = MAX0(cost_ampAA, cost_ampBB);
@@ -1668,7 +1672,7 @@ void DFOCC::ccd_manager() {
 
         // Mem for amplitudes
         cost_ampAA = 0.0;
-        cost_ampAA = nocc2AA * nvir2AA;
+        cost_ampAA = naocc2AA * nvir2AA;
         cost_ampAA /= 1024.0 * 1024.0;
         cost_ampAA *= sizeof(double);
         cost_3amp = 3.0 * cost_ampAA;
@@ -1758,13 +1762,13 @@ void DFOCC::ccd_manager() {
     else if (reference_ == "UNRESTRICTED") {
         // memory requirements
         cost_ampAA = 0.0;
-        cost_ampAA = nocc2AA * nvir2AA;
+        cost_ampAA = naocc2AA * nvir2AA;
         cost_ampAA /= 1024.0 * 1024.0;
         cost_ampAA *= sizeof(double);
-        cost_ampBB = nocc2BB * nvir2BB;
+        cost_ampBB = naocc2BB * nvir2BB;
         cost_ampBB /= 1024.0 * 1024.0;
         cost_ampBB *= sizeof(double);
-        cost_ampAB = nocc2AB * nvir2AB;
+        cost_ampAB = naocc2AB * nvir2AB;
         cost_ampAB /= 1024.0 * 1024.0;
         cost_ampAB *= sizeof(double);
         cost_amp = MAX0(cost_ampAA, cost_ampBB);
@@ -1958,7 +1962,7 @@ void DFOCC::omp3_manager() {
 
     // Mem for amplitudes
     cost_ampAA = 0.0;
-    cost_ampAA = nocc2AA * nvir2AA;
+    cost_ampAA = naocc2AA * nvir2AA;
     cost_ampAA /= 1024.0 * 1024.0;
     cost_ampAA *= sizeof(double);
     cost_3amp = 3.0 * cost_ampAA;
@@ -2257,7 +2261,7 @@ void DFOCC::mp3_manager() {
 
     // Mem for amplitudes
     cost_ampAA = 0.0;
-    cost_ampAA = nocc2AA * nvir2AA;
+    cost_ampAA = naocc2AA * nvir2AA;
     cost_ampAA /= 1024.0 * 1024.0;
     cost_ampAA *= sizeof(double);
     cost_3amp = 3.0 * cost_ampAA;
@@ -2493,7 +2497,7 @@ void DFOCC::omp2_5_manager() {
 
     // Mem for amplitudes
     cost_ampAA = 0.0;
-    cost_ampAA = nocc2AA * nvir2AA;
+    cost_ampAA = naocc2AA * nvir2AA;
     cost_ampAA /= 1024.0 * 1024.0;
     cost_ampAA *= sizeof(double);
     cost_3amp = 3.0 * cost_ampAA;
@@ -2790,7 +2794,7 @@ void DFOCC::mp2_5_manager() {
 
     // Mem for amplitudes
     cost_ampAA = 0.0;
-    cost_ampAA = nocc2AA * nvir2AA;
+    cost_ampAA = naocc2AA * nvir2AA;
     cost_ampAA /= 1024.0 * 1024.0;
     cost_ampAA *= sizeof(double);
     cost_3amp = 3.0 * cost_ampAA;
@@ -3007,7 +3011,7 @@ void DFOCC::olccd_manager() {
 
     // Mem for amplitudes
     cost_ampAA = 0.0;
-    cost_ampAA = nocc2AA * nvir2AA;
+    cost_ampAA = naocc2AA * nvir2AA;
     cost_ampAA /= 1024.0 * 1024.0;
     cost_ampAA *= sizeof(double);
     cost_3amp = 3.0 * cost_ampAA;
@@ -3276,7 +3280,7 @@ void DFOCC::lccd_manager() {
 
     // Mem for amplitudes
     cost_ampAA = 0.0;
-    cost_ampAA = nocc2AA * nvir2AA;
+    cost_ampAA = naocc2AA * nvir2AA;
     cost_ampAA /= 1024.0 * 1024.0;
     cost_ampAA *= sizeof(double);
     cost_3amp = 3.0 * cost_ampAA;

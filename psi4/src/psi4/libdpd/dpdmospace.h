@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -26,7 +26,6 @@
  * @END LICENSE
  */
 
-
 #ifndef DPD_MOSPACE_H
 #define DPD_MOSPACE_H
 
@@ -39,7 +38,7 @@ namespace psi {
 std::vector<std::string> dpd_split(const std::string &indices);
 
 class DPDMOSpace {
-  protected:
+   protected:
     // name of the space
     char label_;
     // list of allowed orbital-index labels
@@ -53,7 +52,7 @@ class DPDMOSpace {
     // irrep of each orbital
     std::vector<int> orbSym_;
 
-  public:
+   public:
     DPDMOSpace(const char label, const std::string &indices, std::vector<int> orbspi);
     DPDMOSpace(const char label, const std::string &indices, Dimension orbspi);
     DPDMOSpace();
@@ -75,6 +74,6 @@ class DPDMOSpace {
     std::vector<std::string> overlap(DPDMOSpace &rhs);
 };
 
-} // namespace psi
+}  // namespace psi
 
-#endif // DPD_MOSPACE_H
+#endif  // DPD_MOSPACE_H

@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -26,15 +26,15 @@
  * @END LICENSE
  */
 
-#include "psi4/libqt/qt.h"
-#include "defines.h"
-#include "dfocc.h"
-
+#include <ctime>
 #ifdef _OPENMP
 #include <omp.h>
 #endif
 
-using namespace psi;
+#include "psi4/libqt/qt.h"
+
+#include "defines.h"
+#include "dfocc.h"
 
 namespace psi {
 namespace dfoccwave {
@@ -1647,7 +1647,6 @@ void DFOCC::ccsd_canonic_triples_grad2() {
     SharedTensor2d V, J1, J2, J3, Jt, tL1, tL2, P2, P3, L2, L2c;
     SharedTensor2d Mijam, Mijab, Miabd;
     SharedTensor1d P1;
-    long int Nijk;
 
     long int nthreads = 1;
 #ifdef _OPENMP
@@ -1655,8 +1654,8 @@ void DFOCC::ccsd_canonic_triples_grad2() {
 #endif
     outfile->Printf("\tnthreads: %i \n", nthreads);
 
-    // Find number of unique ijk combinations (i>=j>=k)
-    Nijk = naoccA * (naoccA + 1) * (naoccA + 2) / 6;
+    // This implementation requires the full set of ijk pairs
+    long int Nijk = naoccA * naoccA * naoccA;
     outfile->Printf("\tNumber of ijk combinations: %i \n", Nijk);
 
     // Memory: 2*O^2V^2 + 4*V^3 + O^3V + V^2N + V^3/2
@@ -1735,6 +1734,12 @@ void DFOCC::ccsd_canonic_triples_grad2() {
     Mijam = SharedTensor2d(new Tensor2d("M <IJ|AM>", naoccA, naoccA, navirA, naoccA));
     Mijab = SharedTensor2d(new Tensor2d("M <IJ|AB>", naoccA, naoccA, navirA, navirA));
     Miabd = SharedTensor2d(new Tensor2d("M[I] <AB|D>", navirA * navirA, navirA));
+
+    // progress counter
+    std::time_t stop, start = std::time(nullptr);
+    long int ind = 0;
+    double step_print = 10.0;
+    double next_print = step_print;
 
     // main loop
     E_t = 0.0;
@@ -2097,6 +2102,16 @@ void DFOCC::ccsd_canonic_triples_grad2() {
                 }
                 Miabd->contract(false, true, navirA * navirA, navirA, navirA, V, T, 0,
                                 (j * naoccA * navirA * navirA) + (k * navirA * navirA), 1.0, 1.0);
+
+                // progress counter
+                ind += 1;
+                double percent = static_cast<double>(ind) / static_cast<double>(Nijk) * 100.0;
+                if (percent >= next_print) {
+                    stop = std::time(nullptr);
+                    next_print += step_print;
+                    outfile->Printf("              %5.1lf  %8d s\n", percent,
+                                    static_cast<int>(stop) - static_cast<int>(start));
+                }
 
             }  // k
         }      // j

@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -33,24 +33,25 @@
 
 #include "scf.h"
 
-namespace psi{ namespace mcscf{
+namespace psi {
+namespace mcscf {
 
-void SCF::initial_guess()
-{
-  using namespace psi;
+void SCF::initial_guess() {
+    using namespace psi;
 
-  SBlockMatrix H_t("H_t",nirreps,sopi,sopi);
-  SBlockVector eigenvectors("H_t",nirreps,sopi);
+    SBlockMatrix H_t("H_t", nirreps, sopi, sopi);
+    SBlockVector eigenvectors("H_t", nirreps, sopi);
 
-  transform(H,H_t,S_sqrt_inv);
+    transform(H, H_t, S_sqrt_inv);
 
-  H_t.diagonalize(C_t,eigenvectors);
+    H_t.diagonalize(C_t, eigenvectors);
 
-  C.multiply(false,false,S_sqrt_inv,C_t);
+    C.multiply(false, false, S_sqrt_inv, C_t);
 
-  epsilon = eigenvectors;
+    epsilon = eigenvectors;
 
-  guess_occupation();
+    guess_occupation();
 }
 
-}} /* End Namespaces */
+}  // namespace mcscf
+}  // namespace psi

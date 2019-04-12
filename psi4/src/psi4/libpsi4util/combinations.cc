@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -26,7 +26,6 @@
  * @END LICENSE
  */
 
-#include <cstdlib>
 #include <algorithm>
 
 #include "libpsi4util.h"
@@ -39,25 +38,20 @@ namespace psi {
  * @param k
  * @param combinations a vector<vector<int> > that will store all the combinations
  */
-void generate_combinations(int n, int k, std::vector<std::vector<int> >& combinations)
-{
-  if( (n > 0) && (k > 0)){
-    std::vector<int> combination;
-    bool* a = new bool[n];
-    for(int i=0;i<n-k;++i)
-      a[i] = false;
-    for(int i=n-k;i<n;++i)
-      a[i] = true;
-    do{
-      combination.clear();
-      for ( int i = 0 ; i < n ; ++i){
-        if(a[i])
-          combination.push_back(i);
-      }
-      combinations.push_back(combination);
-    } while (std::next_permutation(a,a+n));
-    delete[] a;  
-  }
+void generate_combinations(int n, int k, std::vector<std::vector<int>>& combinations) {
+    if ((n > 0) && (k > 0)) {
+        std::vector<int> combination;
+        auto* a = new bool[n];
+        for (int i = 0; i < n - k; ++i) a[i] = false;
+        for (int i = n - k; i < n; ++i) a[i] = true;
+        do {
+            combination.clear();
+            for (int i = 0; i < n; ++i) {
+                if (a[i]) combination.push_back(i);
+            }
+            combinations.push_back(combination);
+        } while (std::next_permutation(a, a + n));
+        delete[] a;
+    }
 }
-
-}
+}  // namespace psi

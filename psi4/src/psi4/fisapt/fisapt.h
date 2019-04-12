@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -30,6 +30,7 @@
 #define FISAPT_H
 
 #include "psi4/libmints/typedefs.h"
+#include "psi4/libmints/basisset.h"
 #include "psi4/libmints/wavefunction.h"
 #include "psi4/libpsi4util/PsiOutStream.h"
 
@@ -39,13 +40,13 @@
 namespace psi {
 
 class JK;
+class BasisSet;
+class DFHelper;
 
 namespace fisapt {
 
 class FISAPT {
-
-protected:
-
+   protected:
     // sSAPT0 exchange-scaling
     double sSAPT0_scale_;
     /// Global options object
@@ -68,6 +69,32 @@ protected:
     std::map<std::string, std::shared_ptr<Vector> > vectors_;
     /// Map of matrices
     std::map<std::string, std::shared_ptr<Matrix> > matrices_;
+
+    // Build the ExchInd20 potential in the monomer A ov space
+    std::shared_ptr<Matrix> build_exch_ind_pot(std::map<std::string, std::shared_ptr<Matrix> >& vars);
+    // Build the Ind20 potential in the monomer A ov space
+    std::shared_ptr<Matrix> build_ind_pot(std::map<std::string, std::shared_ptr<Matrix> >& vars);
+
+    // DFHelper object
+    std::shared_ptr<DFHelper> dfh_;
+
+    /// Helper to drop a matrix to filepath/A->name().dat
+    /// Helper to drop a vector to filepath/A->name().dat
+    //  drop(<Matrix> or <Vector>, filepath) moved py-side
+    /// Helper to extract columns from a matrix
+    static std::shared_ptr<Matrix> extract_columns(const std::vector<int>& cols, std::shared_ptr<Matrix> A);
+
+   public:
+    /// Initialize an FISAPT object with an SCF reference
+    FISAPT(std::shared_ptr<Wavefunction> scf);
+    FISAPT(std::shared_ptr<Wavefunction> scf, Options& options);
+    virtual ~FISAPT();
+
+    /// Gogo!
+    //  void compute_energy(); moved py-side
+
+    /// Get Molecule associated with FISAPT
+    std::shared_ptr<Molecule> molecule() { return primary_->molecule(); }
 
     // => FISAPT 0th-Order Wavefunction <= //
 
@@ -94,7 +121,7 @@ protected:
     /// Produce unified matrices for A', B', and C'
     void unify();
     /// Plot some analysis files
-    void plot();
+    void raw_plot(const std::string& filepath);
 
     // => F-SAPT0 <= //
 
@@ -109,7 +136,7 @@ protected:
     /// Dispersion
     void fdisp();
     /// Output
-    void fdrop();
+    //  fdrop() moved py-side
 
     // => SAPT0 <= //
 
@@ -124,41 +151,20 @@ protected:
     /// Print SAPT results
     void print_trailer();
 
-    // Build the ExchInd20 potential in the monomer A ov space
-    std::shared_ptr<Matrix> build_exch_ind_pot(std::map<std::string, std::shared_ptr<Matrix> >& vars);
-    // Build the Ind20 potential in the monomer A ov space
-    std::shared_ptr<Matrix> build_ind_pot(std::map<std::string, std::shared_ptr<Matrix> >& vars);
-
-    /// Helper to drop a matrix to filepath/A->name().dat
-    void drop(std::shared_ptr<Matrix> A, const std::string& filepath);
-    /// Helper to drop a vector to filepath/A->name().dat
-    void drop(std::shared_ptr<Vector> A, const std::string& filepath);
-    /// Helper to extract columns from a matrix
-    static std::shared_ptr<Matrix> extract_columns(
-        const std::vector<int>& cols,
-        std::shared_ptr<Matrix> A);
-
-public:
-    /// Initialize an FISAPT object with an SCF reference
-    FISAPT(std::shared_ptr<Wavefunction> scf);
-    FISAPT(std::shared_ptr<Wavefunction> scf, Options& options);
-    virtual ~FISAPT();
-
-    /// Gogo!
-    void compute_energy();
-
     /// Dispersion
-    void disp(std::map<std::string, SharedMatrix> matrix_cache,
-              std::map<std::string, SharedVector> vector_cache, bool do_print);
+    void disp(std::map<std::string, SharedMatrix> matrix_cache, std::map<std::string, SharedVector> vector_cache,
+              bool do_print);
+    void sinf_disp(std::map<std::string, SharedMatrix> matrix_cache, std::map<std::string, SharedVector> vector_cache,
+              bool do_print);
 
-    std::map<std::string, double> scalars(){ return scalars_; }
+    /// Return arrays
+    std::map<std::string, double>& scalars() { return scalars_; }
+    std::map<std::string, std::shared_ptr<Vector> >& vectors() { return vectors_; }
+    std::map<std::string, std::shared_ptr<Matrix> >& matrices() { return matrices_; }
 };
 
 class FISAPTSCF {
-
-protected:
-
-
+   protected:
     /// Global options object
     Options& options_;
 
@@ -173,44 +179,32 @@ protected:
     std::map<std::string, std::shared_ptr<Matrix> > matrices_;
 
     /// Print orbitals
-    void print_orbitals(
-        const std::string& header,
-        int start,
-        std::shared_ptr<Vector> eps
-        );
+    void print_orbitals(const std::string& header, int start, std::shared_ptr<Vector> eps);
 
-
-public:
-
-    FISAPTSCF(
-        std::shared_ptr<JK> jk,    // JK object
-        double enuc,                 // Nuclear repulsion energy
-        std::shared_ptr<Matrix> S, // Overlap integrals
-        std::shared_ptr<Matrix> X, // Restricted orthogonalization matrix [nbf x nmo]
-        std::shared_ptr<Matrix> T, // Kinetic integrals
-        std::shared_ptr<Matrix> V, // Potential integrals
-        std::shared_ptr<Matrix> W, // External embedding potential
-        std::shared_ptr<Matrix> C, // Guess for occupied orbitals [nbf x nocc]
-        Options& options
-        );
+   public:
+    FISAPTSCF(std::shared_ptr<JK> jk,     // JK object
+              double enuc,                // Nuclear repulsion energy
+              std::shared_ptr<Matrix> S,  // Overlap integrals
+              std::shared_ptr<Matrix> X,  // Restricted orthogonalization matrix [nbf x nmo]
+              std::shared_ptr<Matrix> T,  // Kinetic integrals
+              std::shared_ptr<Matrix> V,  // Potential integrals
+              std::shared_ptr<Matrix> W,  // External embedding potential
+              std::shared_ptr<Matrix> C,  // Guess for occupied orbitals [nbf x nocc]
+              Options& options);
     virtual ~FISAPTSCF();
 
     void compute_energy();
 
-    std::map<std::string, double>& scalars()                      { return scalars_; }
-    std::map<std::string, std::shared_ptr<Vector> >& vectors()  { return vectors_; }
+    std::map<std::string, double>& scalars() { return scalars_; }
+    std::map<std::string, std::shared_ptr<Vector> >& vectors() { return vectors_; }
     std::map<std::string, std::shared_ptr<Matrix> >& matrices() { return matrices_; }
-
 };
 
 class CPHF_FISAPT {
+    friend class FISAPT;
 
-friend class FISAPT;
-
-protected:
-
+   protected:
     // => Global Data <= //
-
 
     // Convergence tolerance
     double delta_;
@@ -252,20 +246,18 @@ protected:
     // Form the s = Ab product for the provided vectors b (may or may not need more iterations)
     std::map<std::string, std::shared_ptr<Matrix> > product(std::map<std::string, std::shared_ptr<Matrix> > b);
     // Apply the denominator from r into z
-    void preconditioner(std::shared_ptr<Matrix> r,
-                        std::shared_ptr<Matrix> z,
-                        std::shared_ptr<Vector> o,
+    void preconditioner(std::shared_ptr<Matrix> r, std::shared_ptr<Matrix> z, std::shared_ptr<Vector> o,
                         std::shared_ptr<Vector> v);
 
-public:
+   public:
     CPHF_FISAPT();
     virtual ~CPHF_FISAPT();
 
     void compute_cphf();
 };
 
-} // Namespace fisapt
+}  // Namespace fisapt
 
-} // Namespace psi
+}  // Namespace psi
 
 #endif

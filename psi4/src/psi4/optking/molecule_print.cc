@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -54,7 +54,7 @@
 
 namespace opt {
 
-void MOLECULE::print_geom_out(void) {
+void MOLECULE::print_geom_out() {
 #if defined(OPTKING_PACKAGE_QCHEM)
   oprintf_out("\tCartesian Geometry (au)\n");
 #elif defined(OPTKING_PACKAGE_PSI)
@@ -65,7 +65,7 @@ void MOLECULE::print_geom_out(void) {
     fragments[i]->print_geom(psi_outfile, qc_outfile);
 }
 
-void MOLECULE::print_geom_out_irc(void) {
+void MOLECULE::print_geom_out_irc() {
 #if defined(OPTKING_PACKAGE_QCHEM)
   oprintf_out("@IRC    Cartesian Geometry (au)\n");
 #elif defined(OPTKING_PACKAGE_PSI)

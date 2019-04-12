@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -45,7 +45,7 @@ namespace helpers {
 
 namespace psi4 {
 
-void integrals(psi::OneBodyAOInt &integral, ambit::Tensor *target) {
+void PSI_API integrals(psi::OneBodyAOInt &integral, ambit::Tensor *target) {
     // One-electron integrals are generally small enough to compute
     // on a single core and broadcast them out.
 
@@ -77,7 +77,7 @@ void integrals(psi::OneBodyAOInt &integral, ambit::Tensor *target) {
     }
 }
 
-void integrals(psi::TwoBodyAOInt &integral, Tensor *target) {
+void PSI_API integrals(psi::TwoBodyAOInt &integral, Tensor *target) {
     if (target->type() != CoreTensor)
         throw std::runtime_error(
             "integrals(TwoBodyAOInt, Tensor) is only "

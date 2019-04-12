@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -33,10 +33,11 @@
 #include "psi4/libpsio/psio.hpp"
 #include "hf.h"
 
-namespace psi { namespace scf {
+namespace psi {
+namespace scf {
 
 class ROHF : public HF {
-protected:
+   protected:
     SharedMatrix moFeff_;
     SharedMatrix soFeff_;
     SharedMatrix Dt_;
@@ -51,53 +52,49 @@ protected:
     SharedMatrix moFa_;
     SharedMatrix moFb_;
 
-    void form_initialF();
-    void form_initial_C();
-    void form_C();
-    void form_D();
-    double compute_initial_E();
-    double compute_E();
-    virtual bool stability_analysis();
-    virtual void prepare_canonical_orthogonalization();
-    void semicanonicalize();
-
-    void form_G();
-    void form_F();
-
-    virtual void compute_orbital_gradient(bool save_diis);
-    bool diis();
-
-    bool test_convergency();
-
-    void save_information();
-    // Finalize memory/files
-    virtual void finalize();
-
-    void save_density_and_energy();
-    void format_guess();
+    void form_initial_F() override;
+    void form_initial_C() override;
+    double compute_initial_E() override;
+    void prepare_canonical_orthogonalization() override;
+    void semicanonicalize() override;
 
     // Second-order convergence code
     void Hx(SharedMatrix x, SharedMatrix ret);
-    virtual int soscf_update(void);
 
-    /** Applies damping to the density update */
-    virtual void damp_update();
+    void format_guess() override;
 
     void common_init();
-public:
-    ROHF(SharedWavefunction ref_wfn, std::shared_ptr<SuperFunctional> functional);
-    ROHF(SharedWavefunction ref_wfn, std::shared_ptr<SuperFunctional> functional,
-         Options& options, std::shared_ptr<PSIO> psio);
-    virtual ~ROHF();
 
-    SharedMatrix moFeff() const {return moFeff_; }
-    SharedMatrix moFa() const {return moFa_; }
-    SharedMatrix moFb() const {return moFb_; }
+   public:
+    ROHF(SharedWavefunction ref_wfn, std::shared_ptr<SuperFunctional> functional);
+    ROHF(SharedWavefunction ref_wfn, std::shared_ptr<SuperFunctional> functional, Options& options,
+         std::shared_ptr<PSIO> psio);
+    ~ROHF() override;
+
+    SharedMatrix moFeff() const { return moFeff_; }
+    SharedMatrix moFa() const { return moFa_; }
+    SharedMatrix moFb() const { return moFb_; }
+
+    bool diis() override;
+    void save_density_and_energy() override;
+    double compute_orbital_gradient(bool save_diis, int max_diis_vectors) override;
+
+    void form_C() override;
+    void form_D() override;
+    void form_F() override;
+    void form_G() override;
+    double compute_E() override;
+    void finalize() override;
+
+    void compute_SAD_guess() override;
+
+    void damping_update(double) override;
+    int soscf_update(double soscf_conv, int soscf_min_iter, int soscf_max_iter, int soscf_print) override;
+    bool stability_analysis() override;
 
     std::shared_ptr<ROHF> c1_deep_copy(std::shared_ptr<BasisSet> basis);
-
 };
-
-}}
+}  // namespace scf
+}  // namespace psi
 
 #endif

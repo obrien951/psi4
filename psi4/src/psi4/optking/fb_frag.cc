@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -76,7 +76,7 @@ void FB_FRAG::print_intcos(std::string psi_fp, FILE *qc_fp) {
   oprintf(psi_fp, qc_fp, "\n");
 }
 
-double **FB_FRAG::H_guess(void) {
+double **FB_FRAG::H_guess() {
   double **H = init_matrix(Ncoord(), Ncoord());
 
   for (int i=0; i<Ncoord(); ++i)

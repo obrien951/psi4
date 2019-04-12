@@ -27,10 +27,9 @@ if(${ENABLE_ambit})
         ExternalProject_Add(ambit_external
             DEPENDS lapack_external
                     hdf5_external
-            GIT_REPOSITORY https://github.com/jturney/ambit
-            GIT_TAG 324e049
+            URL https://github.com/jturney/ambit/archive/9c7049a.tar.gz  # v0.2 + 37
             UPDATE_COMMAND ""
-            CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}
+            CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${STAGED_INSTALL_PREFIX}
                        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
                        -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
                        -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
@@ -59,11 +58,12 @@ if(${ENABLE_ambit})
                        #-DPSI4_BINARY_DIR=${CMAKE_BINARY_DIR}
                        #-DPSI4_INCLUDE_DIRS=${PYTHON_INCLUDE_DIR}
                        #-DENABLE_CXX11_SUPPORT=ON
+                       -DOpenMP_LIBRARY_DIRS=${OpenMP_LIBRARY_DIRS}
                        -DTargetLAPACK_DIR=${STAGED_INSTALL_PREFIX}/share/cmake/TargetLAPACK
                        -DTargetHDF5_DIR=${STAGED_INSTALL_PREFIX}/share/cmake/TargetHDF5
             CMAKE_CACHE_ARGS -DCMAKE_C_FLAGS:STRING=${CMAKE_C_FLAGS}
                              -DCMAKE_CXX_FLAGS:STRING=${CMAKE_CXX_FLAGS}
-            INSTALL_COMMAND DESTDIR=${CMAKE_BINARY_DIR}/stage ${CMAKE_MAKE_PROGRAM} install)
+                             -DTargetOpenMP_FIND_COMPONENTS:STRING=C;CXX)
 
         set(ambit_DIR ${STAGED_INSTALL_PREFIX}/share/cmake/ambit CACHE PATH "path to internally built ambitConfig.cmake" FORCE)
     endif()

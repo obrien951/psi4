@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -33,6 +33,7 @@
 #include "psi4/libpsio/psio.hpp"
 #include "psi4/libpsio/psio.h"
 #include "psi4/psi4-dec.h"
+#include "psi4/libmints/dipole.h"
 #include "psi4/libmints/sieve.h"
 #include "psi4/libmints/cdsalclist.h"
 #include "psi4/libfock/v.h"
@@ -46,6 +47,7 @@
 #include "psi4/libmints/basisset.h"
 #include "psi4/libmints/vector.h"
 #include "psi4/libmints/integral.h"
+#include "psi4/libmints/mintshelper.h"
 #include "psi4/liboptions/liboptions.h"
 
 #include <algorithm>
@@ -478,8 +480,8 @@ std::shared_ptr<Matrix> SCFGrad::rhf_hessian_response()
 
             // This probably shouldn't be recomputed here; we already needed it to get the
             // second derivative integrals.  One fine day, this should be refactored.
-            auto metric = std::make_shared<FittingMetric>(auxiliary_, true);
-            metric->form_full_eig_inverse();
+            auto metric = std::make_shared<FittingMetric>(auxiliary_, true);            
+            metric->form_full_eig_inverse(options_.get_double("DF_FITTING_CONDITION"));
             SharedMatrix PQ = metric->get_metric();
             double** PQp = PQ->pointer();
 
@@ -568,7 +570,7 @@ std::shared_ptr<Matrix> SCFGrad::rhf_hessian_response()
                         PQint->compute_shell_deriv1(P,0,Q,0);
                         const double* buffer = PQint->buffer();
 
-                        double *ptr = const_cast<double*>(buffer);
+                        auto *ptr = const_cast<double*>(buffer);
 
                         if(pert_incore[Pcenter]){
                             // J terms
@@ -687,7 +689,7 @@ std::shared_ptr<Matrix> SCFGrad::rhf_hessian_response()
                                 }
                             }
 
-                            double *ptr = const_cast<double*>(buffer);
+                            auto *ptr = const_cast<double*>(buffer);
 
                             if(pert_incore[Pcenter]){
                                 // J Terms
@@ -1466,6 +1468,24 @@ std::shared_ptr<Matrix> SCFGrad::rhf_hessian_response()
         }
     }
 
+    // => Dipole derivatives (for IR intensities) <= //
+    MintsHelper mints(basisset_);
+    auto ao_dipole = mints.ao_dipole();
+    auto Ca = Ca_subset("AO");
+    auto Caocc = Ca_subset("AO", "OCC");
+    Matrix mu_x("mu X", nmo_, nocc);
+    Matrix mu_y("mu Y", nmo_, nocc);
+    Matrix mu_z("mu Z", nmo_, nocc);
+    mu_x.transform(Ca, ao_dipole[0], Caocc);
+    mu_y.transform(Ca, ao_dipole[1], Caocc);
+    mu_z.transform(Ca, ao_dipole[2], Caocc);
+    // Start by computing the skeleton derivatives
+    auto dipole_gradient = mints.dipole_grad(Da_subset("AO"));
+    // Account for alpha and beta orbitals
+    dipole_gradient->scale(2);
+    dipole_gradient->add(DipoleInt::nuclear_gradient_contribution(molecule_));
+    double **pdip_grad = dipole_gradient->pointer();
+
     // => Upi <= //
     {
         auto Upi = std::make_shared<Matrix>("U",nmo,nocc);
@@ -1480,8 +1500,12 @@ std::shared_ptr<Matrix> SCFGrad::rhf_hessian_response()
             C_DSCAL(nocc * (size_t) nocc,-0.5, Upqp[0], 1);
             psio_->read(PSIF_HESS,"Uai^A",(char*)Upqp[nocc],nvir * nocc * sizeof(double),next_Uai,&next_Uai);
             psio_->write(PSIF_HESS,"Upi^A",(char*)Upqp[0],nmo * nocc * sizeof(double),next_Upi,&next_Upi);
+            pdip_grad[A][0] += 4*mu_x.vector_dot(Upi);
+            pdip_grad[A][1] += 4*mu_y.vector_dot(Upi);
+            pdip_grad[A][2] += 4*mu_z.vector_dot(Upi);
         }
     }
+    dipole_gradient_ = dipole_gradient;
 
     // => Qpi <= //
     {

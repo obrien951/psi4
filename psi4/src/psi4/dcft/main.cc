@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -26,32 +26,29 @@
  * @END LICENSE
  */
 
-#include "defines.h"
 #include "dcft.h"
 
-#include "psi4/psi4-dec.h"
+#include <cstdio>
+#include <cstdlib>
+
 #include "psi4/libqt/qt.h"
 #include "psi4/libpsio/psio.h"
 #include "psi4/libpsi4util/PsiOutStream.h"
 #include "psi4/liboptions/liboptions.h"
 
-#include <stdio.h>
-#include <stdlib.h>
-
 using namespace psi;
 
+namespace psi {
+namespace dcft {
 
-namespace psi{ namespace dcft{
-
-SharedWavefunction dcft(SharedWavefunction ref_wfn, Options& options)
-{
+SharedWavefunction dcft(SharedWavefunction ref_wfn, Options& options) {
     // Start the timers
     tstart();
 
     outfile->Printf("\n\n\t***********************************************************************************\n");
-    outfile->Printf(    "\t*                        Density Cumulant Functional Theory                       *\n");
-    outfile->Printf(    "\t*                by Alexander Sokolov, Andy Simmonett, and Xiao Wang              *\n");
-    outfile->Printf(    "\t***********************************************************************************\n");
+    outfile->Printf("\t*                        Density Cumulant Functional Theory                       *\n");
+    outfile->Printf("\t*                by Alexander Sokolov, Andy Simmonett, and Xiao Wang              *\n");
+    outfile->Printf("\t***********************************************************************************\n");
 
     auto dcft = std::make_shared<DCFTSolver>(ref_wfn, options);
     dcft->compute_energy();
@@ -61,4 +58,5 @@ SharedWavefunction dcft(SharedWavefunction ref_wfn, Options& options)
     return dcft;
 }
 
-}} // End Namespaces
+}  // namespace dcft
+}  // namespace psi

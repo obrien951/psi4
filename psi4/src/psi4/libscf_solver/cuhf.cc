@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -42,9 +42,9 @@
 #include "psi4/libdiis/diismanager.h"
 #include "psi4/libdiis/diisentry.h"
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <math.h>
+#include <cstdlib>
+#include <cstdio>
+#include <cmath>
 #include <algorithm>
 #include <vector>
 #include <utility>
@@ -68,7 +68,7 @@ CUHF::CUHF(SharedWavefunction ref_wfn, std::shared_ptr<SuperFunctional> func, Op
 CUHF::~CUHF() {}
 
 void CUHF::common_init() {
-    Drms_ = 0.0;
+    name_ = "CUHF";
 
     Fa_ = SharedMatrix(factory_->create_matrix("F alpha"));
     Fb_ = SharedMatrix(factory_->create_matrix("F beta"));
@@ -101,11 +101,11 @@ void CUHF::common_init() {
     }
 }
 
-void CUHF::damp_update() {
-    Da_->scale(1.0 - damping_percentage_);
-    Da_->axpy(damping_percentage_, Da_old_);
-    Db_->scale(1.0 - damping_percentage_);
-    Db_->axpy(damping_percentage_, Db_old_);
+void CUHF::damping_update(double damping_percentage) {
+    Da_->scale(1.0 - damping_percentage);
+    Da_->axpy(damping_percentage, Da_old_);
+    Db_->scale(1.0 - damping_percentage);
+    Db_->axpy(damping_percentage, Db_old_);
     Dt_->copy(Da_);
     Dt_->add(Db_);
 }
@@ -146,7 +146,6 @@ void CUHF::save_density_and_energy() {
     Da_old_->copy(Dt_);
     Db_old_->copy(Dt_);
     Dt_old_->copy(Dt_);
-    Eold_ = E_;
 }
 
 void CUHF::form_G() {
@@ -167,8 +166,6 @@ void CUHF::form_G() {
     Ka_ = K[0];
     Kb_ = K[1];
 }
-
-void CUHF::save_information() {}
 
 void CUHF::compute_spin_contamination() {
     double dN = 0.0;
@@ -205,19 +202,22 @@ void CUHF::compute_spin_contamination() {
     outfile->Printf("  @S^2 Observed:              %8.5F\n", S2 + dS);
 }
 
-bool CUHF::test_convergency() {
-    double ediff = E_ - Eold_;
+void CUHF::form_initial_F() {
+    // Form the initial Fock matrix to get initial orbitals
+    Fp_->copy(J_);
+    Fp_->scale(2.0);
+    Fp_->subtract(Ka_);
+    Fp_->subtract(Kb_);
+    Fp_->scale(0.5);
 
-    // Drms was already computed
-    if (std::fabs(ediff) < energy_threshold_ && Drms_ < density_threshold_)
-        return true;
-    else
-        return false;
-}
-
-void CUHF::form_initialF() {
     Fa_->copy(H_);
-    Fb_->copy(H_);
+    for (const auto& Vext : external_potentials_) {
+        Fa_->add(Vext);
+    }
+    Fa_->add(Fp_);
+
+    // Just reuse alpha for beta
+    Fb_->copy(Fa_);
 
     if (debug_) {
         outfile->Printf("Initial Fock alpha matrix:\n");
@@ -290,10 +290,16 @@ void CUHF::form_F() {
 
     // Build the modified alpha and beta Fock matrices
     Fa_->copy(H_);
+    for (const auto& Vext : external_potentials_) {
+        Fa_->add(Vext);
+    }
     Fa_->add(Fp_);
     Fa_->add(Fm_);
 
     Fb_->copy(H_);
+    for (const auto& Vext : external_potentials_) {
+        Fb_->add(Vext);
+    }
     Fb_->add(Fp_);
     Fb_->subtract(Fm_);
 
@@ -314,6 +320,9 @@ void CUHF::form_C() {
 }
 
 void CUHF::form_D() {
+    Da_->zero();
+    Db_->zero();
+
     for (int h = 0; h < nirrep_; ++h) {
         int nso = nsopi_[h];
         int nmo = nmopi_[h];
@@ -326,9 +335,6 @@ void CUHF::form_D() {
         double** Cb = Cb_->pointer(h);
         double** Da = Da_->pointer(h);
         double** Db = Db_->pointer(h);
-
-        if (na == 0) memset(static_cast<void*>(Da[0]), '\0', sizeof(double) * nso * nso);
-        if (nb == 0) memset(static_cast<void*>(Db[0]), '\0', sizeof(double) * nso * nso);
 
         C_DGEMM('N', 'T', nso, nso, na, 1.0, Ca[0], nmo, Ca[0], nmo, 0.0, Da[0], nso);
         C_DGEMM('N', 'T', nso, nso, nb, 1.0, Cb[0], nmo, Cb[0], nmo, 0.0, Db[0], nso);
@@ -344,12 +350,16 @@ void CUHF::form_D() {
     }
 }
 
-// TODO: Once Dt_ is refactored to D_ the only difference between this and RHF::compute_initial_E is a factor of 0.5
-double CUHF::compute_initial_E() { return nuclearrep_ + 0.5 * (Dt_->vector_dot(H_)); }
+double CUHF::compute_initial_E() { return nuclearrep_ + Dt_->vector_dot(H_); }
 
 double CUHF::compute_E() {
-    double one_electron_E = Dt_->vector_dot(H_);
-    double two_electron_E = 0.5 * (Da_->vector_dot(Fa_) + Db_->vector_dot(Fb_) - one_electron_E);
+    double DH = Dt_->vector_dot(H_);
+    double DFa = Da_->vector_dot(Fa_);
+    double DFb = Db_->vector_dot(Fb_);
+
+    double one_electron_E = DH;
+    double two_electron_E = 0.5 * (DFa + DFb - one_electron_E);
+    double Eelec = 0.5 * (DH + DFa + DFb);
 
     energies_["Nuclear"] = nuclearrep_;
     energies_["One-Electron"] = one_electron_E;
@@ -358,26 +368,19 @@ double CUHF::compute_E() {
     energies_["VV10_E"] = 0.0;
     energies_["-D"] = 0.0;
 
-    double DH = Dt_->vector_dot(H_);
-    double DFa = Da_->vector_dot(Fa_);
-    double DFb = Db_->vector_dot(Fb_);
-    double Eelec = 0.5 * (DH + DFa + DFb);
     // outfile->Printf( "electronic energy = %20.14f\n", Eelec);
     double Etotal = nuclearrep_ + Eelec;
     return Etotal;
 }
 
-void CUHF::compute_orbital_gradient(bool save_diis) {
+double CUHF::compute_orbital_gradient(bool save_diis, int max_diis_vectors) {
     SharedMatrix grad_a = form_FDSmSDF(Fa_, Da_);
     SharedMatrix grad_b = form_FDSmSDF(Fb_, Db_);
 
-    // Store the RMS gradient for convergence checking
-    Drms_ = 0.5 * (grad_a->rms() + grad_b->rms());
-
     if (save_diis) {
         if (initialized_diis_manager_ == false) {
-            diis_manager_ = std::make_shared<DIISManager>(max_diis_vectors_, "HF DIIS vector",
-                                                          DIISManager::LargestError, DIISManager::OnDisk);
+            diis_manager_ = std::make_shared<DIISManager>(max_diis_vectors, "HF DIIS vector", DIISManager::LargestError,
+                                                          DIISManager::OnDisk);
             diis_manager_->set_error_vector_size(2, DIISEntry::Matrix, grad_a.get(), DIISEntry::Matrix, grad_b.get());
             diis_manager_->set_vector_size(2, DIISEntry::Matrix, Fa_.get(), DIISEntry::Matrix, Fb_.get());
             initialized_diis_manager_ = true;
@@ -385,6 +388,11 @@ void CUHF::compute_orbital_gradient(bool save_diis) {
 
         diis_manager_->add_entry(4, grad_a.get(), grad_b.get(), Fa_.get(), Fb_.get());
     }
+
+    if (options_.get_bool("DIIS_RMS_ERROR"))
+        return std::sqrt(0.5 * (std::pow(grad_a->rms(), 2) + std::pow(grad_b->rms(), 2)));
+    else
+        return std::max(grad_a->absmax(), grad_b->absmax());
 }
 
 bool CUHF::diis() { return diis_manager_->extrapolate(2, Fa_.get(), Fb_.get()); }
@@ -393,7 +401,6 @@ bool CUHF::stability_analysis() {
     throw PSIEXCEPTION("CUHF stability analysis has not been implemented yet.  Sorry :(");
     return false;
 }
-
 
 std::shared_ptr<CUHF> CUHF::c1_deep_copy(std::shared_ptr<BasisSet> basis) {
     std::shared_ptr<Wavefunction> wfn = Wavefunction::c1_deep_copy(basis);
@@ -407,10 +414,8 @@ std::shared_ptr<CUHF> CUHF::c1_deep_copy(std::shared_ptr<BasisSet> basis) {
     if (Db_) hf_wfn->Db_ = Db_subset("AO");
     if (Fa_) hf_wfn->Fa_ = Fa_subset("AO");
     if (Fb_) hf_wfn->Fb_ = Fb_subset("AO");
-    if (epsilon_a_) hf_wfn->epsilon_a_ =
-        epsilon_subset_helper(epsilon_a_, nsopi_, "AO", "ALL");
-    if (epsilon_b_) hf_wfn->epsilon_b_ =
-        epsilon_subset_helper(epsilon_b_, nsopi_, "AO", "ALL");
+    if (epsilon_a_) hf_wfn->epsilon_a_ = epsilon_subset_helper(epsilon_a_, nsopi_, "AO", "ALL");
+    if (epsilon_b_) hf_wfn->epsilon_b_ = epsilon_subset_helper(epsilon_b_, nsopi_, "AO", "ALL");
     // H_ ans X_ reset in the HF constructor, copy them over here
     SharedMatrix SO2AO = aotoso()->transpose();
     if (H_) hf_wfn->H_->remove_symmetry(H_, SO2AO);
@@ -419,6 +424,12 @@ std::shared_ptr<CUHF> CUHF::c1_deep_copy(std::shared_ptr<BasisSet> basis) {
     return hf_wfn;
 }
 
-
+void CUHF::compute_SAD_guess() {
+    // Form the SAD guess
+    HF::compute_SAD_guess();
+    // Form the total density used in energy evaluation
+    Dt_->copy(Da_);
+    Dt_->add(Db_);
 }
-}
+}  // namespace scf
+}  // namespace psi

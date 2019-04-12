@@ -3,7 +3,7 @@
 #
 # Psi4: an open-source quantum chemistry software package
 #
-# Copyright (c) 2007-2018 The Psi4 Developers.
+# Copyright (c) 2007-2019 The Psi4 Developers.
 #
 # The copyrights for code used from other parties are included in
 # the corresponding files.
@@ -30,8 +30,6 @@ r"""Stuff stolen from psi. Should import or not as necessary
 or some better way. Apologies to the coders.
 
 """
-from __future__ import absolute_import
-from __future__ import print_function
 import os
 import re
 import sys
@@ -77,7 +75,8 @@ def compare_values(expected, computed, digits, label, passnone=False, verbose=1)
     else:
         thresh = digits
         message = ("\t%s: computed value (%f) does not match (%f) to %f digits." % (label, computed, expected, digits))
-    if abs(expected - computed) > thresh:
+    if abs(float(expected) - float(computed)) > thresh:
+        # float cast handles decimal.Decimal vars
         raise TestComparisonError(message)
     if math.isnan(computed):
         message += "\tprobably because the computed value is nan."
@@ -150,7 +149,7 @@ def compare_dicts(expected, computed, tol, label, forgive=None, verbose=1):
     try:
         import deepdiff
     except ImportError:
-        raise ImportError("""Install deepdiff. `conda install deepdiff -c conda-forge` or `pip install deepdiff`""")
+        raise ImportError("""Python module deepdiff not found. Solve by installing it: `conda install deepdiff -c conda-forge` or `pip install deepdiff`""")
 
     if forgive is None:
         forgive = []
@@ -211,9 +210,19 @@ def compare_molrecs(expected, computed, tol, label, forgive=None, verbose=1, rel
         if 'molecular_multiplicity' in dicary:
             dicary['molecular_multiplicity'] = int(dicary['molecular_multiplicity'])
         if 'fragment_multiplicities' in dicary:
-            dicary['fragment_multiplicities'] = [(m if m is None else int(m)) for m in dicary['fragment_multiplicities']]
+            dicary['fragment_multiplicities'] = [(m if m is None else int(m))
+                                                 for m in dicary['fragment_multiplicities']]
         if 'fragment_separators' in dicary:
             dicary['fragment_separators'] = [(s if s is None else int(s)) for s in dicary['fragment_separators']]
+        # forgive generator version changes
+        if 'provenance' in dicary:
+            dicary['provenance'].pop('version')
+        # regularize connectivity ordering
+        if 'connectivity' in dicary:
+            conn = [(min(at1, at2), max(at1, at2), bo) for (at1, at2, bo) in dicary['connectivity']]
+            conn.sort(key=lambda tup: tup[0])
+            dicary['connectivity'] = conn
+
         return dicary
 
     xptd = massage_dicts(xptd)
@@ -273,7 +282,7 @@ def compare_arrays(expected, computed, digits, label, verbose=1):
 
 
 def query_yes_no(question, default=True):
-    """Ask a yes/no question via raw_input() and return their answer.
+    """Ask a yes/no question via input() and return their answer.
 
     *question* is a string that is presented to the user.
     *default* is the presumed answer if the user just hits <Enter>.
@@ -287,7 +296,7 @@ def query_yes_no(question, default=True):
     yes = re.compile(r'^(y|yes|true|on|1)', re.IGNORECASE)
     no = re.compile(r'^(n|no|false|off|0)', re.IGNORECASE)
 
-    if default == None:
+    if default is None:
         prompt = " [y/n] "
     elif default == True:
         prompt = " [Y/n] "
@@ -298,7 +307,7 @@ def query_yes_no(question, default=True):
 
     while True:
         sys.stdout.write(question + prompt)
-        choice = raw_input().strip().lower()
+        choice = input().strip().lower()
         if default is not None and choice == '':
             return default
         elif yes.match(choice):

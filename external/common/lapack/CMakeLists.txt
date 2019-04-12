@@ -34,12 +34,13 @@ endforeach()
 # <<  Detect OpenMP and modify for BLAS/LAPACK  >>
 if(NOT TARGET tgt::MathOpenMP)
     list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR})
+    set(TargetOpenMP_FIND_COMPONENTS "CXX")
     find_package(MathOpenMP)
 endif()
 
-include(CMakePrintHelpers)
-cmake_print_properties(TARGETS OpenMP::OpenMP_CXX tgt::MathOpenMP blas lapk lapack
-                       PROPERTIES INTERFACE_COMPILE_DEFINITIONS INTERFACE_COMPILE_OPTIONS INTERFACE_INCLUDE_DIRS INTERFACE_LINK_LIBRARIES)
+#include(CMakePrintHelpers)
+#cmake_print_properties(TARGETS OpenMP::OpenMP_CXX OpenMP::OpenMP tgt::MathOpenMP lapack
+#                       PROPERTIES INTERFACE_COMPILE_DEFINITIONS INTERFACE_COMPILE_OPTIONS INTERFACE_INCLUDE_DIRS INTERFACE_LINK_LIBRARIES)
 
 get_property(_ill TARGET lapk PROPERTY INTERFACE_LINK_LIBRARIES)
 list(GET _ill 0 _ill0)
@@ -75,7 +76,7 @@ install(EXPORT "${PN}Targets"
         DESTINATION ${CMAKECONFIG_INSTALL_DIR})
 
 add_custom_target(lapack_external
-    ${CMAKE_COMMAND} "-DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/stage${CMAKE_INSTALL_PREFIX}" -P "${PROJECT_BINARY_DIR}/cmake_install.cmake"
+    ${CMAKE_COMMAND} "-DCMAKE_INSTALL_PREFIX=${STAGED_INSTALL_PREFIX}" -P "${PROJECT_BINARY_DIR}/cmake_install.cmake"
     COMMENT "Installing Psi4-detected BLAS/LAPACK")
 
 set(${PN}_DIR ${STAGED_INSTALL_PREFIX}/share/cmake/${PN} CACHE PATH "path to externally detected ${PN}Config.cmake" FORCE)

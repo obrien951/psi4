@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -60,7 +60,7 @@ bool int_compare(int i, int j) {return i<j;}
 using namespace v3d;
 
 // Determine Pulay simple coordinate combinations.
-int FRAG::form_natural_coord_combinations(void) {
+int FRAG::form_natural_coord_combinations() {
   coords.clear_combos();
 
   int Ns = coords.Nsimples();

@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -32,6 +32,7 @@
 #include "psi4/pragma.h"
 #include <vector>
 #include <map>
+#include <unordered_map>
 #include <string>
 
 namespace psi {
@@ -52,8 +53,7 @@ class BlockOPoints;
  **/
 
 class PSI_API VBase {
-
-protected:
+   protected:
     /// Debug flag
     int debug_;
     /// Print flag
@@ -80,6 +80,9 @@ protected:
     std::shared_ptr<DFTGrid> grid_;
     /// Quadrature values obtained during integration
     std::map<std::string, double> quad_values_;
+    // Caches collocation grids
+    std::unordered_map<size_t, std::map<std::string, SharedMatrix>> cache_map_;
+    int cache_map_deriv_;
 
     /// AO2USO matrix (if not C1)
     SharedMatrix AO2USO_;
@@ -92,18 +95,21 @@ protected:
     bool grac_initialized_;
 
     // VV10 dispersion, return vv10_nlc energy
+    void prepare_vv10_cache(DFTGrid& nlgrid, SharedMatrix D,
+                            std::vector<std::map<std::string, SharedVector>>& vv10_cache,
+                            std::vector<std::shared_ptr<PointFunctions>>& nl_point_workers, int ansatz = 1);
     double vv10_nlc(SharedMatrix D, SharedMatrix ret);
+    SharedMatrix vv10_nlc_gradient(SharedMatrix D);
 
     /// Set things up
     void common_init();
-public:
-     VBase(std::shared_ptr<SuperFunctional> functional,
-           std::shared_ptr<BasisSet> primary, Options& options);
-     virtual ~VBase();
+
+   public:
+    VBase(std::shared_ptr<SuperFunctional> functional, std::shared_ptr<BasisSet> primary, Options& options);
+    virtual ~VBase();
 
     static std::shared_ptr<VBase> build_V(std::shared_ptr<BasisSet> primary,
-                                          std::shared_ptr<SuperFunctional> functional,
-                                          Options& options,
+                                          std::shared_ptr<SuperFunctional> functional, Options& options,
                                           const std::string& type = "RV");
 
     std::shared_ptr<BasisSet> basis() const { return primary_; }
@@ -113,6 +119,10 @@ public:
     std::shared_ptr<BlockOPoints> get_block(int block);
     size_t nblocks();
     std::map<std::string, double>& quadrature_values() { return quad_values_; }
+
+    // Creates a collocation cache map based on stride
+    void build_collocation_cache(size_t memory);
+    void clear_collocation_cache() { cache_map_.clear(); }
 
     // Set the D matrix, get it back if needed
     void set_D(std::vector<SharedMatrix> Dvec);
@@ -139,46 +149,36 @@ public:
 // => Derived Classes <= //
 
 class RV : public VBase {
+   protected:
+   public:
+    RV(std::shared_ptr<SuperFunctional> functional, std::shared_ptr<BasisSet> primary, Options& options);
+    ~RV() override;
 
-protected:
+    void initialize() override;
+    void finalize() override;
 
-public:
-    RV(std::shared_ptr<SuperFunctional> functional,
-        std::shared_ptr<BasisSet> primary,
-        Options& options);
-    virtual ~RV();
+    void compute_V(std::vector<SharedMatrix> ret) override;
+    void compute_Vx(std::vector<SharedMatrix> Dx, std::vector<SharedMatrix> ret) override;
+    SharedMatrix compute_gradient() override;
+    SharedMatrix compute_hessian() override;
 
-    virtual void initialize();
-    virtual void finalize();
-
-    virtual void compute_V(std::vector<SharedMatrix> ret);
-    virtual void compute_Vx(std::vector<SharedMatrix> Dx, std::vector<SharedMatrix> ret);
-    virtual SharedMatrix compute_gradient();
-    virtual SharedMatrix compute_hessian();
-
-    virtual void print_header() const;
+    void print_header() const override;
 };
 
 class UV : public VBase {
+   protected:
+   public:
+    UV(std::shared_ptr<SuperFunctional> functional, std::shared_ptr<BasisSet> primary, Options& options);
+    ~UV() override;
 
-protected:
+    void initialize() override;
+    void finalize() override;
 
-public:
-    UV(std::shared_ptr<SuperFunctional> functional,
-        std::shared_ptr<BasisSet> primary,
-        Options& options);
-    virtual ~UV();
+    void compute_V(std::vector<SharedMatrix> ret) override;
+    void compute_Vx(std::vector<SharedMatrix> Dx, std::vector<SharedMatrix> ret) override;
+    SharedMatrix compute_gradient() override;
 
-    virtual void initialize();
-    virtual void finalize();
-
-    virtual void compute_V(std::vector<SharedMatrix> ret);
-    virtual void compute_Vx(std::vector<SharedMatrix> Dx, std::vector<SharedMatrix> ret);
-    virtual SharedMatrix compute_gradient();
-
-    virtual void print_header() const;
+    void print_header() const override;
 };
-
-
 }
 #endif

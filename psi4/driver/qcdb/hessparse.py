@@ -3,7 +3,7 @@
 #
 # Psi4: an open-source quantum chemistry software package
 #
-# Copyright (c) 2007-2018 The Psi4 Developers.
+# Copyright (c) 2007-2019 The Psi4 Developers.
 #
 # The copyrights for code used from other parties are included in
 # the corresponding files.
@@ -28,12 +28,13 @@
 
 import numpy as np
 
-from .util import filter_comments
+import qcelemental as qcel
+
 
 def load_hessian(shess, dtype):
 
     # list o'lines w/o comments or blanks
-    shess = filter_comments(shess)
+    shess = qcel.util.filter_comments(shess)
     lhess = list(filter(None, map(str.strip, shess.splitlines())))
 
     if dtype in ['fcmfinal', 'cfour']:

@@ -3,7 +3,7 @@
 #
 # Psi4: an open-source quantum chemistry software package
 #
-# Copyright (c) 2007-2018 The Psi4 Developers.
+# Copyright (c) 2007-2019 The Psi4 Developers.
 #
 # The copyrights for code used from other parties are included in
 # the corresponding files.
@@ -26,9 +26,6 @@
 # @END LICENSE
 #
 
-from __future__ import absolute_import
-from __future__ import print_function
-from __future__ import division
 import os
 import re
 import sys
@@ -36,8 +33,6 @@ import sys
 from .exceptions import *
 from .libmintsgshell import *
 
-if sys.version_info >= (3,0):
-    basestring = str
 
 class Gaussian94BasisSetParser(object):
     """Class for parsing basis sets from a text file in Gaussian 94
@@ -106,7 +101,7 @@ class Gaussian94BasisSetParser(object):
         dataset can be list of lines or a single string which will be converted to list of lines
 
         """
-        if isinstance(dataset, basestring):
+        if isinstance(dataset, str):
             lines = dataset.split('\n')
         else:
             lines = dataset
@@ -116,15 +111,15 @@ class Gaussian94BasisSetParser(object):
         spherical = re.compile(r'^\s*spherical\s*', re.IGNORECASE)
         comment = re.compile(r'^\s*\!.*')  # line starts with !
         separator = re.compile(r'^\s*\*\*\*\*')  # line starts with ****
-        ATOM = '(([A-Z]{1,3}\d*)|([A-Z]{1,3}_\w+))'  # match 'C 0', 'Al c 0', 'P p88 p_pass 0' not 'Ofail 0', 'h99_text 0'
-        atom_array = re.compile(r'^\s*((' + ATOM + '\s+)+)0\s*$', re.IGNORECASE)  # array of atomic symbols terminated by 0
-        atom_ecp = re.compile(r'^\s*((' + ATOM + '-ECP\s+)+)(\d+)\s+(\d+)\s*$', re.IGNORECASE)  # atom_ECP number number
+        ATOM = r'(([A-Z]{1,3}\d*)|([A-Z]{1,3}_\w+))'  # match 'C 0', 'Al c 0', 'P p88 p_pass 0' not 'Ofail 0', 'h99_text 0'
+        atom_array = re.compile(r'^\s*((' + ATOM + r'\s+)+)0\s*$', re.IGNORECASE)  # array of atomic symbols terminated by 0
+        atom_ecp = re.compile(r'^\s*((' + ATOM + r'-ECP\s+)+)(\d+)\s+(\d+)\s*$', re.IGNORECASE)  # atom_ECP number number
         shell = re.compile(r'^\s*(\w+)\s*(\d+)\s*(-?\d+\.\d+)')  # Match beginning of contraction
         blank = re.compile(r'^\s*$')
         NUMBER = r'((?:[-+]?\d*\.\d+(?:[DdEe][-+]?\d+)?)|(?:[-+]?\d+\.\d*(?:[DdEe][-+]?\d+)?)|(?:[-+]?\d+))'
-        primitives1 = re.compile(r'^\s*' + NUMBER + '\s+' + NUMBER + '.*')  # Match s, p, d, f, g, ... functions
-        primitives2 = re.compile(r'^\s*' + NUMBER + '\s+' + NUMBER + '\s+' + NUMBER + '.*')  # match sp functions
-        ecpinfo = re.compile(r'^\s*(\d)\s+' + NUMBER + '\s+' + NUMBER + '.*')  # Match rpower, exponent, coefficient
+        primitives1 = re.compile(r'^\s*' + NUMBER + r'\s+' + NUMBER + '.*')  # Match s, p, d, f, g, ... functions
+        primitives2 = re.compile(r'^\s*' + NUMBER + r'\s+' + NUMBER + r'\s+' + NUMBER + '.*')  # match sp functions
+        ecpinfo = re.compile(r'^\s*(\d)\s+' + NUMBER + r'\s+' + NUMBER + '.*')  # Match rpower, exponent, coefficient
 
         # s, p and s, p, d can be grouped together in Pople-style basis sets
         sp = 'SP'

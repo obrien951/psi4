@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -74,28 +74,25 @@
 ** Tianyuan Zhang, June 2017
 */
 
-#include "psi4/libciomr/libciomr.h"
-#include "psi4/libpsi4util/PsiOutStream.h"
-#include "psi4/libpsi4util/exception.h"
-#include "psi4/psi4-dec.h"
-#include "psi4/psifiles.h"
-
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
 
-#include <sys/time.h>
-#include <sys/times.h>
+#ifdef _MSC_VER
+#include <Winsock2.h>
+#include <winsock.h>
+#else
 #include <unistd.h>
+#endif
 
+#include <algorithm>
 #include <chrono>
 #include <list>
 #include <map>
 #include <string>
 #include <utility>
 #include <vector>
-#include <algorithm>
 #ifdef _OPENMP
 #include <omp.h>
 #else
@@ -113,6 +110,14 @@ typedef int omp_lock_t;
     do {                               \
     } while (0)
 #endif
+
+#include "psi4/psi4-dec.h"
+#include "psi4/psifiles.h"
+#include "psi4/times.h"
+
+#include "psi4/libciomr/libciomr.h"
+#include "psi4/libpsi4util/PsiOutStream.h"
+#include "psi4/libpsi4util/exception.h"
 
 /* guess for HZ, if missing */
 #ifndef HZ
@@ -243,7 +248,7 @@ class Timer_Structure {
     Timer_Structure *parent_ptr_;
 
    public:
-    Timer_Structure(Timer_Structure *parent, const std::string& key) : parent_ptr_(parent), key_(key) {
+    Timer_Structure(Timer_Structure *parent, const std::string &key) : parent_ptr_(parent), key_(key) {
         status_ = OFF;
         n_calls_ = 0;
         utime_ = 0;
@@ -926,7 +931,7 @@ bool Timer_thread::merge_move(Timer_Structure *another) {
 Timer_Structure root_timer(nullptr, ""), parallel_timer(nullptr, "");
 std::list<Timer_Structure *> ser_on_timers;
 std::vector<std::list<Timer_Structure *>> par_on_timers;
-time_t timer_start, timer_end;
+std::time_t timer_start, timer_end;
 bool skip_timers;
 static omp_lock_t lock_timer;
 
@@ -939,25 +944,23 @@ void print_timer(const Timer_Structure &timer, std::shared_ptr<PsiOutStream> pri
     switch (timer.get_status()) {
         case ON:
         case OFF:
-            printer->Printf("%s: %10.3fu %10.3fs %10.3fw %6d calls\n", key.c_str(),
-                            timer.get_utime(),
-                            timer.get_stime(), wtime,
-                            timer.get_n_calls());
+            printer->Printf("%s: %10.3fu %10.3fs %10.3fw %6d calls\n", key.c_str(), timer.get_utime(),
+                            timer.get_stime(), wtime, timer.get_n_calls());
             break;
         case PARALLEL:
-            printer->Printf("%s: %10.3fp                         %6d calls\n", key.c_str(),
-                            wtime, timer.get_n_calls());
+            printer->Printf("%s: %10.3fp                         %6d calls\n", key.c_str(), wtime, timer.get_n_calls());
         default:
             break;
     }
 }
 
-void print_nested_timer(const Timer_Structure &timer, std::shared_ptr<PsiOutStream> printer, const std::string& indent) {
+void print_nested_timer(const Timer_Structure &timer, std::shared_ptr<PsiOutStream> printer,
+                        const std::string &indent) {
     const std::list<Timer_Structure> &children = timer.get_children();
     for (auto child_iter = children.begin(), end_child_iter = children.end(); child_iter != end_child_iter;
          ++child_iter) {
         printer->Printf("%s", indent.c_str());
-        print_timer(*child_iter, printer, 28 - indent.length());
+        print_timer(*child_iter, printer, 36 - indent.length());
         print_nested_timer(*child_iter, printer, indent + "| ");
     }
 }
@@ -978,12 +981,12 @@ bool empty_parallel() {
 **
 ** \ingroup QT
 */
-void timer_init(void) {
+void timer_init() {
     omp_init_lock(&lock_timer);
     omp_set_lock(&lock_timer);
-    extern time_t timer_start;
+    extern std::time_t timer_start;
     extern Timer_Structure root_timer;
-    timer_start = time(nullptr);
+    timer_start = std::time(nullptr);
     root_timer.turn_on();
     extern std::list<Timer_Structure *> ser_on_timers;
     ser_on_timers.push_back(&root_timer);
@@ -997,8 +1000,8 @@ void timer_init(void) {
 **
 ** \ingroup QT
 */
-void timer_done(void) {
-    extern time_t timer_start, timer_end;
+void timer_done() {
+    extern std::time_t timer_start, timer_end;
     omp_set_lock(&lock_timer);
     extern Timer_Structure root_timer;
     root_timer.turn_off();
@@ -1008,27 +1011,30 @@ void timer_done(void) {
     gethostname(host, 40);
 
     /* Dump the timing data to timer.dat and free the timers */
-    auto printer = std::make_shared<PsiOutStream>("timer.dat", std::ostream::app);
+    auto mode = std::ostream::app;
+    auto printer = std::make_shared<PsiOutStream>("timer.dat", mode);
     printer->Printf("\n");
     printer->Printf("Host: %s\n", host);
     free(host);
     printer->Printf("\n");
     printer->Printf("Timers On : %s", ctime(&timer_start));
-    timer_end = time(nullptr);
+    timer_end = std::time(nullptr);
     printer->Printf("Timers Off: %s", ctime(&timer_end));
     printer->Printf("\nWall Time:  %10.2f seconds\n\n",
                     std::chrono::duration_cast<std::chrono::duration<double>>(root_timer.get_total_wtime()).count());
+    printer->Printf("                                                       Time (seconds)\n");
+    printer->Printf("Module                               %12s%12s%12s%13s\n", "User", "System", "Wall", "Calls");
 
     const std::list<Timer_Structure> timer_list = root_timer.summarize();
     for (auto timer_iter = timer_list.begin(), end_iter = timer_list.end(); timer_iter != end_iter; ++timer_iter) {
-        print_timer(*timer_iter, printer, 28);
+        print_timer(*timer_iter, printer, 36);
     }
 
-    printer->Printf("\n-----------------------------------------------------------\n");
+    printer->Printf("\n--------------------------------------------------------------------------------------\n");
 
     print_nested_timer(root_timer, printer, "");
 
-    printer->Printf("\n***********************************************************\n");
+    printer->Printf("\n**************************************************************************************\n");
 
     omp_unset_lock(&lock_timer);
     omp_destroy_lock(&lock_timer);
@@ -1057,7 +1063,7 @@ void stop_skip_timers() {
 **
 ** \ingroup QT
 */
-PSI_API void timer_on(const std::string& key) {
+PSI_API void timer_on(const std::string &key) {
     omp_set_lock(&lock_timer);
     extern bool skip_timers;
     if (skip_timers) {
@@ -1093,7 +1099,7 @@ PSI_API void timer_on(const std::string& key) {
 **
 ** \ingroup QT
 */
-PSI_API void timer_off(const std::string& key) {
+PSI_API void timer_off(const std::string &key) {
     omp_set_lock(&lock_timer);
     extern bool skip_timers;
     if (skip_timers) {
@@ -1164,7 +1170,7 @@ PSI_API void timer_off(const std::string& key) {
 **
 ** \ingroup QT
 */
-void parallel_timer_on(const std::string& key, int thread_rank) {
+void parallel_timer_on(const std::string &key, int thread_rank) {
     omp_set_lock(&lock_timer);
     extern bool skip_timers;
     if (skip_timers) {
@@ -1207,7 +1213,7 @@ void parallel_timer_on(const std::string& key, int thread_rank) {
 **
 ** \ingroup QT
 */
-void parallel_timer_off(const std::string& key, int thread_rank) {
+void parallel_timer_off(const std::string &key, int thread_rank) {
     omp_set_lock(&lock_timer);
     extern bool skip_timers;
     if (skip_timers) {
@@ -1270,10 +1276,10 @@ void parallel_timer_off(const std::string& key, int thread_rank) {
             parent_ptr = on_child_ptr;
         }
     }
-    if (parallel_timer.get_parent() != nullptr and empty_parallel()) {
+    if (parallel_timer.get_parent() != nullptr && empty_parallel()) {
         parallel_timer.get_parent()->merge_move_all(&parallel_timer);
         parallel_timer.set_parent(nullptr);
     }
     omp_unset_lock(&lock_timer);
 }
-}
+}  // namespace psi

@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -104,10 +104,12 @@ void CIWavefunction::transform_ci_integrals() {
     auto act_space = std::make_shared<MOSpace>('X', orbitals, indices);
     spaces.push_back(act_space);
 
-    IntegralTransform* ints = new IntegralTransform(H_, Cdrc, Cact, Cvir, Cfzv, spaces, IntegralTransform::TransformationType::Restricted,
-                                                    IntegralTransform::OutputType::DPDOnly, IntegralTransform::MOOrdering::PitzerOrder,
-                                                    IntegralTransform::FrozenOrbitals::OccAndVir, true);
+    IntegralTransform* ints =
+        new IntegralTransform(H_, Cdrc, Cact, Cvir, Cfzv, spaces, IntegralTransform::TransformationType::Restricted,
+                              IntegralTransform::OutputType::DPDOnly, IntegralTransform::MOOrdering::PitzerOrder,
+                              IntegralTransform::FrozenOrbitals::OccAndVir, true);
     ints_ = std::shared_ptr<IntegralTransform>(ints);
+    ints_->set_build_mo_fock(false);
     ints_->set_memory(Process::environment.get_memory() * 0.8);
 
     // Incase we do two ci runs
@@ -196,10 +198,10 @@ void CIWavefunction::rotate_mcscf_integrals(SharedMatrix k, SharedVector onel_ou
     SharedMatrix Cact = get_orbitals("ACT");
     SharedMatrix Crot = get_orbitals("ROT");
 
-    SharedMatrix H_rot_a = Matrix::triplet(Crot, CalcInfo_->so_onel_ints, Cact, true, false, false);
+    SharedMatrix H_rot_a = linalg::triplet(Crot, CalcInfo_->so_onel_ints, Cact, true, false, false);
 
     // => Rotate onel ints <= //
-    SharedMatrix rot_onel = Matrix::doublet(Uact, H_rot_a);
+    SharedMatrix rot_onel = linalg::doublet(Uact, H_rot_a);
     rot_onel->gemm(true, true, 1.0, H_rot_a, Uact, 1.0);
 
     auto tmponel = std::make_shared<Vector>("Temporary onel storage", CalcInfo_->num_ci_tri);
@@ -299,7 +301,7 @@ void CIWavefunction::transform_dfmcscf_ints(bool approx_only) {
     double* aaQp = aaQ->pointer()[0];
     dfh_->fill_tensor("aaQ", aaQ);
 
-    SharedMatrix actMO = Matrix::doublet(aaQ, aaQ, false, true);
+    SharedMatrix actMO = linalg::doublet(aaQ, aaQ, false, true);
     aaQ.reset();
 
     pitzer_to_ci_order_twoel(actMO, CalcInfo_->twoel_ints);
@@ -325,9 +327,6 @@ void CIWavefunction::setup_mcscf_ints() {
     std::vector<int> rot_orbitals(CalcInfo_->num_rot_orbs, 0);
     std::vector<int> act_orbitals(CalcInfo_->num_ci_orbs, 0);
 
-    // Indices *should* be zero, DPD does not use it
-    std::vector<int> indices(CalcInfo_->num_ci_orbs, 0);
-
     int act_orbnum = 0;
     int rot_orbnum = 0;
     for (int h = 0, rn = 0, an = 0; h < CalcInfo_->nirreps; h++) {
@@ -347,15 +346,16 @@ void CIWavefunction::setup_mcscf_ints() {
         rot_orbnum += CalcInfo_->frozen_uocc[h];
     }
 
-    rot_space_ = std::make_shared<MOSpace>('R', rot_orbitals, indices);
-    act_space_ = std::make_shared<MOSpace>('X', act_orbitals, indices);
+    rot_space_ = std::make_shared<MOSpace>('R', rot_orbitals, std::vector<int>());
+    act_space_ = std::make_shared<MOSpace>('X', act_orbitals, std::vector<int>());
     spaces.push_back(rot_space_);
     spaces.push_back(act_space_);
 
     // Now the occ space is active, the vir space is our rot space (FZC to FZV)
-    IntegralTransform* ints = new IntegralTransform(H_, Cdrc, Cact, Cvir, Cfzv, spaces, IntegralTransform::TransformationType::Restricted,
-                                                    IntegralTransform::OutputType::DPDOnly, IntegralTransform::MOOrdering::PitzerOrder,
-                                                    IntegralTransform::FrozenOrbitals::OccAndVir, true);
+    IntegralTransform* ints =
+        new IntegralTransform(H_, Cdrc, Cact, Cvir, Cfzv, spaces, IntegralTransform::TransformationType::Restricted,
+                              IntegralTransform::OutputType::DPDOnly, IntegralTransform::MOOrdering::PitzerOrder,
+                              IntegralTransform::FrozenOrbitals::OccAndVir, true);
     ints_ = std::shared_ptr<IntegralTransform>(ints);
     ints_->set_memory(Process::environment.get_memory() * 0.8);
 
@@ -366,7 +366,8 @@ void CIWavefunction::setup_mcscf_ints() {
     ints_->set_print(0);
 
     // Conventional JK build
-    jk_ = JK::build_JK(basisset_, get_basisset("DF_BASIS_SCF"), options_, false, Process::environment.get_memory() * 0.8 / sizeof(double));
+    jk_ = JK::build_JK(basisset_, get_basisset("DF_BASIS_SCF"), options_, false,
+                       Process::environment.get_memory() * 0.8 / sizeof(double));
     jk_->set_do_J(true);
     jk_->set_do_K(true);
     jk_->set_memory(Process::environment.get_memory() * 0.8 / sizeof(double));
@@ -387,8 +388,10 @@ void CIWavefunction::setup_mcscf_ints_ao() {
 #else
         throw PSIEXCEPTION("GTFock was not compiled in this version");
 #endif
-    } else if ((options_.get_str("SCF_TYPE").find("DF") != std::string::npos) or scf_type == "CD" or scf_type == "PK" or scf_type == "DIRECT" or scf_type == "OUT_OF_CORE") {
-        jk_ = JK::build_JK(this->basisset(), get_basisset("DF_BASIS_SCF"), options_, false, Process::environment.get_memory() * 0.8 / sizeof(double));
+    } else if ((options_.get_str("SCF_TYPE").find("DF") != std::string::npos) || scf_type == "CD" || scf_type == "PK" ||
+               scf_type == "DIRECT" || scf_type == "OUT_OF_CORE") {
+        jk_ = JK::build_JK(this->basisset(), get_basisset("DF_BASIS_SCF"), options_, false,
+                           Process::environment.get_memory() * 0.8 / sizeof(double));
     } else {
         outfile->Printf("\n Please select GTFock, DF, CD or PK for use with MCSCF_TYPE AO");
         throw PSIEXCEPTION("AO_CASSCF does not work with your SCF_TYPE");
@@ -493,7 +496,7 @@ void CIWavefunction::transform_mcscf_ints_ao(bool approx_only) {
         Cact->set_column(0, v, Crot_vec);
     }
 
-    timer_on("CIWave: Forming Active Psuedo Density");
+    timer_on("CIWave: Forming Active Pseudo Density");
     /// Step 1:  D_{mu nu} ^{tu} = C_{mu t} C_{nu u} forall t, u in active
     std::vector<std::tuple<int, int, SharedMatrix, SharedMatrix>> D_vec;
     for (size_t i = 0; i < nact; i++) {
@@ -509,7 +512,7 @@ void CIWavefunction::transform_mcscf_ints_ao(bool approx_only) {
             D_vec.push_back(std::make_tuple(i, j, Cmat_i, Cmat_j));
         }
     }
-    timer_off("CIWave: Forming Active Psuedo Density");
+    timer_off("CIWave: Forming Active Pseudo Density");
 
     std::vector<SharedMatrix>& Cl = jk_->C_left();
     std::vector<SharedMatrix>& Cr = jk_->C_right();
@@ -535,7 +538,7 @@ void CIWavefunction::transform_mcscf_ints_ao(bool approx_only) {
         int i = std::get<0>(D_vec[D_tasks]);
         int j = std::get<1>(D_vec[D_tasks]);
         SharedMatrix J = jk_->J()[D_tasks];
-        SharedMatrix half_trans = Matrix::triplet(Crot, J, Cact, true, false, false);
+        SharedMatrix half_trans = linalg::triplet(Crot, J, Cact, true, false, false);
 #pragma omp parallel for schedule(static)
         for (size_t p = 0; p < nrot; p++) {
             for (size_t q = 0; q < nact; q++) {
@@ -622,7 +625,7 @@ void CIWavefunction::read_dpd_ci_ints() {
     // => Read one electron integrals <= //
     // Build temporary desired arrays
     int nmotri_full = (CalcInfo_->nmo * (CalcInfo_->nmo + 1)) / 2;
-    double* tmp_onel_ints = new double[nmotri_full];
+    auto* tmp_onel_ints = new double[nmotri_full];
 
     // Read one electron integrals
     iwl_rdone(PSIF_OEI, PSIF_MO_FZC, tmp_onel_ints, nmotri_full, 0, (print_ > 4), "outfile");
@@ -710,7 +713,7 @@ void CIWavefunction::rotate_dfmcscf_twoel_ints(SharedMatrix Uact, SharedVector t
     // Uact_av DFERI_R_a_Q - > DFERI_a_aQ
 
     SharedMatrix dense_Uact = Uact->to_block_sharedmatrix();
-    SharedMatrix tmp_rot_aaQ = Matrix::doublet(dense_Uact, RaQ);
+    SharedMatrix tmp_rot_aaQ = linalg::doublet(dense_Uact, RaQ);
     RaQ.reset();
 
     // Quv += Qvu
@@ -735,7 +738,7 @@ void CIWavefunction::rotate_dfmcscf_twoel_ints(SharedMatrix Uact, SharedVector t
     dfh_->fill_tensor("aaQ", aaQ);
 
     // Form ERI's
-    SharedMatrix rot_twoel = Matrix::doublet(rot_aaQ, aaQ, false, true);
+    SharedMatrix rot_twoel = linalg::doublet(rot_aaQ, aaQ, false, true);
 
     rot_aaQ.reset();
     aaQ.reset();
@@ -805,7 +808,7 @@ void CIWavefunction::rotate_mcscf_twoel_ints(SharedMatrix Uact, SharedVector two
 
     // Rotate the integrals
     SharedMatrix dense_Uact = Uact->to_block_sharedmatrix();
-    SharedMatrix half_rot_aaaa = Matrix::doublet(aaar, dense_Uact, false, true);
+    SharedMatrix half_rot_aaaa = linalg::doublet(aaar, dense_Uact, false, true);
 
     aaar.reset();
 
@@ -1000,7 +1003,7 @@ void CIWavefunction::onel_ints_from_jk() {
     if (mcscf_object_init_) {
         somcscf_->set_AO_IFock(J[0]);
     }
-    SharedMatrix onel_ints = Matrix::triplet(Cact, J[0], Cact, true, false, false);
+    SharedMatrix onel_ints = linalg::triplet(Cact, J[0], Cact, true, false, false);
 
     // Set 1D onel ints
     pitzer_to_ci_order_onel(onel_ints, CalcInfo_->onel_ints);
@@ -1009,7 +1012,7 @@ void CIWavefunction::onel_ints_from_jk() {
     J[0]->add(H_);
 
     SharedMatrix Cdrc = get_orbitals("DRC");
-    SharedMatrix D = Matrix::doublet(Cdrc, Cdrc, false, true);
+    SharedMatrix D = linalg::doublet(Cdrc, Cdrc, false, true);
     CalcInfo_->edrc = J[0]->vector_dot(D);
 }
 
@@ -1069,5 +1072,5 @@ void CIWavefunction::pitzer_to_ci_order_twoel(SharedMatrix src, SharedVector des
         }
     }
 }
-}
-}  // namespace psi::detci
+}  // namespace detci
+}  // namespace psi

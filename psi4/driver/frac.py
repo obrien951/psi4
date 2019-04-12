@@ -3,7 +3,7 @@
 #
 # Psi4: an open-source quantum chemistry software package
 #
-# Copyright (c) 2007-2018 The Psi4 Developers.
+# Copyright (c) 2007-2019 The Psi4 Developers.
 #
 # The copyrights for code used from other parties are included in
 # the corresponding files.
@@ -25,10 +25,6 @@
 #
 # @END LICENSE
 #
-
-from __future__ import division
-from __future__ import print_function
-from __future__ import absolute_import
 
 from psi4 import core
 from psi4.driver import p4util
@@ -188,7 +184,7 @@ def frac_traverse(name, **kwargs):
         E, wfn = driver.energy('scf', dft_functional=name, return_wfn=True, molecule=molecule, **kwargs)
         C = 1
         if E == 0.0:
-            E = core.get_variable('SCF ITERATION ENERGY')
+            E = core.variable('SCF ITERATION ENERGY')
             C = 0
 
         if LUMO > 0:
@@ -237,7 +233,7 @@ def frac_traverse(name, **kwargs):
         E, wfn = driver.energy('scf', dft_functional=name, return_wfn=True, molecule=molecule, **kwargs)
         C = 1
         if E == 0.0:
-            E = core.get_variable('SCF ITERATION ENERGY')
+            E = core.variable('SCF ITERATION ENERGY')
             C = 0
 
         if LUMO > 0:
@@ -395,7 +391,7 @@ def frac_nuke(name, **kwargs):
             E, wfn = driver.energy('scf', dft_functional=name, return_wfn=True, molecule=molecule, **kwargs)
             C = 1
             if E == 0.0:
-                E = core.get_variable('SCF ITERATION ENERGY')
+                E = core.variable('SCF ITERATION ENERGY')
                 C = 0
 
             if HOMO > 0:

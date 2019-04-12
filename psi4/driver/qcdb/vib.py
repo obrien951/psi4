@@ -3,7 +3,7 @@
 #
 # Psi4: an open-source quantum chemistry software package
 #
-# Copyright (c) 2007-2018 The Psi4 Developers.
+# Copyright (c) 2007-2019 The Psi4 Developers.
 #
 # The copyrights for code used from other parties are included in
 # the corresponding files.
@@ -26,30 +26,25 @@
 # @END LICENSE
 #
 
-from __future__ import division
-from __future__ import print_function
-from __future__ import absolute_import
 import sys
 import math
+import itertools
 import collections
 
 import numpy as np
 
-from .physconst import *
+import qcelemental as qcel
+
 from .psiutil import *
 from .util import *
 from .libmintsmolecule import compute_atom_map
 from .datastructures import QCAspect
 
-try:
-    from itertools import izip_longest as zip_longest  # py2
-except ImportError:
-    from itertools import zip_longest  # py3
 
 LINEAR_A_TOL = 1.0E-2  # tolerance (roughly max dev) for TR space
 
 
-def compare_vibinfos(expected, computed, tol, label, verbose=1, forgive=None, required=None):
+def compare_vibinfos(expected, computed, tol, label, verbose=1, forgive=None, required=None, toldict=None):
     """Compare two dictionaries of vibration QCAspect objects. All items in
     `expected` must be present in `computed` and agree to `tol` (outright
     (<1) or decimal places (>=1)). At minimum, both must contain items in
@@ -94,12 +89,20 @@ def compare_vibinfos(expected, computed, tol, label, verbose=1, forgive=None, re
     checkkeys.extend(expected.keys())
 
     for asp in checkkeys:
-        if asp in ['q', 'w', 'x']:
+        if asp not in computed and asp in forgive:
+            continue
+
+        if toldict is not None and asp in toldict:
+            ktol = 10.**-toldict[asp]
+        else:
+            ktol = tol
+
+        if asp in 'qwx':
             ccnc = _phase_cols_to_max_element(computed[asp].data)
             eenc = _phase_cols_to_max_element(expected[asp].data)
             ccnc = _check_degen_modes(ccnc, computed['omega'].data)
             eenc = _check_degen_modes(eenc, expected['omega'].data)
-            same = np.allclose(eenc, ccnc, atol=tol)
+            same = np.allclose(eenc, ccnc, atol=ktol)
             print_stuff(asp=asp, same=same, ref=eenc, val=ccnc, space='\n')
 
         elif asp in ['gamma', 'TRV']:
@@ -107,10 +110,10 @@ def compare_vibinfos(expected, computed, tol, label, verbose=1, forgive=None, re
             print_stuff(asp=asp, same=same, ref=expected[asp].data, val=computed[asp].data)
 
         elif isinstance(expected[asp].data, float):
-            same = abs(expected[asp].data - computed[asp].data) < tol
+            same = abs(expected[asp].data - computed[asp].data) < ktol
             print_stuff(asp=asp, same=same, ref=expected[asp].data, val=computed[asp].data)
         else:
-            same = np.allclose(expected[asp].data, computed[asp].data, atol=tol) and \
+            same = np.allclose(expected[asp].data, computed[asp].data, atol=ktol) and \
                    (expected[asp].data.shape == computed[asp].data.shape)
             print_stuff(asp=asp, same=same, ref=expected[asp].data, val=computed[asp].data)
 
@@ -225,6 +228,7 @@ def print_molden_vibs(vibinfo, atom_symbol, geom, standalone=True):
         for at in range(nat):
             text += ('   ' + """{:20.10f}""" * 3 + '\n').format(*(vibinfo['x'].data[:, vib].reshape(nat, 3)[at].real))
 
+
 #     text += """\n[INT]\n"""
 #     for vib in active:
 #         text += """1.0\n"""
@@ -300,7 +304,7 @@ def _phase_cols_to_max_element(arr, tol=1.e-2, verbose=1):
     return arr2
 
 
-def harmonic_analysis(hess, geom, mass, basisset, irrep_labels, project_trans=True, project_rot=True):
+def harmonic_analysis(hess, geom, mass, basisset, irrep_labels, dipder=None, project_trans=True, project_rot=True):
     """Like so much other Psi4 goodness, originally by @andysim
 
     Parameters
@@ -315,6 +319,8 @@ def harmonic_analysis(hess, geom, mass, basisset, irrep_labels, project_trans=Tr
         Basis set object (can be dummy, e.g., STO-3G) for SALCs.
     irrep_labels : list of str
         Irreducible representation labels.
+    dipder : ndarray of float
+        (3, 3 * nat) dipole derivatives in atomic units, [Eh a0/u] or [(e a0/a0)^2/u]
     project_trans : bool, optional
         Idealized translations projected out of final vibrational analysis.
     project_rot : bool, optional
@@ -356,6 +362,8 @@ def harmonic_analysis(hess, geom, mass, basisset, irrep_labels, project_trans=Tr
     | Xtp0          | Turning point v=0                          | a0        | ndarray(ndof) float (+/0)                            |
     +---------------+--------------------------------------------+-----------+------------------------------------------------------+
     | theta_vib     | char temp                                  | K         | ndarray(ndof) float (+/0)                            |
+    +---------------+--------------------------------------------+-----------+------------------------------------------------------+
+    | IR_intensity  | infrared intensity                         | km/mol    | ndarray(ndof) float (+/+)                            |
     +---------------+--------------------------------------------+-----------+------------------------------------------------------+
 
     Examples
@@ -416,9 +424,8 @@ def harmonic_analysis(hess, geom, mass, basisset, irrep_labels, project_trans=Tr
     space = ('T' if project_trans else '') + ('R' if project_rot else '')
     TRspace = _get_TR_space(mass, geom, space=space, tol=LINEAR_A_TOL)
     nrt = TRspace.shape[0]
-    text.append(
-        '  projection of translations ({}) and rotations ({}) removed {} degrees of freedom ({})'.
-        format(project_trans, project_rot, nrt, nrt_expected))
+    text.append('  projection of translations ({}) and rotations ({}) removed {} degrees of freedom ({})'.format(
+        project_trans, project_rot, nrt, nrt_expected))
 
     P = np.identity(3 * nat)
     for irt in TRspace:
@@ -435,7 +442,8 @@ def harmonic_analysis(hess, geom, mass, basisset, irrep_labels, project_trans=Tr
 
     idx = np.argsort(pre_force_constant_au)
     pre_force_constant_au = pre_force_constant_au[idx]
-    uconv_cm_1 = np.sqrt(psi_na * psi_hartree2J * 1.0e19) / (2 * np.pi * psi_c * psi_bohr2angstroms)
+    uconv_cm_1 = (np.sqrt(qcel.constants.na * qcel.constants.hartree2J * 1.0e19) /
+                  (2 * np.pi * qcel.constants.c * qcel.constants.bohr2angstroms))
     pre_frequency_cm_1 = np.lib.scimath.sqrt(pre_force_constant_au) * uconv_cm_1
 
     pre_lowfreq = np.where(np.real(pre_frequency_cm_1) < 100.0)[0]
@@ -509,11 +517,13 @@ def harmonic_analysis(hess, geom, mass, basisset, irrep_labels, project_trans=Tr
     if project_trans and not project_rot:
         text.append('  Note that "Vibration"s include {} un-projected rotation-like modes.'.format(nrt_expected - 3))
     elif not project_trans and not project_rot:
-        text.append('  Note that "Vibration"s include {} un-projected rotation-like and translation-like modes.'.format(nrt_expected))
+        text.append('  Note that "Vibration"s include {} un-projected rotation-like and translation-like modes.'.
+                    format(nrt_expected))
 
     # general conversion factors, LAB II.11
-    uconv_K = (psi_h * psi_na * 1.0e21) / (8 * np.pi * np.pi * psi_c)
-    uconv_S = np.sqrt((psi_c * (2 * np.pi * psi_bohr2angstroms)**2) / (psi_h * psi_na * 1.0e21))
+    uconv_K = (qcel.constants.h * qcel.constants.na * 1.0e21) / (8 * np.pi * np.pi * qcel.constants.c)
+    uconv_S = np.sqrt((qcel.constants.c * (2 * np.pi * qcel.constants.bohr2angstroms)**2) /
+                      (qcel.constants.h * qcel.constants.na * 1.0e21))
 
     # normco & reduced mass, LAB II.14 & II.15
     wL = np.einsum('i,ij->ij', sqrtmmminv, qL)
@@ -525,8 +535,26 @@ def harmonic_analysis(hess, geom, mass, basisset, irrep_labels, project_trans=Tr
     xL = np.sqrt(reduced_mass_u) * wL
     vibinfo['x'] = QCAspect('normal mode', 'a0', xL, 'normalized un-mass-weighted')
 
+    # IR intensities, CCQC Proj. Eqns. 15-16
+    uconv_kmmol = (qcel.constants.get("Avogadro constant") * np.pi * 1.e-3 * qcel.constants.get("electron mass in u") *
+                   qcel.constants.get("fine-structure constant")**2 * qcel.constants.get("atomic unit of length") / 3)
+    uconv_D2A2u = (
+        qcel.constants.get('atomic unit of electric dipole mom.') * 1.e11 /
+        qcel.constants.get('hertz-inverse meter relationship') / qcel.constants.get('atomic unit of length'))**2
+    if not (dipder is None or np.array(dipder).size == 0):
+        qDD = dipder.dot(wL)
+        ir_intensity = np.zeros(qDD.shape[1])
+        for i in range(qDD.shape[1]):
+            ir_intensity[i] = qDD[:, i].dot(qDD[:, i])
+        # working but not needed
+        #vibinfo['IR_intensity'] = QCAspect('infrared intensity', 'Eh a0/u', ir_intensity, '')
+        #ir_intensity_D2A2u = ir_intensity * uconv_D2A2u
+        #vibinfo['IR_intensity'] = QCAspect('infrared intensity', '(D/AA)^2/u', ir_intens_D2A2u, '')
+        ir_intensity_kmmol = ir_intensity * uconv_kmmol
+        vibinfo['IR_intensity'] = QCAspect('infrared intensity', 'km/mol', ir_intensity_kmmol, '')
+
     # force constants, LAB II.16 (real compensates for earlier sqrt)
-    uconv_mdyne_a = (0.1 * (2 * np.pi * psi_c)**2) / psi_na
+    uconv_mdyne_a = (0.1 * (2 * np.pi * qcel.constants.c)**2) / qcel.constants.na
     force_constant_mdyne_a = reduced_mass_u * (frequency_cm_1 * frequency_cm_1).real * uconv_mdyne_a
     vibinfo['k'] = QCAspect('force constant', 'mDyne/A', force_constant_mdyne_a, '')
 
@@ -552,7 +580,7 @@ def harmonic_analysis(hess, geom, mass, basisset, irrep_labels, project_trans=Tr
 
     # characteristic vibrational temperature, RAK thermo & https://en.wikipedia.org/wiki/Vibrational_temperature
     #   (imag freq zeroed)
-    uconv_K = 100 * psi_h * psi_c / psi_kb
+    uconv_K = 100 * qcel.constants.h * qcel.constants.c / qcel.constants.kb
     vib_temperature_K = frequency_cm_1.real * uconv_K
     vibinfo['theta_vib'] = QCAspect('char temp', 'K', vib_temperature_K, '')
 
@@ -611,7 +639,7 @@ def print_vibs(vibinfo, atom_lbl=None, normco='x', shortlong=True, **kwargs):
         "Collect data into fixed-length chunks or blocks"
         # grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx"
         args = [iter(iterable)] * n
-        return zip_longest(*args, fillvalue=fillvalue)
+        return itertools.zip_longest(*args, fillvalue=fillvalue)
 
     if normco not in ['q', 'w', 'x']:
         raise ValidationError("""Requested normal coordinates not among allowed q/w/x: """ + normco)
@@ -704,6 +732,16 @@ def print_vibs(vibinfo, atom_lbl=None, normco='x', shortlong=True, **kwargs):
                 vibinfo['DQ0'].data[vib], '', width=width, prec=prec, colsp=colsp)
         text += '\n'
 
+        if 'IR_intensity' in vibinfo:
+            text += """{:{presp}}{:{prewidth}}""".format(
+                '', 'IR activ ' + _br(vibinfo['IR_intensity'].units), prewidth=prewidth, presp=presp)
+            for vib in row:
+                if vib is None:
+                    break
+                text += """{:^{width}.{prec}f}{:{colsp}}""".format(
+                    vibinfo['IR_intensity'].data[vib], '', width=width, prec=prec, colsp=colsp)
+            text += '\n'
+
         if 'theta_vib' in vibinfo:
             text += """{:{presp}}{:{prewidth}}""".format(
                 '', 'Char temp ' + _br(vibinfo['theta_vib'].units), prewidth=prewidth, presp=presp)
@@ -714,7 +752,6 @@ def print_vibs(vibinfo, atom_lbl=None, normco='x', shortlong=True, **kwargs):
                     vibinfo['theta_vib'].data[vib], '', width=width, prec=prec, colsp=colsp)
             text += '\n'
 
-        #text += 'IR activ [KM/mol]\n'
         #text += 'Raman activ [A^4/u]\n'
         text += ' ' * presp + '-' * (prewidth + groupby * (width + colsp) - colsp) + '\n'
 
@@ -737,8 +774,9 @@ def print_vibs(vibinfo, atom_lbl=None, normco='x', shortlong=True, **kwargs):
                     for vib in row:
                         if vib is None:
                             break
-                        text += """{:^{width}.{prec}f}""".format(
-                            (vibinfo[normco].data[3 * at + xyz, vib]), width=width, prec=ncprec)
+                        text += """{:^{width}.{prec}f}""".format((vibinfo[normco].data[3 * at + xyz, vib]),
+                                                                 width=width,
+                                                                 prec=ncprec)
                         text += """{:{colsp}}""".format('', colsp=colsp)
                     text += '\n'
 
@@ -789,9 +827,10 @@ def thermo(vibinfo, T, P, multiplicity, molecular_mass, E0, sigma, rot_const, ro
     sm[('S', 'elec')] = math.log(q_elec)
 
     # translational
-    beta = 1 / (psi_kb * T)
-    q_trans = (2.0 * np.pi * molecular_mass * psi_amu2kg / (beta * psi_h * psi_h))**1.5 * psi_na / (beta * P)
-    sm[('S', 'trans')] = 5 / 2 + math.log(q_trans / psi_na)
+    beta = 1 / (qcel.constants.kb * T)
+    q_trans = (2.0 * np.pi * molecular_mass * qcel.constants.amu2kg /
+               (beta * qcel.constants.h * qcel.constants.h))**1.5 * qcel.constants.na / (beta * P)
+    sm[('S', 'trans')] = 5 / 2 + math.log(q_trans / qcel.constants.na)
     sm[('Cv', 'trans')] = 3 / 2
     sm[('Cp', 'trans')] = 5 / 2
     sm[('E', 'trans')] = 3 / 2 * T
@@ -801,13 +840,13 @@ def thermo(vibinfo, T, P, multiplicity, molecular_mass, E0, sigma, rot_const, ro
     if rotor_type == "RT_ATOM":
         pass
     elif rotor_type == "RT_LINEAR":
-        q_rot = 1. / (beta * sigma * 100 * psi_c * psi_h * rot_const[1])
+        q_rot = 1. / (beta * sigma * 100 * qcel.constants.c * qcel.constants.h * rot_const[1])
         sm[('S', 'rot')] = 1.0 + math.log(q_rot)
         sm[('Cv', 'rot')] = 1
         sm[('Cp', 'rot')] = 1
         sm[('E', 'rot')] = T
     else:
-        phi_A, phi_B, phi_C = rot_const * 100 * psi_c * psi_h / psi_kb
+        phi_A, phi_B, phi_C = rot_const * 100 * qcel.constants.c * qcel.constants.h / qcel.constants.kb
         q_rot = math.sqrt(math.pi) * T**1.5 / (sigma * math.sqrt(phi_A * phi_B * phi_C))
         sm[('S', 'rot')] = 3 / 2 + math.log(q_rot)
         sm[('Cv', 'rot')] = 3 / 2
@@ -840,7 +879,9 @@ def thermo(vibinfo, T, P, multiplicity, molecular_mass, E0, sigma, rot_const, ro
     sm[('E', 'vib')] = sm[('ZPE', 'vib')] + np.sum(rT * T / np.expm1(rT))
     sm[('H', 'vib')] = sm[('E', 'vib')]
 
-    assert (abs(ZPE_cm_1 - sm[('ZPE', 'vib')] * psi_R * psi_hartree2wavenumbers * 0.001 / psi_hartree2kJmol) < 0.1)
+    assert (abs(ZPE_cm_1 - sm[
+        ('ZPE', 'vib')] * qcel.constants.R * qcel.constants.hartree2wavenumbers * 0.001 / qcel.constants.hartree2kJmol)
+            < 0.1)
 
     #real_vibs = np.ma.masked_where(vibinfo['omega'].data.imag > vibinfo['omega'].data.real, vibinfo['omega'].data)
 
@@ -853,7 +894,7 @@ def thermo(vibinfo, T, P, multiplicity, molecular_mass, E0, sigma, rot_const, ro
         # terms above are unitless (S, Cv, Cp) or in units of temperature (ZPE, E, H, G) as expressions are divided by R.
         # R [Eh/K], computed as below, slightly diff in 7th sigfig from 3.1668114e-6 (k_B in [Eh/K])
         #    value listed https://en.wikipedia.org/wiki/Boltzmann_constant
-        uconv_R_EhK = psi_R / psi_hartree2kJmol
+        uconv_R_EhK = qcel.constants.R / qcel.constants.hartree2kJmol
         for piece in ['S', 'Cv', 'Cp']:
             sm[(piece, term)] *= uconv_R_EhK  # [mEh/K] <-- []
         for piece in ['ZPE', 'E', 'H', 'G']:
@@ -887,7 +928,7 @@ def thermo(vibinfo, T, P, multiplicity, molecular_mass, E0, sigma, rot_const, ro
     # display
     format_S_Cv_Cp = """\n  {:19} {:11.3f} [cal/(mol K)]  {:11.3f} [J/(mol K)]  {:15.8f} [mEh/K]"""
     format_ZPE_E_H_G = """\n  {:19} {:11.3f} [kcal/mol]  {:11.3f} [kJ/mol]  {:15.8f} [Eh]"""
-    uconv = np.asarray([psi_hartree2kcalmol, psi_hartree2kJmol, 1.])
+    uconv = np.asarray([qcel.constants.hartree2kcalmol, qcel.constants.hartree2kJmol, 1.])
 
     # TODO rot_const, rotor_type
     text = ''
@@ -923,7 +964,7 @@ def thermo(vibinfo, T, P, multiplicity, molecular_mass, E0, sigma, rot_const, ro
     for term in terms:
         text += format_ZPE_E_H_G.format(terms[term] + ' ZPE', *sm[('ZPE', term)] * uconv)
         if term in ['vib', 'corr']:
-            text += """ {:15.3f} [cm^-1]""".format(sm[('ZPE', term)] * psi_hartree2wavenumbers)
+            text += """ {:15.3f} [cm^-1]""".format(sm[('ZPE', term)] * qcel.constants.hartree2wavenumbers)
     text += """\n  Total ZPE, Electronic energy at 0 [K]                             {:15.8f} [Eh]""".format(
         sm[('ZPE', 'tot')])
 

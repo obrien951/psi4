@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -33,7 +33,7 @@
  *  @defgroup MCSCF MCSCF is a code for SCF/MCSCF computations
  *  @ingroup MCSCF
  *  @brief Contains main() and global variables
-*/
+ */
 
 // Standard libraries
 #include <iostream>
@@ -54,11 +54,11 @@
 #include "scf.h"
 
 namespace psi {
-MOInfoSCF* moinfo_scf = 0;
+MOInfoSCF* moinfo_scf = nullptr;
 
 namespace mcscf {
 
-MemoryManager* memory_manager = 0;
+MemoryManager* memory_manager = nullptr;
 
 /**
  * The main function
@@ -90,9 +90,9 @@ SharedWavefunction mcscf(SharedWavefunction ref_wfn, Options& options) {
         moinfo_scf = new psi::MOInfoSCF(*(wfn.get()), options);
         wfn->compute_energy();
 
-        Process::environment.globals["CURRENT ENERGY"] = wfn->reference_energy();
-        Process::environment.globals["CURRENT REFERENCE ENERGY"] = wfn->reference_energy();
-        Process::environment.globals["SCF TOTAL ENERGY"] = wfn->reference_energy();
+        wfn->set_scalar_variable("CURRENT ENERGY", wfn->energy());
+        wfn->set_scalar_variable("CURRENT REFERENCE ENERGY", wfn->energy());
+        wfn->set_scalar_variable("SCF TOTAL ENERGY", wfn->energy());
 
     } else if (options.get_str("REFERENCE") == "MCSCF") {
         throw PSIEXCEPTION("REFERENCE = MCSCF not implemented yet");
@@ -125,5 +125,5 @@ void init_psi(Options& options_) {
  * Close psi by calling psio_done() and psi_stop()
  */
 void close_psi(Options& options_) { outfile->Printf("\n\n  MCSCF Execution Completed.\n\n"); }
-}
-} /* End Namespaces */
+}  // namespace mcscf
+}  // namespace psi

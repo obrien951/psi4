@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -37,7 +37,6 @@
 
 namespace psi {
 
-
 /*!
 ** IWL_WRTONE()
 **
@@ -52,11 +51,9 @@ namespace psi {
 ** Revised by TDC, June 2001
 ** \ingroup IWL
 */
-void IWL::write_one(PSIO *psio, int itap, const char *label, int ntri, double *onel_ints)
-{
+void IWL::write_one(PSIO *psio, int itap, const char *label, int ntri, double *onel_ints) {
     psio->open(itap, PSIO_OPEN_OLD);
-    psio->write_entry(itap, label, (char*)onel_ints, ntri*sizeof(double));
+    psio->write_entry(itap, label, (char *)onel_ints, ntri * sizeof(double));
     psio->close(itap, 1);
 }
-
 }

@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -34,4 +34,4 @@
 #include "moinfo_scf.h"
 #include "model_space.h"
 #include "psi4/psi4-dec.h"
-#endif // _psi_src_lib_libmoinfo_libmoinfo_h_
+#endif  // _psi_src_lib_libmoinfo_libmoinfo_h_

@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -39,9 +39,6 @@
 #include "psi4/libpsi4util/PsiOutStream.h"
 
 #include <cmath>
-
-#define EXTERN
-#include "psi4/libdpd/dpd.gbl"
 
 using namespace psi;
 
@@ -190,7 +187,6 @@ void IntegralTransform::presort_so_tei() {
     double *aFzcOp = init_array(nTriSo_);
     double *aD = init_array(nTriSo_);
     double *aFock = init_array(nTriSo_);
-    double *aoH = init_array(nTriSo_);
     double *bFzcD = aFzcD;
     double *bFzcOp = aFzcOp;
     double *bD = aD;
@@ -210,10 +206,14 @@ void IntegralTransform::presort_so_tei() {
             for (int q = 0; q <= p; ++q) {
                 int pq = INDEX((p + soOffset), (q + soOffset));
                 for (int i = 0; i < frzcpi_[h]; ++i) aFzcD[pq] += pCa[p][i] * pCa[q][i];
-                for (int i = 0; i < nalphapi_[h]; ++i) aD[pq] += pCa[p][i] * pCa[q][i];
                 if (transformationType_ != TransformationType::Restricted) {
                     for (int i = 0; i < frzcpi_[h]; ++i) bFzcD[pq] += pCb[p][i] * pCb[q][i];
-                    for (int i = 0; i < nbetapi_[h]; ++i) bD[pq] += pCb[p][i] * pCb[q][i];
+                }
+                if(buildMOFock_){
+                    for (int i = 0; i < nalphapi_[h]; ++i) aD[pq] += pCa[p][i] * pCa[q][i];
+                    if (transformationType_ != TransformationType::Restricted) {
+                        for (int i = 0; i < nbetapi_[h]; ++i) bD[pq] += pCb[p][i] * pCb[q][i];
+                    }
                 }
             }
         }
@@ -239,7 +239,7 @@ void IntegralTransform::presort_so_tei() {
     */
 
     // H_->print();
-    aoH = H_->to_lower_triangle();
+    double *aoH = H_->to_lower_triangle();
     for (int pq = 0; pq < nTriSo_; ++pq) {
         aFzcOp[pq] = aoH[pq];
         aFock[pq] = aoH[pq];
@@ -522,7 +522,6 @@ void IntegralTransform::presort_so_tei() {
     free(aFzcD);
     free(aFzcOp);
     free(aD);
-    free(aoH);
     free(aFock);
     if (transformationType_ != TransformationType::Restricted) {
         free(bFzcD);
@@ -530,6 +529,7 @@ void IntegralTransform::presort_so_tei() {
         free(bD);
         free(bFock);
     }
+    delete[] aoH;
 
     dpd_set_default(currentActiveDPD);
 

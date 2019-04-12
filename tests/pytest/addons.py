@@ -1,4 +1,22 @@
+import os
+import shutil
+import subprocess
+
 import pytest
+
+
+def _which(command, return_bool=False):
+    # environment is $PSIPATH:$PATH, less any None values
+    lenv = {'PATH': ':'.join([os.path.abspath(x) for x in os.environ.get('PSIPATH', '').split(':') if x != '']) +
+                    ':' + os.environ.get('PATH')}  # yapf: disable
+    lenv = {k: v for k, v in lenv.items() if v is not None}
+
+    ans = shutil.which(command, mode=os.F_OK | os.X_OK, path=lenv['PATH'])
+
+    if return_bool:
+        return bool(ans)
+    else:
+        return ans
 
 
 def _plugin_import(plug):
@@ -31,6 +49,18 @@ def is_numpy_new_enough(version_feature_introduced):
     return parse_version(numpy.version.version) >= parse_version(version_feature_introduced)
 
 
+def is_dftd3_new_enough(version_feature_introduced):
+    if not _which('dftd3', return_bool=True):
+        return False
+    # Note: anything below v3.2.1 will return the help menu here. but that's fine as version compare evals to False.
+    command = [_which('dftd3'), '-version']
+    proc = subprocess.run(command, stdout=subprocess.PIPE)
+    candidate_version = proc.stdout.decode('utf-8').strip()
+
+    from pkg_resources import parse_version
+    return parse_version(candidate_version) >= parse_version(version_feature_introduced)
+
+
 def is_nvidia_gpu_present():
     try:
         import GPUtil
@@ -57,6 +87,24 @@ hardware_nvidia_gpu = pytest.mark.skipif(is_nvidia_gpu_present() is False,
 
 using_memory_profiler = pytest.mark.skipif(_plugin_import('memory_profiler') is False,
                                 reason='Not detecting module memory_profiler. Install package if necessary and add to envvar PYTHONPATH')
+
+using_psi4 = pytest.mark.skipif(False,
+                                reason='Not detecting module psi4. Install package if necessary and add to envvar PYTHONPATH')
+
+using_qcdb = pytest.mark.skipif(True,
+                                reason='Not detecting common driver. Install package if necessary and add to envvar PYTHONPATH')
+
+using_dftd3 = pytest.mark.skipif(_which('dftd3', return_bool=True) is False,
+                                reason='Not detecting executable dftd3. Install package if necessary and add to envvar PATH or PSIPATH')
+
+using_dftd3_321 = pytest.mark.skipif(is_dftd3_new_enough("3.2.1") is False,
+                                reason='DFTD3 does not include 3.2.1 features. Update package and add to PATH')
+
+using_gcp = pytest.mark.skipif(_which("gcp", return_bool=True) is False,
+                                reason="Not detecting executable gcp. Install package if necessary and add to envvar PSIPATH or PATH")
+
+using_mp2d = pytest.mark.skipif(_which('mp2d', return_bool=True) is False,
+                                reason='Not detecting executable mp2d. Install package if necessary and add to envvar PATH or PSIPATH')
 
 #using_scipy = pytest.mark.skipif(_plugin_import('scipy') is False,
 #                                reason='Not detecting module scipy. Install package if necessary and add to envvar PYTHONPATH')

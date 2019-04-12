@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -26,29 +26,30 @@
  * @END LICENSE
  */
 
-#include "psi4/psi4-dec.h"
-
-#include "psi4/libmints/sieve.h"
-#include "psi4/libfock/cubature.h"
-#include "psi4/libfock/points.h"
-#include "psi4/libqt/qt.h"
-#include "psi4/libciomr/libciomr.h"
-#include "psi4/libmints/matrix.h"
-#include "psi4/libmints/molecule.h"
-#include "psi4/libmints/basisset.h"
-#include "psi4/libmints/vector.h"
-#include "psi4/libmints/integral.h"
-#include "psi4/libmints/potential.h"
-#include "psi4/libfilesystem/path.h"
-#include "psi4/libpsi4util/PsiOutStream.h"
-#include "psi4/liboptions/liboptions.h"
-
 #include "csg.h"
 
+#include <algorithm>
 #ifdef _OPENMP
 #include <omp.h>
-#include "psi4/libpsi4util/process.h"
 #endif
+
+#include "psi4/psi4-dec.h"
+
+#include "psi4/libciomr/libciomr.h"
+#include "psi4/libfilesystem/path.h"
+#include "psi4/libfock/cubature.h"
+#include "psi4/libfock/points.h"
+#include "psi4/libmints/basisset.h"
+#include "psi4/libmints/integral.h"
+#include "psi4/libmints/matrix.h"
+#include "psi4/libmints/molecule.h"
+#include "psi4/libmints/potential.h"
+#include "psi4/libmints/sieve.h"
+#include "psi4/libmints/vector.h"
+#include "psi4/liboptions/liboptions.h"
+#include "psi4/libpsi4util/PsiOutStream.h"
+#include "psi4/libpsi4util/process.h"
+#include "psi4/libqt/qt.h"
 
 namespace psi {
 
@@ -190,7 +191,7 @@ void CubicScalarGrid::populate_grid() {
                         }
                     }
                 }
-                blocks_.push_back(std::make_shared<BlockOPoints>(block_size, xp, yp, zp, wp, extents_));
+                blocks_.push_back(std::make_shared<BlockOPoints>(0, block_size, xp, yp, zp, wp, extents_));
             }
         }
     }
@@ -286,7 +287,8 @@ void CubicScalarGrid::write_cube_file(double* v, const std::string& name, const 
 
     // Atoms of molecule (Z, Q?, x, y, z)
     for (int A = 0; A < mol_->natom(); A++) {
-        fprintf(fh, "%3d %10.6f %10.6f %10.6f %10.6f\n", (int)mol_->Z(A), 0.0, mol_->x(A), mol_->y(A), mol_->z(A));
+        fprintf(fh, "%3d %10.6f %10.6f %10.6f %10.6f\n", (int)mol_->true_atomic_number(A), 0.0, mol_->x(A), mol_->y(A),
+                mol_->z(A));
     }
 
     // Data, striped (x, y, z)
@@ -598,7 +600,7 @@ void CubicScalarGrid::compute_density(std::shared_ptr<Matrix> D, const std::stri
     double density_percent = 100.0 * options_.get_double("CUBEPROP_ISOCONTOUR_THRESHOLD");
     std::stringstream comment;
     comment << " [e/a0^3]. Isocontour range for " << density_percent << "% of the density: (" << isocontour_range.first
-            << "," << isocontour_range.second << ")";
+            << "," << isocontour_range.second << ")." << ecp_header();
     // Write to disk
     write_gen_file(v, name, type, comment.str());
     delete[] v;
@@ -649,6 +651,34 @@ void CubicScalarGrid::compute_orbitals(std::shared_ptr<Matrix> C, const std::vec
     }
     free_block(v);
 }
+void CubicScalarGrid::compute_difference(std::shared_ptr<Matrix> C, const std::vector<int>& indices,
+                                         const std::string& label, const bool square, const std::string& type) {
+    auto C2 = std::make_shared<Matrix>(primary_->nbf(), indices.size());
+    double** Cp = C->pointer();
+    double** C2p = C2->pointer();
+    for (int k = 0; k < indices.size(); k++) {
+        C_DCOPY(primary_->nbf(), &Cp[0][indices[k]], C->colspi()[0], &C2p[0][k], C2->colspi()[0]);
+    }
+    auto v_t = std::make_shared<Matrix>(indices.size(), npoints_);
+    double** v_tp = v_t->pointer();
+    auto v = std::make_shared<Vector>(npoints_);
+    double* vp = v->pointer();
+    add_orbitals(&v_tp[0], C2);
+    for (int i = 0; i < npoints_; i++) {
+         if (square) {
+             v->set(0, i, (v_t->get(0,i) - v_t->get(1,i))*(v_t->get(0,i) + v_t->get(1,i)));
+         } else {
+             v->set(0, i, (v_t->get(0,i) - v_t->get(1,i)));
+         }
+    }
+    std::pair<double, double> isocontour_range = compute_isocontour_range(&vp[0], 2.0);
+    double density_percent = 100.0 * options_.get_double("CUBEPROP_ISOCONTOUR_THRESHOLD");
+    std::stringstream comment;
+    comment << ". Isocontour range for " << density_percent << "% of the density: (" << isocontour_range.first
+            << "," << isocontour_range.second << ")";
+    // Write to disk
+    write_gen_file(&vp[0], label, type, comment.str());
+}
 void CubicScalarGrid::compute_LOL(std::shared_ptr<Matrix> D, const std::string& name, const std::string& type) {
     double* v = new double[npoints_];
     memset(v, '\0', npoints_ * sizeof(double));
@@ -695,4 +725,22 @@ std::pair<double, double> CubicScalarGrid::compute_isocontour_range(double* v2, 
     }
     return std::make_pair(positive_isocontour, negative_isocontour);
 }
+std::string CubicScalarGrid::ecp_header() {
+    std::stringstream ecp_head;
+    ecp_head.str("");
+    if (primary_->has_ECP()) {
+        ecp_head << " Total core: " << primary_->n_ecp_core() << " [e] from 1-indexed atoms (";
+        std::stringstream ecp_atoms;
+        std::stringstream ecp_ncore;
+        for (int A = 0; A < mol_->natom(); A++) {
+            if (primary_->n_ecp_core(mol_->label(A)) > 0) {
+                ecp_atoms << A+1 << "[" << mol_->symbol(A) << "], ";
+                ecp_ncore << primary_->n_ecp_core(mol_->label(A)) << ", ";
+            }
+        }
+        ecp_head << ecp_atoms.str().substr(0,ecp_atoms.str().length()-2) << ") electrons ("
+                 << ecp_ncore.str().substr(0,ecp_ncore.str().length()-2) << ").";
+    }
+    return ecp_head.str();
 }
+}  // namespace psi

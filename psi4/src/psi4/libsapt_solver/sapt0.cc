@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -27,11 +27,18 @@
  */
 
 #include "sapt0.h"
+#include "psi4/lib3index/3index.h"
 #include "psi4/physconst.h"
+#include "psi4/libciomr/libciomr.h"
+#include "psi4/libpsio/psio.hpp"
 #include "psi4/libmints/basisset.h"
 #include "psi4/libmints/matrix.h"
 #include "psi4/libmints/twobody.h"
 #include "psi4/libmints/integral.h"
+#include "psi4/libpsi4util/process.h"
+#include "psi4/libpsio/psio.hpp"
+#include "psi4/libpsio/psio.h"
+#include "psi4/libqt/qt.h"
 
 namespace psi {
 namespace sapt {
@@ -144,19 +151,19 @@ double SAPT0::compute_energy() {
         print_results();
     }
 
-    set_variable("E Elst10", e_elst10_);
-    set_variable("E Exch10", e_exch10_);
-    set_variable("E Exch10(S^2)", e_exch10_s2_);
-    set_variable("E Ind20", e_ind20_);
-    set_variable("E Exch-Ind20", e_exch_ind20_);
-    set_variable("E Disp20", e_disp20_);
-    set_variable("E Exch-Disp20", e_exch_disp20_);
-    set_variable("E Disp20(SS)", e_disp20_ss_);
-    set_variable("E Disp20(OS)", e_disp20_os_);
-    set_variable("E Exch-Disp20(SS)", e_exch_disp20_ss_);
-    set_variable("E Exch-Disp20(OS)", e_exch_disp20_os_);
-    set_variable("E SAPT0", e_sapt0_);
-    set_variable("E SCS-SAPT0", e_sapt0_scs_);
+    set_scalar_variable("E Elst10", e_elst10_);
+    set_scalar_variable("E Exch10", e_exch10_);
+    set_scalar_variable("E Exch10(S^2)", e_exch10_s2_);
+    set_scalar_variable("E Ind20", e_ind20_);
+    set_scalar_variable("E Exch-Ind20", e_exch_ind20_);
+    set_scalar_variable("E Disp20", e_disp20_);
+    set_scalar_variable("E Exch-Disp20", e_exch_disp20_);
+    set_scalar_variable("E Disp20(SS)", e_disp20_ss_);
+    set_scalar_variable("E Disp20(OS)", e_disp20_os_);
+    set_scalar_variable("E Exch-Disp20(SS)", e_exch_disp20_ss_);
+    set_scalar_variable("E Exch-Disp20(OS)", e_exch_disp20_os_);
+    set_scalar_variable("E SAPT0", e_sapt0_);
+    set_scalar_variable("E SCS-SAPT0", e_sapt0_scs_);
 
     return (e_sapt0_);
 }
@@ -272,7 +279,8 @@ void SAPT0::print_results() {
                         coupled.c_str(), scaled.c_str(), *scal_it * e_exch_ind20_ * 1000.0,
                         *scal_it * e_exch_ind20_ * pc_hartree2kcalmol, *scal_it * e_exch_ind20_ * pc_hartree2kJmol);
         outfile->Printf("      delta HF,%1s (2) %3s      %16.8lf [mEh] %16.8lf [kcal/mol] %16.8lf [kJ/mol]\n",
-                        coupled.c_str(), scaled.c_str(), dHF2 * 1000.0, dHF2 * pc_hartree2kcalmol, dHF2 * pc_hartree2kJmol);
+                        coupled.c_str(), scaled.c_str(), dHF2 * 1000.0, dHF2 * pc_hartree2kcalmol,
+                        dHF2 * pc_hartree2kJmol);
         outfile->Printf("\n    Dispersion %3s            %16.8lf [mEh] %16.8lf [kcal/mol] %16.8lf [kJ/mol]\n",
                         scaled.c_str(), tot_disp * 1000.0, tot_disp * pc_hartree2kcalmol, tot_disp * pc_hartree2kJmol);
         outfile->Printf("      Disp20                  %16.8lf [mEh] %16.8lf [kcal/mol] %16.8lf [kJ/mol]\n",
@@ -322,7 +330,7 @@ void SAPT0::print_results() {
             Process::environment.globals["SAPT EXCH10 ENERGY"] = e_exch10_;
             Process::environment.globals["SAPT EXCH10(S^2) ENERGY"] = e_exch10_s2_;
 
-            if(no_response_) {
+            if (no_response_) {
                 Process::environment.globals["SAPT IND20,U ENERGY"] = e_ind20_;
                 Process::environment.globals["SAPT EXCH-IND20,U ENERGY"] = e_exch_ind20_;
             } else {
@@ -400,7 +408,7 @@ void SAPT0::df_integrals() {
 
     // Get fitting metric
     auto metric = std::make_shared<FittingMetric>(ribasis_);
-    metric->form_eig_inverse();
+    metric->form_eig_inverse(options_.get_double("DF_FITTING_CONDITION"));
     double **J_temp = metric->get_metric()->pointer();
     double **J_mhalf = block_matrix(ndf_, ndf_);
     C_DCOPY(ndf_ * ndf_, J_temp[0], 1, J_mhalf[0], 1);
@@ -410,10 +418,9 @@ void SAPT0::df_integrals() {
     double maxSchwartz = 0.0;
     double *Schwartz = init_array(basisset_->nshell() * (basisset_->nshell() + 1) / 2);
 
-    std::shared_ptr<IntegralFactory> ao_eri_factory =
+    auto ao_eri_factory =
         std::make_shared<IntegralFactory>(basisset_, basisset_, basisset_, basisset_);
-    std::shared_ptr<TwoBodyAOInt> ao_eri = std::shared_ptr<TwoBodyAOInt>(ao_eri_factory->eri());
-    const double *ao_buffer = ao_eri->buffer();
+    auto ao_eri = std::shared_ptr<TwoBodyAOInt>(ao_eri_factory->eri());
 
     for (int P = 0, PQ = 0; P < basisset_->nshell(); P++) {
         int numw = basisset_->shell(P).nfunction();
@@ -426,8 +433,8 @@ void SAPT0::df_integrals() {
             for (int w = 0; w < numw; w++) {
                 for (int x = 0; x < numx; x++) {
                     int index = (((w * numx + x) * numw + w) * numx + x);
-                    tei = ao_buffer[index];
-                    if (std::fabs(tei) > max) max = std::fabs(tei);
+                    tei = ao_eri->buffer()[index];
+                    if (std::abs(tei) > max) max = std::abs(tei);
                 }
             }
             Schwartz[PQ] = max;
@@ -440,10 +447,9 @@ void SAPT0::df_integrals() {
 
     double *DFSchwartz = init_array(ribasis_->nshell());
 
-    std::shared_ptr<IntegralFactory> df_eri_factory =
+    auto df_eri_factory =
         std::make_shared<IntegralFactory>(ribasis_, zero_, ribasis_, zero_);
-    std::shared_ptr<TwoBodyAOInt> df_eri = std::shared_ptr<TwoBodyAOInt>(df_eri_factory->eri());
-    const double *df_buffer = df_eri->buffer();
+    auto df_eri = std::shared_ptr<TwoBodyAOInt>(df_eri_factory->eri());
 
     for (int P = 0; P < ribasis_->nshell(); P++) {
         int numw = ribasis_->shell(P).nfunction();
@@ -452,8 +458,8 @@ void SAPT0::df_integrals() {
         df_eri->compute_shell(P, 0, P, 0);
 
         for (int w = 0; w < numw; w++) {
-            tei = df_buffer[w];
-            if (std::fabs(tei) > max) max = std::fabs(tei);
+            tei = df_eri->buffer()[w];
+            if (std::abs(tei) > max) max = std::abs(tei);
         }
         DFSchwartz[P] = max;
     }
@@ -549,7 +555,7 @@ void SAPT0::df_integrals() {
         outfile->Printf("\n");
     }
 
-    std::shared_ptr<IntegralFactory> rifactory =
+    auto rifactory =
         std::make_shared<IntegralFactory>(ribasis_, zero_, basisset_, basisset_);
 
     int nthreads = 1;
@@ -558,11 +564,9 @@ void SAPT0::df_integrals() {
 #endif
     int rank = 0;
 
-    std::shared_ptr<TwoBodyAOInt> *eri = new std::shared_ptr<TwoBodyAOInt>[ nthreads ];
-    const double **buffer = new const double *[nthreads];
+    auto eri = std::vector<std::unique_ptr<TwoBodyAOInt>>(nthreads);
     for (int i = 0; i < nthreads; ++i) {
-        eri[i] = std::shared_ptr<TwoBodyAOInt>(rifactory->eri());
-        buffer[i] = eri[i]->buffer();
+        eri[i] = std::unique_ptr<TwoBodyAOInt>(rifactory->eri());
     }
 
     zero_disk(PSIF_SAPT_TEMP, "AO RI Integrals", ndf_, nsotri_screened);
@@ -606,7 +610,7 @@ void SAPT0::df_integrals() {
                                         for (int nu = 0; nu < numnu; ++nu, ++index, ++munu) {
                                             int onu = basisset_->shell(NU).function_index() + nu;
 
-                                            AO_RI[munu + munu_offset][oP] = buffer[rank][index];
+                                            AO_RI[munu + munu_offset][oP] = eri[rank]->buffer()[index];
                                         }
                                     }
                                 }
@@ -621,7 +625,7 @@ void SAPT0::df_integrals() {
                                             int onu = basisset_->shell(NU).function_index() + nu;
                                             int index = P * nummu * nummu + mu * nummu + nu;
 
-                                            AO_RI[munu + munu_offset][oP] = buffer[rank][index];
+                                            AO_RI[munu + munu_offset][oP] = eri[rank]->buffer()[index];
                                         }
                                     }
                                 }
@@ -856,8 +860,6 @@ void SAPT0::df_integrals() {
     free(PQ_stop);
     free(block_length);
 
-    for (int i = 0; i < nthreads; ++i) eri[i].reset();
-
     psio_->close(PSIF_SAPT_TEMP, 0);
 }
 
@@ -868,7 +870,7 @@ void SAPT0::df_integrals_aio() {
 
     // Get fitting metric
     auto metric = std::make_shared<FittingMetric>(ribasis_);
-    metric->form_eig_inverse();
+    metric->form_eig_inverse(options_.get_double("DF_FITTING_CONDITION"));
     double **J_temp = metric->get_metric()->pointer();
     double **J_mhalf = block_matrix(ndf_, ndf_);
     C_DCOPY(ndf_ * ndf_, J_temp[0], 1, J_mhalf[0], 1);
@@ -878,10 +880,9 @@ void SAPT0::df_integrals_aio() {
     double maxSchwartz = 0.0;
     double *Schwartz = init_array(basisset_->nshell() * (basisset_->nshell() + 1) / 2);
 
-    std::shared_ptr<IntegralFactory> ao_eri_factory =
+    auto ao_eri_factory =
         std::make_shared<IntegralFactory>(basisset_, basisset_, basisset_, basisset_);
-    std::shared_ptr<TwoBodyAOInt> ao_eri = std::shared_ptr<TwoBodyAOInt>(ao_eri_factory->eri());
-    const double *ao_buffer = ao_eri->buffer();
+    auto ao_eri = std::shared_ptr<TwoBodyAOInt>(ao_eri_factory->eri());
 
     for (int P = 0, PQ = 0; P < basisset_->nshell(); P++) {
         int numw = basisset_->shell(P).nfunction();
@@ -894,8 +895,8 @@ void SAPT0::df_integrals_aio() {
             for (int w = 0; w < numw; w++) {
                 for (int x = 0; x < numx; x++) {
                     int index = (((w * numx + x) * numw + w) * numx + x);
-                    tei = ao_buffer[index];
-                    if (std::fabs(tei) > max) max = std::fabs(tei);
+                    tei = ao_eri->buffer()[index];
+                    if (std::abs(tei) > max) max = std::abs(tei);
                 }
             }
             Schwartz[PQ] = max;
@@ -908,10 +909,9 @@ void SAPT0::df_integrals_aio() {
 
     double *DFSchwartz = init_array(ribasis_->nshell());
 
-    std::shared_ptr<IntegralFactory> df_eri_factory =
+    auto df_eri_factory =
         std::make_shared<IntegralFactory>(ribasis_, zero_, ribasis_, zero_);
-    std::shared_ptr<TwoBodyAOInt> df_eri = std::shared_ptr<TwoBodyAOInt>(df_eri_factory->eri());
-    const double *df_buffer = df_eri->buffer();
+    auto df_eri = std::shared_ptr<TwoBodyAOInt>(df_eri_factory->eri());
 
     for (int P = 0; P < ribasis_->nshell(); P++) {
         int numw = ribasis_->shell(P).nfunction();
@@ -920,8 +920,8 @@ void SAPT0::df_integrals_aio() {
         df_eri->compute_shell(P, 0, P, 0);
 
         for (int w = 0; w < numw; w++) {
-            tei = df_buffer[w];
-            if (std::fabs(tei) > max) max = std::fabs(tei);
+            tei = df_eri->buffer()[w];
+            if (std::abs(tei) > max) max = std::abs(tei);
         }
         DFSchwartz[P] = max;
     }
@@ -1017,7 +1017,7 @@ void SAPT0::df_integrals_aio() {
         outfile->Printf("\n");
     }
 
-    std::shared_ptr<IntegralFactory> rifactory =
+    auto rifactory =
         std::make_shared<IntegralFactory>(ribasis_, zero_, basisset_, basisset_);
 
     int nthreads = 1;
@@ -1026,11 +1026,9 @@ void SAPT0::df_integrals_aio() {
 #endif
     int rank = 0;
 
-    std::shared_ptr<TwoBodyAOInt> *eri = new std::shared_ptr<TwoBodyAOInt>[ nthreads ];
-    const double **buffer = new const double *[nthreads];
+    auto eri = std::vector<std::unique_ptr<TwoBodyAOInt>>(nthreads);
     for (int i = 0; i < nthreads; ++i) {
-        eri[i] = std::shared_ptr<TwoBodyAOInt>(rifactory->eri());
-        buffer[i] = eri[i]->buffer();
+        eri[i] = std::unique_ptr<TwoBodyAOInt>(rifactory->eri());
     }
 
     zero_disk(PSIF_SAPT_TEMP, "AO RI Integrals", ndf_, nsotri_screened);
@@ -1079,7 +1077,7 @@ void SAPT0::df_integrals_aio() {
                                         for (int nu = 0; nu < numnu; ++nu, ++index, ++munu) {
                                             int onu = basisset_->shell(NU).function_index() + nu;
 
-                                            AO_RI[curr_block % 2][munu + munu_offset][oP] = buffer[rank][index];
+                                            AO_RI[curr_block % 2][munu + munu_offset][oP] = eri[rank]->buffer()[index];
                                         }
                                     }
                                 }
@@ -1094,7 +1092,7 @@ void SAPT0::df_integrals_aio() {
                                             int onu = basisset_->shell(NU).function_index() + nu;
                                             int index = P * nummu * nummu + mu * nummu + nu;
 
-                                            AO_RI[curr_block % 2][munu + munu_offset][oP] = buffer[rank][index];
+                                            AO_RI[curr_block % 2][munu + munu_offset][oP] = eri[rank]->buffer()[index];
                                         }
                                     }
                                 }
@@ -1377,8 +1375,6 @@ void SAPT0::df_integrals_aio() {
     free(PQ_stop);
     free(block_length);
 
-    for (int i = 0; i < nthreads; ++i) eri[i].reset();
-
     psio_->close(PSIF_SAPT_TEMP, 0);
 }
 
@@ -1462,10 +1458,9 @@ void SAPT0::oo_df_integrals() {
     int nshelltri = basisset_->nshell() * (basisset_->nshell() + 1) / 2;
     double *Schwartz = init_array(basisset_->nshell() * (basisset_->nshell() + 1) / 2);
 
-    std::shared_ptr<IntegralFactory> ao_eri_factory =
+    auto ao_eri_factory =
         std::make_shared<IntegralFactory>(basisset_, basisset_, basisset_, basisset_);
-    std::shared_ptr<TwoBodyAOInt> ao_eri = std::shared_ptr<TwoBodyAOInt>(ao_eri_factory->eri());
-    const double *ao_buffer = ao_eri->buffer();
+    auto ao_eri = std::shared_ptr<TwoBodyAOInt>(ao_eri_factory->eri());
 
     for (int P = 0, PQ = 0; P < basisset_->nshell(); P++) {
         int numw = basisset_->shell(P).nfunction();
@@ -1478,8 +1473,8 @@ void SAPT0::oo_df_integrals() {
             for (int w = 0; w < numw; w++) {
                 for (int x = 0; x < numx; x++) {
                     int index = (((w * numx + x) * numw + w) * numx + x);
-                    tei = ao_buffer[index];
-                    if (std::fabs(tei) > max) max = std::fabs(tei);
+                    tei = ao_eri->buffer()[index];
+                    if (std::abs(tei) > max) max = std::abs(tei);
                 }
             }
             Schwartz[PQ] = max;
@@ -1492,10 +1487,9 @@ void SAPT0::oo_df_integrals() {
 
     double *DFSchwartz = init_array(elstbasis_->nshell());
 
-    std::shared_ptr<IntegralFactory> df_eri_factory =
+    auto df_eri_factory =
         std::make_shared<IntegralFactory>(elstbasis_, zero_, elstbasis_, zero_);
-    std::shared_ptr<TwoBodyAOInt> df_eri = std::shared_ptr<TwoBodyAOInt>(df_eri_factory->eri());
-    const double *df_buffer = df_eri->buffer();
+    auto df_eri = std::shared_ptr<TwoBodyAOInt>(df_eri_factory->eri());
 
     for (int P = 0; P < elstbasis_->nshell(); P++) {
         int numw = elstbasis_->shell(P).nfunction();
@@ -1504,8 +1498,8 @@ void SAPT0::oo_df_integrals() {
         df_eri->compute_shell(P, 0, P, 0);
 
         for (int w = 0; w < numw; w++) {
-            tei = df_buffer[w];
-            if (std::fabs(tei) > max) max = std::fabs(tei);
+            tei = df_eri->buffer()[w];
+            if (std::abs(tei) > max) max = std::abs(tei);
         }
         DFSchwartz[P] = max;
     }
@@ -1515,7 +1509,7 @@ void SAPT0::oo_df_integrals() {
 
     int maxPshell = elstbasis_->max_function_per_shell();
 
-    std::shared_ptr<IntegralFactory> rifactory =
+    auto rifactory =
         std::make_shared<IntegralFactory>(elstbasis_, zero_, basisset_, basisset_);
 
     int nthreads = 1;
@@ -1524,11 +1518,9 @@ void SAPT0::oo_df_integrals() {
 #endif
     int rank = 0;
 
-    std::shared_ptr<TwoBodyAOInt> *eri = new std::shared_ptr<TwoBodyAOInt>[ nthreads ];
-    const double **buffer = new const double *[nthreads];
+    auto eri = std::vector<std::unique_ptr<TwoBodyAOInt>>(nthreads);
     for (int i = 0; i < nthreads; ++i) {
-        eri[i] = std::shared_ptr<TwoBodyAOInt>(rifactory->eri());
-        buffer[i] = eri[i]->buffer();
+        eri[i] = std::unique_ptr<TwoBodyAOInt>(rifactory->eri());
     }
 
     int *MUNUtoMU = init_int_array(nshelltri);
@@ -1587,8 +1579,8 @@ void SAPT0::oo_df_integrals() {
                             for (int nu = 0; nu < numnu; ++nu, ++index) {
                                 int onu = basisset_->shell(NU).function_index() + nu;
 
-                                temp[P][omu * nso_ + onu] = buffer[rank][index];
-                                temp[P][onu * nso_ + omu] = buffer[rank][index];
+                                temp[P][omu * nso_ + onu] = eri[rank]->buffer()[index];
+                                temp[P][onu * nso_ + omu] = eri[rank]->buffer()[index];
                             }
                         }
                     }
@@ -1622,7 +1614,7 @@ void SAPT0::oo_df_integrals() {
 
     // Get fitting metric
     auto metric = std::make_shared<FittingMetric>(elstbasis_);
-    metric->form_eig_inverse();
+    metric->form_eig_inverse(options_.get_double("DF_FITTING_CONDITION"));
     double **J_temp = metric->get_metric()->pointer();
     double **J_mhalf = block_matrix(ndf_, ndf_);
     C_DCOPY(ndf_ * ndf_, J_temp[0], 1, J_mhalf[0], 1);
@@ -1781,5 +1773,5 @@ void SAPT0::oo_df_integrals() {
 
     C_p_BB.done();
 }
-}
-}
+}  // namespace sapt
+}  // namespace psi

@@ -1,14 +1,20 @@
-# We require C++11 support from the compiler and standard library.
+cmake_policy(PUSH)
+cmake_policy(SET CMP0057 NEW)  # support IN_LISTS
+
+# We require C++14 support from the compiler and standard library.
+list(APPEND _allowed_cxx_standards 14 17)
+if(NOT psi4_CXX_STANDARD IN_LIST _allowed_cxx_standards)
+  message(FATAL_ERROR "Psi4 requires C++14 at least")
+endif()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES GNU)
-    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.9)
-        message(FATAL_ERROR "GCC version must be at least 4.9!")
+    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 5.0)
+        message(FATAL_ERROR "GCC version must be at least 5.0!")
     endif()
 
 elseif (CMAKE_CXX_COMPILER_ID MATCHES Intel)
     if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS "17.0.0")
         message(FATAL_ERROR "ICPC version must be at least 2017.0.0 to work with pybind11 2.1!")  # v1.2
-        #message(FATAL_ERROR "ICPC version must be at least 2016.0.2 to work with pybind11 2.0.0!")  # v1.1
     endif()
 
     set(_testfl ${CMAKE_BINARY_DIR}/test_gcc_version.cc)
@@ -53,7 +59,16 @@ elseif (CMAKE_CXX_COMPILER_ID MATCHES Clang)
         message(FATAL_ERROR "CLANG version must be at least 3.6!")
     endif()
 
+elseif (CMAKE_CXX_COMPILER_ID MATCHES MSVC)
+    # As for MSVC 14.0, it is not possible to set anything bellow C++14
+    # FIXME Remove following line when we switch to C++14
+    set(psi4_CXX_STANDARD 14)
+    if(MSVC_TOOLSET_VERSION LESS 140)
+        message(FATAL_ERROR "MSVC toolset version must be at least 14.0!")
+    endif()
+
 else()
     message(WARNING "Please add a check in custom_cxxstandard.cmake for ${CMAKE_CXX_COMPILER_ID}.")
 endif()
 
+cmake_policy(POP)

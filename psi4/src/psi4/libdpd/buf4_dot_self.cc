@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -42,22 +42,20 @@ namespace psi {
 **   dpdbuf4 *BufX: A pointer to the dpdbuf4.
 */
 
-double DPD::buf4_dot_self(dpdbuf4 *BufX)
-{
+double DPD::buf4_dot_self(dpdbuf4 *BufX) {
     int h, nirreps, my_irrep;
     int row, col;
-    double alpha=0.0;
+    double alpha = 0.0;
 
     nirreps = BufX->params->nirreps;
     my_irrep = BufX->file.my_irrep;
 
-    for(h=0; h < nirreps; h++) {
-
+    for (h = 0; h < nirreps; h++) {
         buf4_mat_irrep_init(BufX, h);
         buf4_mat_irrep_rd(BufX, h);
 
-        for(row=0; row < BufX->params->rowtot[h]; row++)
-            for(col=0; col < BufX->params->coltot[h^my_irrep]; col++)
+        for (row = 0; row < BufX->params->rowtot[h]; row++)
+            for (col = 0; col < BufX->params->coltot[h ^ my_irrep]; col++)
                 alpha += BufX->matrix[h][row][col] * BufX->matrix[h][row][col];
 
         buf4_mat_irrep_close(BufX, h);
@@ -66,4 +64,4 @@ double DPD::buf4_dot_self(dpdbuf4 *BufX)
     return alpha;
 }
 
-}
+}  // namespace psi

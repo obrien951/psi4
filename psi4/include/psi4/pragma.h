@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -26,11 +26,12 @@
  * @END LICENSE
  */
 
-///File is stolen from pulsar all thanks to bennyp
+/// File is stolen from pulsar all thanks to bennyp
 
 #ifndef PULSAR_GUARD_PULSAR__PRAGMA_H_
 #define PULSAR_GUARD_PULSAR__PRAGMA_H_
 
+// clang-format off
 #if defined(__ICC) || defined(__INTEL_COMPILER)
 
 // pragmas for Intel
@@ -56,7 +57,7 @@
 #define PRAGMA_WARNING_IGNORE_DEPRECATED_DECLARATIONS      _Pragma("warning(disable:1478)")
 #define PRAGMA_WARNING_IGNORE_OVERLOADED_VIRTUAL
 
-#elif defined(__clang__)   // Do clang before GNU because clang defines __GNUC__, too.
+#elif defined(__clang__)  // Do clang before GNU because clang defines __GNUC__, too.
 
 #define PRAGMA_WARNING_PUSH                                _Pragma("clang diagnostic push")
 #define PRAGMA_WARNING_POP                                 _Pragma("clang diagnostic pop")
@@ -105,21 +106,47 @@
 #define PRAGMA_WARNING_IGNORE_DEPRECATED_DECLARATIONS      _Pragma("GCC diagnostic ignored \"-Wdeprecated-declarations\"")
 #define PRAGMA_WARNING_IGNORE_OVERLOADED_VIRTUAL
 
+#elif defined(_MSC_VER)
+
+// pragmas for Microsoft Visual Compiler (MSVC)
+#define PRAGMA_WARNING_PUSH
+#define PRAGMA_WARNING_POP
+#define PRAGMA_WARNING_IGNORE_UNUSED_PARAMETERS
+#define PRAGMA_WARNING_IGNORE_UNUSED_VARIABLES
+#define PRAGMA_WARNING_IGNORE_FP_EQUALITY
+#define PRAGMA_WARNING_IGNORE_FP_CONVERT
+#define PRAGMA_WARNING_IGNORE_CONVERT
+#define PRAGMA_WARNING_IGNORE_SWITCH_MISSING_DEFAULT
+#define PRAGMA_WARNING_IGNORE_POINTLESS_COMPARISON_UINT_0
+#define PRAGMA_WARNING_IGNORE_STATEMENT_UNREACHABLE
+#define PRAGMA_WARNING_IGNORE_SHADOW
+#define PRAGMA_WARNING_IGNORE_SHADOW_MEMBER
+#define PRAGMA_WARNING_IGNORE_EXTRA_SEMICOLON
+#define PRAGMA_WARNING_IGNORE_REDECLARED_INLINE
+#define PRAGMA_WARNING_IGNORE_UNUSED_LOCAL_TYPEDEFS
+#define PRAGMA_WARNING_IGNORE_GCC_PRAGMA
+#define PRAGMA_WARNING_IGNORE_NONVIRTUAL_DTOR
+#define PRAGMA_WARNING_IGNORE_UNUSED_FUNCTION
+#define PRAGMA_WARNING_IGNORE_UNRECOGNIZED_PRAGMA
+#define PRAGMA_WARNING_IGNORE_DEPRECATED_DECLARATIONS
+#define PRAGMA_WARNING_IGNORE_OVERLOADED_VIRTUAL
+
 #endif
+// clang-format on
 
 // The following is adapted from https://gcc.gnu.org/wiki/Visibility the step-by-step guide at the very bottom
 // Visibility macros
 #if defined _WIN32 || defined __CYGWIN__
-#   define PSI_HELPER_SO_EXPORT __declspec(dllexport)
-#   define PSI_HELPER_SO_LOCAL
+#define PSI_HELPER_SO_EXPORT __declspec(dllexport)
+#define PSI_HELPER_SO_LOCAL
 #else
-#   if __GNUC__ >= 4
-#       define PSI_HELPER_SO_EXPORT __attribute__ ((visibility ("default")))
-#       define PSI_HELPER_SO_LOCAL  __attribute__ ((visibility ("hidden")))
-#   else
-#       define PSI_HELPER_SO_EXPORT
-#       define PSI_HELPER_SO_LOCAL
-#   endif
+#if __GNUC__ >= 4
+#define PSI_HELPER_SO_EXPORT __attribute__((visibility("default")))
+#define PSI_HELPER_SO_LOCAL __attribute__((visibility("hidden")))
+#else
+#define PSI_HELPER_SO_EXPORT
+#define PSI_HELPER_SO_LOCAL
+#endif
 #endif
 
 // Use generic helper definitions to define PSI_API and PSI_LOCAL
@@ -127,5 +154,13 @@
 // PSI_LOCAL is used for non-API symbols.
 #define PSI_API PSI_HELPER_SO_EXPORT
 #define PSI_LOCAL PSI_HELPER_SO_LOCAL
+
+// Use in the header file as follows:
+// PSI_DEPRECATED("extremely unsafe, use 'combust' instead!!!") void explode(void);
+// will produce this kind output when compiling:
+//    warning: 'explode' is deprecated: extremely unsafe, use 'combust' instead!!!
+// The macro can similarly be used to deprecate variables.
+// The implementation uses the standard attribute available in C++14
+#define PSI_DEPRECATED(msg) [[deprecated(msg)]]
 
 #endif

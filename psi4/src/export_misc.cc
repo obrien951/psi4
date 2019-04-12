@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -29,10 +29,14 @@
 #include "psi4/pybind11.h"
 
 #include "psi4/libciomr/libciomr.h"
+#include "psi4/libqt/qt.h"
 
 using namespace psi;
+namespace py = pybind11;
 
 void export_misc(py::module &m) {
+    m.def("timer_on", timer_on, "Start timer with argument as label");
+    m.def("timer_off", timer_off, "Stop timer of label argument");
     m.def("tstart", tstart, "docstring");
     m.def("tstop", tstop, "docstring");
 }

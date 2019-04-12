@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -36,25 +36,22 @@
 #include "psi4/libmints/onebody.h"
 #include "psi4/libmints/twobody.h"
 
-namespace ambit
-{
+namespace ambit {
 
 class Tensor;
 
-namespace helpers
-{
+namespace helpers {
 
-namespace psi4
-{
+namespace psi4 {
 
 void integrals(psi::OneBodyAOInt &integral, ambit::Tensor *target);
 
 void integrals(psi::TwoBodyAOInt &integral, ambit::Tensor *target);
 
-} // namespace psi4
+}  // namespace psi4
 
-} // namespace helpers
+}  // namespace helpers
 
-} // namespace ambit
+}  // namespace ambit
 
-#endif // AMBIT_INTEGRALS_H
+#endif  // AMBIT_INTEGRALS_H

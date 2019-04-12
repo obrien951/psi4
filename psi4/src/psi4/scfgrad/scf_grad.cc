@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -27,11 +27,15 @@
  */
 
 #include "scf_grad.h"
-#include "jk_grad.h"
+
+#include <algorithm>
+#include <sstream>
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 #include "psi4/libqt/qt.h"
 #include "psi4/libpsio/psio.hpp"
-#include "psi4/liboptions/liboptions_python.h"
 #include "psi4/libmints/matrix.h"
 #include "psi4/libmints/molecule.h"
 #include "psi4/libmints/basisset.h"
@@ -45,18 +49,9 @@
 #include "psi4/libdisp/dispersion.h"
 #include "psi4/libscf_solver/hf.h"
 #include "psi4/libpsi4util/PsiOutStream.h"
-
-#include <algorithm>
-
-#include <sstream>
-
-#ifdef _OPENMP
-#include <omp.h>
 #include "psi4/libpsi4util/process.h"
-#endif
 
-using namespace psi;
-
+#include "jk_grad.h"
 
 namespace psi {
 namespace scfgrad {
@@ -69,11 +64,11 @@ SCFGrad::SCFGrad(SharedWavefunction ref_wfn, Options& options) :
     scf::HF* scfwfn = (scf::HF*)ref_wfn.get();
     functional_ = scfwfn->functional();
     potential_ = scfwfn->V_potential();
-    if (ref_wfn->arrays().count("-D Gradient")){
-        gradients_["-D Gradient"] = ref_wfn->get_array("-D Gradient");
+    if (ref_wfn->has_array_variable("-D Gradient")) {
+        gradients_["-D Gradient"] = ref_wfn->array_variable("-D Gradient");
     }
-    if (ref_wfn->arrays().count("-D Hessian")){
-        hessians_["-D Hessian"] = ref_wfn->get_array("-D Hessian");
+    if (ref_wfn->has_array_variable("-D Hessian")) {
+        hessians_["-D Hessian"] = ref_wfn->array_variable("-D Hessian");
     }
 
 }
@@ -362,7 +357,7 @@ SharedMatrix SCFGrad::compute_hessian()
     std::shared_ptr<VBase> potential;
 
     if (functional_->needs_xc()) {
-        throw PSIEXCEPTION("Missing XC derivates for Hessians");
+        throw PSIEXCEPTION("Missing XC derivatives for Hessians");
         // if (options_.get_str("REFERENCE") == "RKS") {
         //     potential_->set_D({Da_});
         // } else {
@@ -824,7 +819,7 @@ SharedMatrix SCFGrad::compute_hessian()
         double* eps_ap = eps_a->pointer();
         double* eps_bp = eps_b->pointer();
 
-        double* temp = new double[nso * (size_t) nalpha];
+        auto* temp = new double[nso * (size_t) nalpha];
 
         ::memset((void*) temp, '\0', sizeof(double) * nso * nalpha);
         for (int i = 0; i < nalpha; i++) {

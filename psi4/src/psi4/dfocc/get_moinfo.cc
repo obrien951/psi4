@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -65,10 +65,11 @@ void DFOCC::get_moinfo() {
         natom = molecule_->natom();
 
         // Read in nuclear repulsion energy
-        Enuc = reference_wavefunction_->molecule()->nuclear_repulsion_energy(reference_wavefunction_->get_dipole_field_strength());
+        Enuc = reference_wavefunction_->molecule()->nuclear_repulsion_energy(
+            reference_wavefunction_->get_dipole_field_strength());
 
         // Read SCF energy
-        Escf = reference_wavefunction_->reference_energy();
+        Escf = reference_wavefunction_->energy();
         Eref = Escf;
         Eelec = Escf - Enuc;
 
@@ -170,10 +171,11 @@ void DFOCC::get_moinfo() {
         natom = molecule_->natom();
 
         // Read in nuclear repulsion energy
-        Enuc = reference_wavefunction_->molecule()->nuclear_repulsion_energy(reference_wavefunction_->get_dipole_field_strength());
+        Enuc = reference_wavefunction_->molecule()->nuclear_repulsion_energy(
+            reference_wavefunction_->get_dipole_field_strength());
 
         // Read SCF energy
-        Escf = reference_wavefunction_->reference_energy();
+        Escf = reference_wavefunction_->energy();
         Eref = Escf;
         Eelec = Escf - Enuc;
 
@@ -340,28 +342,28 @@ void DFOCC::get_moinfo() {
     /************************** Create all required matrice *************************************/
     /********************************************************************************************/
     // Build Hso
-    //Hso_ = std::shared_ptr<Matrix>(new Matrix("SO-basis One-electron Ints", nso_, nso_));
-    //Tso_ = std::shared_ptr<Matrix>(new Matrix("SO-basis Kinetic Energy Ints", nso_, nso_));
-    //Vso_ = std::shared_ptr<Matrix>(new Matrix("SO-basis Potential Energy Ints", nso_, nso_));
-    //Sso_ = std::shared_ptr<Matrix>(new Matrix("SO-basis Overlap Ints", nso_, nso_));
-    //Hso_->zero();
-    //Tso_->zero();
-    //Vso_->zero();
-    //Sso_->zero();
+    // Hso_ = std::shared_ptr<Matrix>(new Matrix("SO-basis One-electron Ints", nso_, nso_));
+    // Tso_ = std::shared_ptr<Matrix>(new Matrix("SO-basis Kinetic Energy Ints", nso_, nso_));
+    // Vso_ = std::shared_ptr<Matrix>(new Matrix("SO-basis Potential Energy Ints", nso_, nso_));
+    // Sso_ = std::shared_ptr<Matrix>(new Matrix("SO-basis Overlap Ints", nso_, nso_));
+    // Hso_->zero();
+    // Tso_->zero();
+    // Vso_->zero();
+    // Sso_->zero();
 
     //// Read SO-basis one-electron integrals
-    //double *so_ints = init_array(ntri_so);
-    //IWL::read_one(psio_.get(), PSIF_OEI, PSIF_SO_T, so_ints, ntri_so, 0, 0, "outfile");
-    //Tso_->set(so_ints);
-    //IWL::read_one(psio_.get(), PSIF_OEI, PSIF_SO_V, so_ints, ntri_so, 0, 0, "outfile");
-    //Vso_->set(so_ints);
-    //IWL::read_one(psio_.get(), PSIF_OEI, PSIF_SO_S, so_ints, ntri_so, 0, 0, "outfile");
-    //Sso_->set(so_ints);
-    //free(so_ints);
-    //Hso_->copy(Tso_);
-    //Hso_->add(Vso_);
-    //Tso_.reset();
-    //Vso_.reset();
+    // double *so_ints = init_array(ntri_so);
+    // IWL::read_one(psio_.get(), PSIF_OEI, PSIF_SO_T, so_ints, ntri_so, 0, 0, "outfile");
+    // Tso_->set(so_ints);
+    // IWL::read_one(psio_.get(), PSIF_OEI, PSIF_SO_V, so_ints, ntri_so, 0, 0, "outfile");
+    // Vso_->set(so_ints);
+    // IWL::read_one(psio_.get(), PSIF_OEI, PSIF_SO_S, so_ints, ntri_so, 0, 0, "outfile");
+    // Sso_->set(so_ints);
+    // free(so_ints);
+    // Hso_->copy(Tso_);
+    // Hso_->add(Vso_);
+    // Tso_.reset();
+    // Vso_.reset();
     // CDS: Migrate these from disk reads to grabbing off Wavefunction
     Hso = SharedTensor2d(new Tensor2d("SO-basis One-electron Ints", nso_, nso_));
     Hso->set(H_);

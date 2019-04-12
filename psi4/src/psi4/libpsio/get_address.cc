@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -35,28 +35,27 @@
 #include "psi4/libpsio/psio.hpp"
 
 namespace psi {
-  /*!
-   ** PSIO_GET_ADDRESS(): Given a starting page/offset and a shift length
-   ** (in bytes), return the page/offset of the next position in the file.
-   ** \ingroup PSIO
-   */
+/*!
+ ** PSIO_GET_ADDRESS(): Given a starting page/offset and a shift length
+ ** (in bytes), return the page/offset of the next position in the file.
+ ** \ingroup PSIO
+ */
 
-  psio_address psio_get_address(psio_address start, size_t shift) {
+psio_address psio_get_address(psio_address start, size_t shift) {
     psio_address address;
     size_t bytes_left;
 
     bytes_left = PSIO_PAGELEN - start.offset; /* Bytes remaining on fpage */
 
     if (shift >= bytes_left) { /* Shift to later page */
-      address.page = start.page + (shift - bytes_left)/PSIO_PAGELEN+ 1;
-      address.offset = shift - bytes_left -(address.page - start.page- 1)
-          *PSIO_PAGELEN;
+        address.page = start.page + (shift - bytes_left) / PSIO_PAGELEN + 1;
+        address.offset = shift - bytes_left - (address.page - start.page - 1) * PSIO_PAGELEN;
     } else { /* Block starts on current page */
-      address.page = start.page;
-      address.offset = start.offset + shift;
+        address.page = start.page;
+        address.offset = start.offset + shift;
     }
 
     return address;
-  }
-
 }
+
+}  // namespace psi

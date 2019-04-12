@@ -3,7 +3,7 @@
 .. #
 .. # Psi4: an open-source quantum chemistry software package
 .. #
-.. # Copyright (c) 2007-2018 The Psi4 Developers.
+.. # Copyright (c) 2007-2019 The Psi4 Developers.
 .. #
 .. # The copyrights for code used from other parties are included in
 .. # the corresponding files.
@@ -147,6 +147,15 @@ messy) flag will prevent files being deleted at the end of the run::
 |psirc| File
 ============
 
+.. caution:: It is very easy to forget about the |psirc| file you once
+   created, leading to great confusion over why all your jobs are using
+   the wrong memory or are suddenly not density-fit. Also be aware that
+   |psirc| contents count as part of your input file (invoked after
+   e.g. ``from psi4 import *`` and before your Psithon-->Python parsed
+   input commands), so these settings take priority over command-line
+   arguments to the ``psi4`` executable.
+   Please use the |psirc| file conscientiously.
+
 If using the environment variable :envvar:`PSI_SCRATCH` is inconvenient,
 or if some ``psi4_io`` commands must be present in all input files,
 the |psirc| resource file can be used (example :source:`samples/example_psi4rc_file`). 
@@ -228,7 +237,7 @@ explained below. Note that each deeper level trumps all previous levels.
 ..     export OMP_NUM_THREADS=4
 ..     export MKL_NUM_THREADS=4
 ..
-.. |PSIfour| then detects these value via the API routines in ``<omp.h>`` and
+.. Psi4 then detects these value via the API routines in ``<omp.h>`` and
 .. ``<mkl.h>``, and runs all applicable code with 4 threads.
 
 .. rubric:: (2) The -n Command Line Flag

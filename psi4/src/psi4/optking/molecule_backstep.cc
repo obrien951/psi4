@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -87,7 +87,7 @@ inline double DE_rfo_energy(double rfo_t, double rfo_g, double rfo_h) {
   return (rfo_t * rfo_g + 0.5 * rfo_t * rfo_t * rfo_h)/(1 + rfo_t*rfo_t);
 }
 
-void MOLECULE::backstep(void) {
+void MOLECULE::backstep() {
 
   oprintf_out("\tRe-doing last optimization step - smaller this time.\n");
   oprintf_out("\tConsecutive backstep number %d.\n", p_Opt_data->g_consecutive_backsteps()+1);

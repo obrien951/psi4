@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -126,7 +126,7 @@ void IntegralTransform::setup_tpdm_buffer(const dpdbuf4 *D) {
 
 void IntegralTransform::sort_so_tpdm(const dpdbuf4 *D, int irrep, size_t first_row, size_t num_rows, bool first_run) {
     // The buffer needs to be set up if the pointer is still null
-    if (tpdm_buffer_ == 0) setup_tpdm_buffer(D);
+    if (tpdm_buffer_ == nullptr) setup_tpdm_buffer(D);
 
     std::shared_ptr<SOBasisSet> sobasis = wfn_->sobasisset();
 
@@ -269,4 +269,4 @@ void IntegralTransform::sort_so_tpdm(const dpdbuf4 *D, int irrep, size_t first_r
         delete[] toc;
     }  // End pq iterator
 }
-}  // End namespace
+}  // namespace psi

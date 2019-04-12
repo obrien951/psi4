@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -28,21 +28,18 @@
 
 /*! \file
     \ingroup DETCI
-    \brief Enter brief description of file here 
+    \brief Enter brief description of file here
 */
 
-#ifndef _psi_src_bin_detci_ci_tol_h
-#define _psi_src_bin_detci_ci_tol_h
+#pragma once
 
-namespace psi { namespace detci {
-
-#define S_MAX 0.999995 /* Max overlap for mitrush vects and collapsed vecs */
-#define HD_MIN 1.0E-4  /* Minimum diagonal element of preconditioner       */
-#define ZERO 1e-10
-#define MPn_ZERO 1e-14
-#define SA_NORM_TOL 1.0E-5 /* norm of schmidt orthogonalized vector */
-#define MPn_NORM_TOL 1.0E-12
-
-}} // namespace psi::detci
-
-#endif // header guard
+namespace psi {
+namespace detci {
+constexpr auto S_MAX = 0.999995; /* Max overlap for mitrush vects and collapsed vecs */
+constexpr auto HD_MIN = 1.0E-4;  /* Minimum diagonal element of preconditioner       */
+constexpr auto ZERO = 1e-10;
+constexpr auto MPn_ZERO = 1e-14;
+constexpr auto SA_NORM_TOL = 1.0E-5; /* norm of schmidt orthogonalized vector */
+constexpr auto MPn_NORM_TOL = 1.0E-12;
+}  // namespace detci
+}  // namespace psi

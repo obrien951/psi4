@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -46,7 +46,8 @@ void IntegralTransform::common_initialize() {
     abIntName_ = "";
     bbIntName_ = "";
 
-    keepHtInts_ = 0;
+    keepHtInts_ = false;
+    buildMOFock_ = true;
 
     nTriSo_ = nso_ * (nso_ + 1) / 2;
     nTriMo_ = nmo_ * (nmo_ + 1) / 2;
@@ -200,7 +201,7 @@ void IntegralTransform::process_spaces() {
             for (int h = 0; h < nirreps_; ++h) {
                 for (int n = 0; n < aOrbsPI[h]; ++n) {
                     if (transformationType_ == TransformationType::Restricted) {
-                        aPitzerCount = pitzerOffset + nalphapi_[h];
+                        aPitzerCount = pitzerOffset + nbetapi_[h];
                     } else {
                         aPitzerCount = pitzerOffset + nalphapi_[h];
                     }
@@ -570,7 +571,7 @@ void IntegralTransform::update_orbitals() {
 /**
  * Sets the orbital matrix, but touches nothing else. This is used for a MCSCF wavefunction
  * and is a bit of a hack, use at your own risk.
-**/
+ **/
 void IntegralTransform::set_orbitals(SharedMatrix C) {
     Ca_ = C->clone();
     Cb_ = Ca_;
@@ -635,7 +636,7 @@ void IntegralTransform::process_eigenvectors() {
                 std::vector<SharedMatrix> virandsoc;
                 virandsoc.push_back(Ca_->get_block({zero, sopi_}, {nalphapi_, nalphapi_ + avir}));
                 virandsoc.push_back(Ca_->get_block({zero, sopi_}, {clsdpi_, clsdpi_ + openpi_}));
-                Ca = Matrix::horzcat(virandsoc);
+                Ca = linalg::horzcat(virandsoc);
                 Ca->set_name("Alpha virtual orbitals");
             } else {
                 Ca = Ca_->get_block({zero, sopi_}, {nalphapi_, nalphapi_ + avir});

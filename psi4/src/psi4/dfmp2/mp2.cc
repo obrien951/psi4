@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -27,37 +27,35 @@
  */
 
 #include "mp2.h"
-#include "corr_grad.h"
-
-#include "psi4/libpsi4util/PsiOutStream.h"
-#include "psi4/libpsi4util/process.h"
-#include "psi4/liboptions/liboptions_python.h"
-#include "psi4/lib3index/3index.h"
-#include "psi4/libfock/jk.h"
-#include "psi4/libfock/apps.h"
-#include "psi4/libqt/qt.h"
-#include "psi4/libpsio/psio.hpp"
-#include "psi4/libpsio/psio.h"
-#include "psi4/psi4-dec.h"
-#include "psi4/physconst.h"
-#include "psi4/psifiles.h"
-
-#include "psi4/libmints/basisset.h"
-#include "psi4/libmints/matrix.h"
-#include "psi4/libmints/vector.h"
-#include "psi4/libmints/sieve.h"
-#include "psi4/libmints/extern.h"
-#include "psi4/libmints/twobody.h"
-#include "psi4/libmints/integral.h"
-#include "psi4/libmints/oeprop.h"
-#include "psi4/libmints/molecule.h"
-#include "psi4/libmints/mintshelper.h"
 
 #ifdef _OPENMP
 #include <omp.h>
 #endif
 
-using namespace psi;
+#include "psi4/psi4-dec.h"
+#include "psi4/physconst.h"
+#include "psi4/psifiles.h"
+
+#include "psi4/lib3index/3index.h"
+#include "psi4/libfock/apps.h"
+#include "psi4/libfock/jk.h"
+#include "psi4/libmints/basisset.h"
+#include "psi4/libmints/extern.h"
+#include "psi4/libmints/integral.h"
+#include "psi4/libmints/matrix.h"
+#include "psi4/libmints/mintshelper.h"
+#include "psi4/libmints/molecule.h"
+#include "psi4/libmints/oeprop.h"
+#include "psi4/libmints/sieve.h"
+#include "psi4/libmints/twobody.h"
+#include "psi4/libmints/vector.h"
+#include "psi4/libpsi4util/PsiOutStream.h"
+#include "psi4/libpsi4util/process.h"
+#include "psi4/libpsio/psio.h"
+#include "psi4/libpsio/psio.hpp"
+#include "psi4/libqt/qt.h"
+
+#include "corr_grad.h"
 
 namespace psi {
 namespace dfmp2 {
@@ -87,7 +85,7 @@ void DFMP2::compute_opdm_and_nos(const SharedMatrix Dnosym, SharedMatrix Dso, Sh
     // Now, copy over the full matrix, whenever nonzero columns are
     for (int h = 0; h < nirrep_; ++h) {
         if (nsopi_[h] == 0) continue;
-        double* CStemp = new double[nsopi_[h]];
+        auto* CStemp = new double[nsopi_[h]];
         double** pC1 = SO_c1NO->pointer(h);
         double** Smat = S_->pointer(h);
         int symcol = 0;
@@ -108,7 +106,7 @@ void DFMP2::compute_opdm_and_nos(const SharedMatrix Dnosym, SharedMatrix Dso, Sh
         if (symcol != nmopi_[h]) {
             outfile->Printf(
                 "Problem determining natural orbital and density matrix symmetries.\n"
-                "Future calls to oeprop will not work, using this density.  Try disabling symmetry.\n\n");
+                "Future calls to oeprop using this density will not work. Try disabling symmetry.\n\n");
             occ->zero();
             Cno->zero();
             Dso->zero();
@@ -179,7 +177,7 @@ void DFMP2::common_init() {
     variables_["MP2 SINGLES ENERGY"] = 0.0;
     variables_["MP2 OPPOSITE-SPIN CORRELATION ENERGY"] = 0.0;
     variables_["MP2 SAME-SPIN CORRELATION ENERGY"] = 0.0;
-    variables_["SCF TOTAL ENERGY"] = reference_wavefunction_->reference_energy();
+    variables_["SCF TOTAL ENERGY"] = reference_wavefunction_->energy();
 
     sss_ = options_.get_double("MP2_SS_SCALE");
     oss_ = options_.get_double("MP2_OS_SCALE");
@@ -315,6 +313,9 @@ SharedMatrix DFMP2::compute_gradient() {
     print_energies();
     energy_ = variables_["MP2 TOTAL ENERGY"];
 
+    // Symmetrize the gradient to remove noise
+    gradients_["Total"]->symmetrize_gradient(molecule_);
+
     print_gradients();
 
     return gradients_["Total"];
@@ -432,7 +433,7 @@ SharedMatrix DFMP2::form_inverse_metric() {
     } else {
         // Form the inverse metric manually
         auto metric = std::make_shared<FittingMetric>(ribasis_, true);
-        metric->form_eig_inverse(1.0E-10);
+        metric->form_eig_inverse(options_.get_double("DF_FITTING_CONDITION"));
         SharedMatrix Jm12 = metric->get_metric();
 
         // Save inverse metric to the SCF three-index integral file if it exists
@@ -744,12 +745,19 @@ void DFMP2::print_energies() {
                                            variables_["MP2 SINGLES ENERGY"];
     variables_["MP2 TOTAL ENERGY"] = variables_["SCF TOTAL ENERGY"] + variables_["MP2 CORRELATION ENERGY"];
 
-    variables_["SCS-MP2 OPPOSITE-SPIN CORRELATION ENERGY"] = oss_ * variables_["MP2 OPPOSITE-SPIN CORRELATION ENERGY"];
-    variables_["SCS-MP2 SAME-SPIN CORRELATION ENERGY"] = sss_ * variables_["MP2 SAME-SPIN CORRELATION ENERGY"];
-    variables_["SCS-MP2 CORRELATION ENERGY"] = variables_["SCS-MP2 OPPOSITE-SPIN CORRELATION ENERGY"] +
-                                               variables_["SCS-MP2 SAME-SPIN CORRELATION ENERGY"] +
-                                               variables_["MP2 SINGLES ENERGY"];
+    //variables_["SCS-MP2 OPPOSITE-SPIN CORRELATION ENERGY"] = oss_ * variables_["MP2 OPPOSITE-SPIN CORRELATION ENERGY"];
+    //variables_["SCS-MP2 SAME-SPIN CORRELATION ENERGY"] = sss_ * variables_["MP2 SAME-SPIN CORRELATION ENERGY"];
+    //variables_["SCS-MP2 CORRELATION ENERGY"] = variables_["SCS-MP2 OPPOSITE-SPIN CORRELATION ENERGY"] +
+    //                                           variables_["SCS-MP2 SAME-SPIN CORRELATION ENERGY"] +
+    //                                           variables_["MP2 SINGLES ENERGY"];
+    variables_["SCS-MP2 CORRELATION ENERGY"] = 6.0/5.0 * variables_["MP2 OPPOSITE-SPIN CORRELATION ENERGY"] +
+                                               1.0/3.0 * variables_["MP2 SAME-SPIN CORRELATION ENERGY"] +
+                                                         variables_["MP2 SINGLES ENERGY"];
     variables_["SCS-MP2 TOTAL ENERGY"] = variables_["SCF TOTAL ENERGY"] + variables_["SCS-MP2 CORRELATION ENERGY"];
+    variables_["CUSTOM SCS-MP2 CORRELATION ENERGY"] = oss_ * variables_["MP2 OPPOSITE-SPIN CORRELATION ENERGY"] +
+                                                      sss_ * variables_["MP2 SAME-SPIN CORRELATION ENERGY"] +
+                                                             variables_["MP2 SINGLES ENERGY"];
+    variables_["CUSTOM SCS-MP2 TOTAL ENERGY"] = variables_["SCF TOTAL ENERGY"] + variables_["CUSTOM SCS-MP2 CORRELATION ENERGY"];
 
     outfile->Printf("\t-----------------------------------------------------------\n");
     outfile->Printf("\t ==================> DF-MP2 Energies <==================== \n");
@@ -767,25 +775,15 @@ void DFMP2::print_energies() {
     outfile->Printf("\t %-25s = %24.16f [-]\n", "SCS Same-Spin Scale", sss_);
     outfile->Printf("\t %-25s = %24.16f [-]\n", "SCS Opposite-Spin Scale", oss_);
     outfile->Printf("\t %-25s = %24.16f [Eh]\n", "SCS Same-Spin Energy",
-                    variables_["SCS-MP2 SAME-SPIN CORRELATION ENERGY"]);
+                    sss_ * variables_["MP2 SAME-SPIN CORRELATION ENERGY"]);
     outfile->Printf("\t %-25s = %24.16f [Eh]\n", "SCS Opposite-Spin Energy",
-                    variables_["SCS-MP2 OPPOSITE-SPIN CORRELATION ENERGY"]);
+                    oss_ * variables_["MP2 OPPOSITE-SPIN CORRELATION ENERGY"]);
     outfile->Printf("\t %-25s = %24.16f [Eh]\n", "SCS Correlation Energy", variables_["SCS-MP2 CORRELATION ENERGY"]);
     outfile->Printf("\t %-25s = %24.16f [Eh]\n", "SCS Total Energy", variables_["SCS-MP2 TOTAL ENERGY"]);
     outfile->Printf("\t-----------------------------------------------------------\n");
     outfile->Printf("\n");
-
-    Process::environment.globals["CURRENT ENERGY"] = variables_["MP2 TOTAL ENERGY"];
-    Process::environment.globals["CURRENT CORRELATION ENERGY"] = variables_["MP2 CORRELATION ENERGY"];
-    Process::environment.globals["MP2 TOTAL ENERGY"] = variables_["MP2 TOTAL ENERGY"];
-    Process::environment.globals["MP2 SINGLES ENERGY"] = variables_["MP2 SINGLES ENERGY"];
-    Process::environment.globals["MP2 SAME-SPIN CORRELATION ENERGY"] = variables_["MP2 SAME-SPIN CORRELATION ENERGY"];
-    Process::environment.globals["MP2 OPPOSITE-SPIN CORRELATION ENERGY"] =
-        variables_["MP2 OPPOSITE-SPIN CORRELATION ENERGY"];
-    Process::environment.globals["MP2 CORRELATION ENERGY"] = variables_["MP2 CORRELATION ENERGY"];
-    Process::environment.globals["SCS-MP2 TOTAL ENERGY"] = variables_["SCS-MP2 TOTAL ENERGY"];
-    Process::environment.globals["SCS-MP2 CORRELATION ENERGY"] = variables_["SCS-MP2 CORRELATION ENERGY"];
 }
+
 void DFMP2::print_gradients() {
     std::vector<std::string> gradient_terms;
     gradient_terms.push_back("Nuclear");
@@ -3388,5 +3386,5 @@ void RODFMP2::print_header() {
     outfile->Printf("\t %7s %7d %7d %7d %7d %7d %7d\n", "BETA", focc_b, occ_b, aocc_b, avir_b, vir_b, fvir_b);
     outfile->Printf("\t --------------------------------------------------------\n\n");
 }
-}
-}
+}  // namespace dfmp2
+}  // namespace psi

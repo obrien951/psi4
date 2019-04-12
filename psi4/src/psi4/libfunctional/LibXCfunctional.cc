@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -35,14 +35,12 @@
 #include "psi4/libpsi4util/PsiOutStream.h"
 #include "psi4/libpsi4util/exception.h"
 
-#include "libxc/xc.h"
 #include <cmath>
 #include <string>
 #include <algorithm>
 
 // LibXC helper utility for setter functions, not really supposed to do this
-#include "libxc/xc.h"
-
+#include <xc.h>
 
 using namespace psi;
 
@@ -87,28 +85,57 @@ LibXCFunctional::LibXCFunctional(std::string xc_name, bool unpolarized) {
     }
 
     // Extract variables
-    if (xc_functional_->info->family == XC_FAMILY_HYB_GGA ||
-        xc_functional_->info->family == XC_FAMILY_HYB_MGGA) {
+    if (xc_functional_->info->family == XC_FAMILY_HYB_GGA || xc_functional_->info->family == XC_FAMILY_HYB_MGGA) {
         /* Range separation? */
-        int rangesep = 0;
-        if (xc_functional_->info->flags & XC_FLAGS_HYB_CAM) rangesep++;
-        if (xc_functional_->info->flags & XC_FLAGS_HYB_CAMY) rangesep++;
-        if (xc_functional_->info->flags & XC_FLAGS_HYB_LC) rangesep++;
-        if (xc_functional_->info->flags & XC_FLAGS_HYB_LCY) rangesep++;
-        if (rangesep) {
+        lrc_ = false;
+        if (xc_functional_->info->flags & XC_FLAGS_HYB_CAMY) {
+            outfile->Printf("Functional '%d' is a HYB_CAMY functional which is not supported in Psi4\n",
+                            xc_name.c_str());
+            throw PSIEXCEPTION("HYB_CAMY functionals not supported in Psi4 at present");
+        }
+        if (xc_functional_->info->flags & XC_FLAGS_HYB_LC) {
+            outfile->Printf("Functional '%d' is a HYB_LC functional which is not supported in Psi4\n", xc_name.c_str());
+            throw PSIEXCEPTION("HYB_LC functionals not supported in Psi4 at present");
+        }
+        if (xc_functional_->info->flags & XC_FLAGS_HYB_LCY) {
+            outfile->Printf("Functional '%d' is a HYB_LCY functional which is not supported in Psi4\n",
+                            xc_name.c_str());
+            throw PSIEXCEPTION("HYB_LCY functionals not supported in Psi4 at present");
+        }
+        if (xc_functional_->info->flags & XC_FLAGS_HYB_CAM) {
             lrc_ = true;
-
-            // SR      = LibXC_ALPHA + LibXC_BETA = psi4.set_x_alpha
-            // LR      = LibXC_ALPHA              = psi4.set_x_alpha + psi4.set_x_beta
-            // LR - SR =             - LibXC_BETA =                    psi4.set_x_beta
-
             double alpha, beta;
             xc_hyb_cam_coef(xc_functional_.get(), &omega_, &alpha, &beta);
 
+            /*
+              The values alpha and beta have a different meaning in
+              psi4 and libxc.
+
+              In libxc, alpha is the contribution from full exact
+              exchange (at all ranges), and beta is the contribution
+              from short-range only exchange, yielding alpha exact
+              exchange at the long range and alpha+beta in the short
+              range in total.
+
+              In Psi4, alpha is the amount of exchange at all ranges,
+              while beta is the difference between the amount of
+              exchange in the long range and in the short range,
+              meaning alpha+beta at the long range, and alpha only at
+              the short range.
+
+              These differences amount to the transform
+
+              SR      = LibXC_ALPHA + LibXC_BETA = Psi4_ALPHA
+              LR      = LibXC_ALPHA              = Psi4_ALPHA + Psi4_BETA
+              LR - SR =             - LibXC_BETA =              Psi4_BETA
+            */
+
             global_exch_ = alpha + beta;
             lr_exch_ = -1.0 * beta;
+        }
 
-        } else {
+        if (!lrc_) {
+            // Global hybrid
             global_exch_ = xc_hyb_exx_coef(xc_functional_.get());
         }
     }
@@ -137,11 +164,10 @@ LibXCFunctional::LibXCFunctional(std::string xc_name, bool unpolarized) {
     needs_vv10_ = false;
     vv10_c_ = 0.0;
     vv10_b_ = 0.0;
-    if (xc_functional_->info->flags & XC_FLAGS_VV10){
+    if (xc_functional_->info->flags & XC_FLAGS_VV10) {
         xc_nlc_coef(xc_functional_.get(), &vv10_b_, &vv10_c_);
         needs_vv10_ = true;
     }
-
 }
 LibXCFunctional::~LibXCFunctional() { xc_func_end(xc_functional_.get()); }
 std::shared_ptr<Functional> LibXCFunctional::build_worker() {
@@ -193,29 +219,28 @@ void LibXCFunctional::set_omega(double omega) {
         throw PSIEXCEPTION("LibXCfunctional: set_omega not defined for input functional");
     }
 }
-std::map<std::string, double> LibXCFunctional::query_libxc(const std::string& functional)
-{
+std::map<std::string, double> LibXCFunctional::query_libxc(const std::string& functional) {
     std::map<std::string, double> params;
 
     if (functional == "XC_HYB_CAM_COEF") {
         double omega, alpha, beta;
         xc_hyb_cam_coef(xc_functional_.get(), &omega, &alpha, &beta);
+        // LibXC and Psi4 conventions for alpha and beta differ, see
+        // above for full description
         params["OMEGA"] = omega;
         params["ALPHA"] = alpha + beta;
-        params["BETA"] = -1.0 * beta;
-    }
-    else if (functional == "XC_NLC_COEF") {
+        params["BETA"] = -beta;
+    } else if (functional == "XC_NLC_COEF") {
         double nlc_b, nlc_c;
         xc_nlc_coef(xc_functional_.get(), &nlc_b, &nlc_c);
         params["NLC_B"] = nlc_b;
         params["NLC_C"] = nlc_c;
-    }
-    else if (functional == "XC_HYB_EXX_COEF") {
+    } else if (functional == "XC_HYB_EXX_COEF") {
         double mixing = xc_hyb_exx_coef(xc_functional_.get());
         params["MIXING"] = mixing;
-    }
-    else {
-        outfile->Printf("LibXCFunctional: query_libxc unknown function to query parameters for: %s\n.", functional.c_str());
+    } else {
+        outfile->Printf("LibXCFunctional: query_libxc unknown function to query parameters for: %s\n.",
+                        functional.c_str());
         throw PSIEXCEPTION("LibXCFunctional: query_libxc unknown functional.");
     }
 
@@ -251,8 +276,8 @@ void LibXCFunctional::set_tweak(std::vector<double> values) {
     } else if (xc_func_name_ == "XC_GGA_X_PW91") {
         if (vsize == 7) {
             // (XC(func_type) *p, FLOAT a, FLOAT b, FLOAT c, FLOAT d, FLOAT f, FLOAT alpha, FLOAT expo);
-            xc_gga_x_pw91_set_params(xc_functional_.get(), values[0], values[1], values[2], values[3], values[4], values[5],
-                                     values[6]);
+            xc_gga_x_pw91_set_params(xc_functional_.get(), values[0], values[1], values[2], values[3], values[4],
+                                     values[5], values[6]);
             failed = false;
         }
     } else if (xc_func_name_ == "XC_GGA_X_RPBE") {
@@ -282,15 +307,15 @@ void LibXCFunctional::set_tweak(std::vector<double> values) {
     } else if (xc_func_name_ == "XC_MGGA_X_TPSS") {
         if (vsize == 5) {
             // (xc_func_type *p, double b, double c, double e, double kappa, double mu, double BLOC_a, double BLOC_bu);
-            xc_mgga_x_tpss_set_params(xc_functional_.get(), values[0], values[1], values[2], values[3],
-                                      values[4], 2.0, 0.0);
+            xc_mgga_x_tpss_set_params(xc_functional_.get(), values[0], values[1], values[2], values[3], values[4], 2.0,
+                                      0.0);
             failed = false;
         }
     } else if (xc_func_name_ == "XC_MGGA_C_TPSS") {
         if (vsize == 6) {
             // (xc_func_type *p, double beta, double d, double C0_0, double C0_1, double C0_2, double C0_3);
-            xc_mgga_c_tpss_set_params(xc_functional_.get(), values[0], values[1], values[2], values[3],
-                                      values[4], values[5]);
+            xc_mgga_c_tpss_set_params(xc_functional_.get(), values[0], values[1], values[2], values[3], values[4],
+                                      values[5]);
             failed = false;
         }
     } else if (xc_func_name_ == "XC_MGGA_C_BC95") {
@@ -299,14 +324,14 @@ void LibXCFunctional::set_tweak(std::vector<double> values) {
             xc_mgga_c_bc95_set_params(xc_functional_.get(), values[0], values[1]);
             failed = false;
         }
-    // } else if (xc_func_name_ == "XC_MGGA_C_PKZB") {
-    //     if (vsize == 6) {
-    //         // ((XC(func_type) *p, FLOAT beta, FLOAT d, FLOAT C0_0, FLOAT C0_1, FLOAT C0_2, FLOAT
-    //         // C0_3);
-    //         xc_mgga_c_pkzb_set_params(xc_functional_.get(), values[0], values[1], values[2], values[3],
-    //                                   values[4], values[5]);
-    //         failed = false;
-    //     }
+        // } else if (xc_func_name_ == "XC_MGGA_C_PKZB") {
+        //     if (vsize == 6) {
+        //         // ((XC(func_type) *p, FLOAT beta, FLOAT d, FLOAT C0_0, FLOAT C0_1, FLOAT C0_2, FLOAT
+        //         // C0_3);
+        //         xc_mgga_c_pkzb_set_params(xc_functional_.get(), values[0], values[1], values[2], values[3],
+        //                                   values[4], values[5]);
+        //         failed = false;
+        //     }
     } else {
         throw PSIEXCEPTION(
             "LibXCfunctional: set_tweak: There are no known tweaks for this functional, please double check "
@@ -343,9 +368,7 @@ std::vector<std::tuple<std::string, int, double>> LibXCFunctional::get_mix_data(
     return ret;
 }
 void LibXCFunctional::compute_functional(const std::map<std::string, SharedVector>& in,
-                                         const std::map<std::string, SharedVector>& out,
-                                         int npoints, int deriv) {
-
+                                         const std::map<std::string, SharedVector>& out, int npoints, int deriv) {
     // => Input variables <= //
 
     if ((deriv >= 1) & (!vxc_)) {
@@ -375,13 +398,13 @@ void LibXCFunctional::compute_functional(const std::map<std::string, SharedVecto
     if (true) {
         rho_ap = in.find("RHO_A")->second->pointer();
 
-        if (!unpolarized_){
+        if (!unpolarized_) {
             rho_bp = in.find("RHO_B")->second->pointer();
         }
     }
     if (gga_) {
         gamma_aap = in.find("GAMMA_AA")->second->pointer();
-        if (!unpolarized_){
+        if (!unpolarized_) {
             gamma_abp = in.find("GAMMA_AB")->second->pointer();
             gamma_bbp = in.find("GAMMA_BB")->second->pointer();
         }
@@ -389,7 +412,7 @@ void LibXCFunctional::compute_functional(const std::map<std::string, SharedVecto
     if (meta_) {
         tau_ap = in.find("TAU_A")->second->pointer();
         // lapl_ap = in.find("LAPL_RHO_A")->second->pointer();
-        if (!unpolarized_){
+        if (!unpolarized_) {
             tau_bp = in.find("TAU_B")->second->pointer();
             // lapl_bp = in.find("LAPL_RHO_B")->second->pointer();
         }
@@ -532,7 +555,6 @@ void LibXCFunctional::compute_functional(const std::map<std::string, SharedVecto
             throw PSIEXCEPTION("LibXCFunction deriv=0 is not implemented, call deriv >=1");
         }
 
-
         // Compute deriv
         if (deriv >= 1) {
             // Allocate
@@ -555,18 +577,16 @@ void LibXCFunctional::compute_functional(const std::map<std::string, SharedVecto
             }
 
             double* fvp = nullptr;
-            if (exc_){
+            if (exc_) {
                 fvp = fv.data();
             }
 
             // Compute
             if (meta_) {
-                xc_mgga_exc_vxc(xc_functional_.get(), npoints, rho_ap, gamma_aap, flapl.data(), tau_ap,
-                                fvp, fv_rho.data(), fv_gamma.data(), fv_lapl.data(),
-                                fv_tau.data());
+                xc_mgga_exc_vxc(xc_functional_.get(), npoints, rho_ap, gamma_aap, flapl.data(), tau_ap, fvp,
+                                fv_rho.data(), fv_gamma.data(), fv_lapl.data(), fv_tau.data());
             } else if (gga_) {
-                xc_gga_exc_vxc(xc_functional_.get(), npoints, rho_ap, gamma_aap, fvp,
-                               fv_rho.data(), fv_gamma.data());
+                xc_gga_exc_vxc(xc_functional_.get(), npoints, rho_ap, gamma_aap, fvp, fv_rho.data(), fv_gamma.data());
 
             } else {
                 xc_lda_exc_vxc(xc_functional_.get(), npoints, rho_ap, fvp, fv_rho.data());
@@ -574,7 +594,7 @@ void LibXCFunctional::compute_functional(const std::map<std::string, SharedVecto
             // printf("%s | %lf %lf\n", xc_func_name_.c_str(), fv_rho[0], fv_gamma[0]);
 
             // Re-apply
-            if (exc_){
+            if (exc_) {
                 for (size_t i = 0; i < npoints; i++) {
                     v[i] += alpha_ * fv[i] * rho_ap[i];
                 }
@@ -603,8 +623,8 @@ void LibXCFunctional::compute_functional(const std::map<std::string, SharedVecto
                 std::vector<double> fv2_rho_gamma(npoints);
                 std::vector<double> fv2_gamma2(npoints);
 
-                xc_gga_fxc(xc_functional_.get(), npoints, rho_ap, gamma_aap, fv2_rho2.data(),
-                           fv2_rho_gamma.data(), fv2_gamma2.data());
+                xc_gga_fxc(xc_functional_.get(), npoints, rho_ap, gamma_aap, fv2_rho2.data(), fv2_rho_gamma.data(),
+                           fv2_gamma2.data());
 
                 C_DAXPY(npoints, alpha_, fv2_rho2.data(), 1, v_rho_a_rho_a, 1);
                 C_DAXPY(npoints, alpha_, fv2_gamma2.data(), 1, v_gamma_aa_gamma_aa, 1);
@@ -650,7 +670,6 @@ void LibXCFunctional::compute_functional(const std::map<std::string, SharedVecto
             C_DCOPY(npoints, tau_bp, 1, (ftau.data() + 1), 2);
         }
 
-
         // Compute first deriv
         if (deriv == 0) {
             throw PSIEXCEPTION("LibXCFunction deriv=0 is not implemented, call deriv >=1");
@@ -665,13 +684,12 @@ void LibXCFunctional::compute_functional(const std::map<std::string, SharedVecto
             }
 
             if (meta_) {
-                xc_mgga_exc_vxc(xc_functional_.get(), npoints, frho.data(), fgamma.data(), flapl.data(),
-                                ftau.data(), fvp, fv_rho.data(), fv_gamma.data(), fv_lapl.data(),
-                                fv_tau.data());
+                xc_mgga_exc_vxc(xc_functional_.get(), npoints, frho.data(), fgamma.data(), flapl.data(), ftau.data(),
+                                fvp, fv_rho.data(), fv_gamma.data(), fv_lapl.data(), fv_tau.data());
 
             } else if (gga_) {
-                xc_gga_exc_vxc(xc_functional_.get(), npoints, frho.data(), fgamma.data(), fvp,
-                               fv_rho.data(), fv_gamma.data());
+                xc_gga_exc_vxc(xc_functional_.get(), npoints, frho.data(), fgamma.data(), fvp, fv_rho.data(),
+                               fv_gamma.data());
 
             } else {
                 xc_lda_exc_vxc(xc_functional_.get(), npoints, frho.data(), fvp, fv_rho.data());
@@ -702,8 +720,7 @@ void LibXCFunctional::compute_functional(const std::map<std::string, SharedVecto
         // Compute second deriv
         if (deriv >= 2) {
             if (meta_) {
-                throw PSIEXCEPTION(
-                    "Second derivative for meta functionals is not yet available");
+                throw PSIEXCEPTION("Second derivative for meta functionals is not yet available");
 
             } else if (gga_) {
                 std::vector<double> fv2_rho2(npoints * 3);
@@ -737,7 +754,6 @@ void LibXCFunctional::compute_functional(const std::map<std::string, SharedVecto
                 }
 
             } else {
-
                 std::vector<double> fv2_rho2(npoints * 3);
 
                 xc_lda_fxc(xc_functional_.get(), npoints, frho.data(), fv2_rho2.data());

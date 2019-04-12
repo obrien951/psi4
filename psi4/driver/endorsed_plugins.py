@@ -3,7 +3,7 @@
 #
 # Psi4: an open-source quantum chemistry software package
 #
-# Copyright (c) 2007-2018 The Psi4 Developers.
+# Copyright (c) 2007-2019 The Psi4 Developers.
 #
 # The copyrights for code used from other parties are included in
 # the corresponding files.
@@ -47,12 +47,7 @@ except ImportError:
 try:
     import snsmp2
 except ImportError as e:
-    if sys.version_info >= (3, 0):
-        errmsg = e.msg
-    else:
-        errmsg = e.message
-
-    if 'scipy' in errmsg:
+    if 'scipy' in e.msg:
         raise ImportError("""Psi4 plugin 'snsmp2' available, but scipy missing. Try `conda install scipy` or `pip install scipy`.""")
     else:
         pass

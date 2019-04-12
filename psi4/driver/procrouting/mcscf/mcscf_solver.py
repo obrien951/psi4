@@ -3,7 +3,7 @@
 #
 # Psi4: an open-source quantum chemistry software package
 #
-# Copyright (c) 2007-2018 The Psi4 Developers.
+# Copyright (c) 2007-2019 The Psi4 Developers.
 #
 # The copyrights for code used from other parties are included in
 # the corresponding files.
@@ -83,7 +83,7 @@ def mcscf_solver(ref_wfn):
     mcscf_current_step_type = 'Initial CI'
 
     # Start with SCF energy and other params
-    scf_energy = core.get_variable("HF TOTAL ENERGY")
+    scf_energy = ciwfn.variable("HF TOTAL ENERGY")
     eold = scf_energy
     norb_iter = 1
     converged = False
@@ -91,7 +91,7 @@ def mcscf_solver(ref_wfn):
     qc_step = False
     approx_integrals_only = True
 
-    # Fake info to start with the inital diagonalization
+    # Fake info to start with the initial diagonalization
     ediff = 1.e-4
     orb_grad_rms = 1.e-3
 
@@ -157,7 +157,7 @@ def mcscf_solver(ref_wfn):
 
         ciwfn.form_opdm()
         ciwfn.form_tpdm()
-        ci_grad_rms = core.get_variable("DETCI AVG DVEC NORM")
+        ci_grad_rms = ciwfn.variable("DETCI AVG DVEC NORM")
 
         # Update MCSCF object
         Cocc = ciwfn.get_orbitals("DOCC")
@@ -167,7 +167,7 @@ def mcscf_solver(ref_wfn):
         tpdm = ciwfn.get_tpdm("SUM", True)
         mcscf_obj.update(Cocc, Cact, Cvir, opdm, tpdm)
 
-        current_energy = core.get_variable("MCSCF TOTAL ENERGY")
+        current_energy = ciwfn.variable("MCSCF TOTAL ENERGY")
 
         orb_grad_rms = mcscf_obj.gradient_rms()
         ediff = current_energy - eold
@@ -218,7 +218,7 @@ def mcscf_solver(ref_wfn):
 
             # Figure out DIIS error vector
             if mcscf_diis_error_type == "GRAD":
-                error = core.Matrix.triplet(ciwfn.get_orbitals("OA"),
+                error = core.triplet(ciwfn.get_orbitals("OA"),
                                             mcscf_obj.gradient(),
                                             ciwfn.get_orbitals("AV"),
                                             False, False, True)
@@ -238,13 +238,13 @@ def mcscf_solver(ref_wfn):
             xstep.axpy(-1.0, total_step)
             xstep.scale(-1.0)
             Ustep = mcscf_obj.form_rotation_matrix(xstep)
-            totalU = core.Matrix.doublet(totalU, Ustep, False, False)
+            totalU = core.doublet(totalU, Ustep, False, False)
 
         # Build the rotation directly (not recommended)
         # orbs_mat = mcscf_obj.Ck(start_orbs, total_step)
 
         # Finally rotate and set orbitals
-        orbs_mat = core.Matrix.doublet(start_orbs, totalU, False, False)
+        orbs_mat = core.doublet(start_orbs, totalU, False, False)
         ciwfn.set_orbitals("ROT", orbs_mat)
 
         # Figure out what the next step should be
@@ -300,8 +300,9 @@ def mcscf_solver(ref_wfn):
         current_energy = mcscf_obj.current_total_energy()
         current_energy += mcscf_nuclear_energy
 
-        core.set_variable("CI ROOT %d TOTAL ENERGY" % 1, current_energy)
-        core.set_variable("CURRENT ENERGY", current_energy)
+        ciwfn.set_variable("CI ROOT %d TOTAL ENERGY" % 1, current_energy)
+        ciwfn.set_variable("CURRENT ENERGY", current_energy)
+        ciwfn.set_energy(current_energy)
 
         docc_energy = mcscf_obj.current_docc_energy()
         ci_energy = mcscf_obj.current_ci_energy()
@@ -373,7 +374,8 @@ def mcscf_solver(ref_wfn):
     proc_util.print_ci_results(ciwfn, "MCSCF", scf_energy, current_energy, print_opdm_no=True)
 
     # Set final energy
-    core.set_variable("CURRENT ENERGY", core.get_variable("MCSCF TOTAL ENERGY"))
+    ciwfn.set_variable("CURRENT ENERGY", ciwfn.variable("MCSCF TOTAL ENERGY"))
+    ciwfn.set_energy(ciwfn.variable("MCSCF TOTAL ENERGY"))
 
     # What do we need to cleanup?
     if core.get_option("DETCI", "MCSCF_CI_CLEANUP"):

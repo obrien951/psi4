@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -33,41 +33,42 @@
  ** \ingroup PSIO
  */
 
+#ifdef _MSC_VER
+#include <process.h>
+#define SYSTEM_GETPID ::_getpid
+#else
 #include <unistd.h>
+#define SYSTEM_GETPID ::getpid
+#endif
 #include <cstring>
 #include <cstdlib>
 #include "psi4/libpsio/psio.h"
 #include "psi4/libpsio/psio.hpp"
 #include "psi4/psi4-dec.h"
-#include <unistd.h>
 #include <sstream>
 
 namespace psi {
 
-std::string PSIO::getpid(void) {
-  std::stringstream ss;
+std::string PSIO::getpid() {
+    std::stringstream ss;
 
-  if (psi::restart_id.empty()) {
-    pid_t pid = ::getpid();
-    ss << pid;
-  }
-  else
-    ss << psi::restart_id;
+    if (psi::restart_id.empty()) {
+        ss << SYSTEM_GETPID();
+    } else
+        ss << psi::restart_id;
 
-  return ss.str();
+    return ss.str();
 }
 
-std::string psio_getpid(void) {
-  std::stringstream ss;
+std::string psio_getpid() {
+    std::stringstream ss;
 
-  if (psi::restart_id.empty()) {
-    pid_t pid = ::getpid();
-    ss << pid;
-  }
-  else
-    ss << psi::restart_id;
+    if (psi::restart_id.empty()) {
+        ss << SYSTEM_GETPID();
+    } else
+        ss << psi::restart_id;
 
-  return ss.str();
+    return ss.str();
 }
 
-}
+}  // namespace psi

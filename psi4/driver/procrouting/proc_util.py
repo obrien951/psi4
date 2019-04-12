@@ -3,7 +3,7 @@
 #
 # Psi4: an open-source quantum chemistry software package
 #
-# Copyright (c) 2007-2018 The Psi4 Developers.
+# Copyright (c) 2007-2019 The Psi4 Developers.
 #
 # The copyrights for code used from other parties are included in
 # the corresponding files.
@@ -26,16 +26,12 @@
 # @END LICENSE
 #
 
-from __future__ import print_function
-from __future__ import absolute_import
-
 import numpy as np
 
 from psi4 import core
 from psi4.driver import p4util
 from psi4.driver.p4util.exceptions import *
-from psi4.driver.procrouting.dft_funcs import functionals
-from psi4.driver.procrouting.dft_funcs import build_superfunctional_from_dictionary
+from psi4.driver.procrouting.dft import functionals, build_superfunctional_from_dictionary
 
 def scf_set_reference_local(name, is_dft=False):
     """
@@ -173,7 +169,7 @@ def print_ci_results(ciwfn, rname, scf_e, ci_e, print_opdm_no=False):
         core.print_out("\n   ==> %s root %d information <==\n\n" % (rname, root))
 
         # Print total energy
-        root_e = core.get_variable("CI ROOT %d TOTAL ENERGY" % (root))
+        root_e = ciwfn.variable("CI ROOT %d TOTAL ENERGY" % (root))
         core.print_out("    %s Root %d energy =  %20.15f\n" % (rname, root, root_e))
 
         # Print natural occupations

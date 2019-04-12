@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -32,7 +32,7 @@ PRAGMA_WARNING_IGNORE_DEPRECATED_DECLARATIONS
 #include <memory>
 PRAGMA_WARNING_POP
 #include "psi4/libqt/qt.h"
-#include <math.h>
+#include <cmath>
 #include <limits>
 #include <vector>
 #include "cholesky.h"
@@ -64,7 +64,7 @@ void Cholesky::choleskify() {
     size_t max_rows = (max_rows_ULI > max_size_t ? max_size_t : max_rows_ULI);
 
     // Get the diagonal (Q|Q)^(0)
-    double* diag = new double[n];
+    auto* diag = new double[n];
     compute_diagonal(diag);
 
     // Temporary cholesky factor

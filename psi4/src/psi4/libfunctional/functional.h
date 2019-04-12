@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -47,9 +47,7 @@ namespace psi {
  *
  **/
 class Functional {
-
-protected:
-
+   protected:
     // => Meta-Data <= //
 
     // Actually (1-\alpha)*w, the final scale of all computed values
@@ -84,8 +82,7 @@ protected:
     // Initialize null functional
     void common_init();
 
-public:
-
+   public:
     // => Constructors (Use the factory constructor, or really know what's up) <= //
 
     Functional();
@@ -100,8 +97,7 @@ public:
     // => Computers <= //
 
     virtual void compute_functional(const std::map<std::string, SharedVector>& in,
-                                    const std::map<std::string, SharedVector>& out, int npoints,
-                                    int deriv) = 0;
+                                    const std::map<std::string, SharedVector>& out, int npoints, int deriv) = 0;
 
     // => Parameters <= //
 
@@ -146,7 +142,6 @@ public:
     void py_print() const { print("outfile", 1); }
     void py_print_detail(int level) const { print("outfile", level); }
 };
-
 }
 
 #endif

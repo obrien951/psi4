@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -331,19 +331,19 @@ PKWorker::PKWorker(std::shared_ptr<BasisSet> primary, SharedSieve sieve, std::sh
 }
 
 char *PKWorker::get_label_J(const int batch) {
-    char *label = new char[100];
+    auto *label = new char[100];
     sprintf(label, "J Block (Batch %d)", batch);
     return label;
 }
 
 char *PKWorker::get_label_K(const int batch) {
-    char *label = new char[100];
+    auto *label = new char[100];
     sprintf(label, "K Block (Batch %d)", batch);
     return label;
 }
 
 char *PKWorker::get_label_wK(const int batch) {
-    char *label = new char[100];
+    auto *label = new char[100];
     sprintf(label, "wK Block (Batch %d)", batch);
     return label;
 }

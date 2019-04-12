@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -44,8 +44,7 @@ namespace psi {
 **  The result is written to FileB.
 */
 
-int DPD::file2_dirprd(dpdfile2 *FileA, dpdfile2 *FileB)
-{
+int DPD::file2_dirprd(dpdfile2 *FileA, dpdfile2 *FileB) {
     int h, nirreps, my_irrep;
 
     nirreps = FileA->params->nirreps;
@@ -56,11 +55,8 @@ int DPD::file2_dirprd(dpdfile2 *FileA, dpdfile2 *FileB)
     file2_mat_rd(FileA);
     file2_mat_rd(FileB);
 
-    for(h=0; h < nirreps; h++) {
-
-        dirprd_block(FileA->matrix[h], FileB->matrix[h],
-                     FileA->params->rowtot[h], FileA->params->coltot[h^my_irrep]);
-
+    for (h = 0; h < nirreps; h++) {
+        dirprd_block(FileA->matrix[h], FileB->matrix[h], FileA->params->rowtot[h], FileA->params->coltot[h ^ my_irrep]);
     }
 
     file2_mat_wrt(FileB);
@@ -70,5 +66,4 @@ int DPD::file2_dirprd(dpdfile2 *FileA, dpdfile2 *FileB)
     return 0;
 }
 
-
-}
+}  // namespace psi

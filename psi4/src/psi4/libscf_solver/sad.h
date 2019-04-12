@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -37,9 +37,7 @@ class Molecule;
 namespace scf {
 
 class SADGuess {
-
-protected:
-
+   protected:
     int print_;
     int debug_;
 
@@ -48,9 +46,6 @@ protected:
     std::vector<std::shared_ptr<BasisSet>> atomic_bases_;
     std::vector<std::shared_ptr<BasisSet>> atomic_fit_bases_;
     SharedMatrix AO2SO_;
-
-    int nalpha_;
-    int nbeta_;
 
     Options& options_;
 
@@ -61,22 +56,19 @@ protected:
 
     void common_init();
 
-    SharedMatrix form_D_AO();
-    void form_gradient(int norbs, SharedMatrix grad, SharedMatrix F, SharedMatrix D,
-                      SharedMatrix S, SharedMatrix X);
+    void run_atomic_calculations(SharedMatrix& D_AO, SharedMatrix& Huckel_C, SharedVector& Huckel_E);
+    void form_gradient(SharedMatrix grad, SharedMatrix F, SharedMatrix D, SharedMatrix S, SharedMatrix X);
     void get_uhf_atomic_density(std::shared_ptr<BasisSet> atomic_basis, std::shared_ptr<BasisSet> fit_basis,
-                                int n_electrons, int multiplicity, SharedMatrix D);
-    void form_C_and_D(int nocc, int norbs, SharedMatrix X, SharedMatrix F,
-                                  SharedMatrix C, SharedMatrix Cocc, SharedVector occ,
-                                  SharedMatrix D);
+                                SharedVector occ_a, SharedVector occ_b, SharedMatrix D, SharedMatrix Chuckel,
+                                SharedVector Ehuckel);
+    void form_C_and_D(SharedMatrix X, SharedMatrix F, SharedMatrix C, SharedVector E, SharedMatrix Cocc,
+                      SharedVector occ, SharedMatrix D);
 
     void form_D();
     void form_C();
 
-public:
-    SADGuess(std::shared_ptr<BasisSet> basis,
-             std::vector<std::shared_ptr<BasisSet>> atomic_bases, int nalpha,
-             int nbeta, Options& options);
+   public:
+    SADGuess(std::shared_ptr<BasisSet> basis, std::vector<std::shared_ptr<BasisSet>> atomic_bases, Options& options);
     virtual ~SADGuess();
 
     void compute_guess();
@@ -86,12 +78,13 @@ public:
     SharedMatrix Ca() const { return Ca_; }
     SharedMatrix Cb() const { return Cb_; }
 
+    SharedMatrix huckel_guess();
+
     void set_atomic_fit_bases(std::vector<std::shared_ptr<BasisSet>> fit_bases) { atomic_fit_bases_ = fit_bases; }
     void set_print(int print) { print_ = print; }
     void set_debug(int debug) { debug_ = debug; }
-
 };
-
-}}
+}  // namespace scf
+}  // namespace psi
 
 #endif

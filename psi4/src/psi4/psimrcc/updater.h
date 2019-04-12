@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -34,42 +34,45 @@
 /**
  *  @file updater.h
  *  @ingroup (PSIMRCC)
-*/
+ */
 
-namespace psi{ namespace psimrcc{
+namespace psi {
+namespace psimrcc {
 
 class Hamiltonian;
 
 /**
  *  @class Updater
  *  @brief Containts the procedure for updating the amplitudes
-*/
-class Updater{
-public:
-  Updater(Options &options);
-  virtual ~Updater();
-  virtual void update(int cycle,Hamiltonian* heff) = 0;
-  void zero_internal_amps();
-  void zero_t1_internal_amps();
-  void zero_internal_delta_amps();
-protected:
-  Options &options_;
+ */
+class Updater {
+   public:
+    Updater(Options &options);
+    virtual ~Updater();
+    virtual void update(int cycle, Hamiltonian *heff) = 0;
+    void zero_internal_amps();
+    void zero_t1_internal_amps();
+    void zero_internal_delta_amps();
+
+   protected:
+    Options &options_;
 };
 
-class MkUpdater : public Updater{
-public:
-  MkUpdater(Options &options);
-  virtual ~MkUpdater();
-  virtual void update(int cycle,Hamiltonian* heff);
+class MkUpdater : public Updater {
+   public:
+    MkUpdater(Options &options);
+    ~MkUpdater() override;
+    void update(int cycle, Hamiltonian *heff) override;
 };
 
-class BWUpdater : public Updater{
-public:
-  BWUpdater(Options &options);
-  virtual ~BWUpdater();
-  virtual void update(int cycle,Hamiltonian* heff);
+class BWUpdater : public Updater {
+   public:
+    BWUpdater(Options &options);
+    ~BWUpdater() override;
+    void update(int cycle, Hamiltonian *heff) override;
 };
 
-}} /* End Namespaces */
+}  // namespace psimrcc
+}  // namespace psi
 
-#endif // _psi_src_bin_psimrcc_updater_h_
+#endif  // _psi_src_bin_psimrcc_updater_h_

@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -34,7 +34,6 @@
 namespace psi {
 
 std::string get_writer_file_prefix(const std::string& molecule_name);
-
 }
 
-#endif // WRITER_FILE_PREFIX_H
+#endif  // WRITER_FILE_PREFIX_H

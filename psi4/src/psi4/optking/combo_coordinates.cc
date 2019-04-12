@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -115,7 +115,7 @@ bool COMBO_COORDINATES::Dq2Dx2(GeomType geom, int lookup, double **dq2dx2, int a
 }
 
 // Clear current combinations.  Leaves simples in place
-void COMBO_COORDINATES::clear_combos(void) {
+void COMBO_COORDINATES::clear_combos() {
   for (std::size_t i=0; i<index.size(); ++i)
     index[i].clear();
   for (std::size_t i=0; i<coeff.size(); ++i)

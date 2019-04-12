@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -36,8 +36,7 @@
 
 namespace psi {
 
-int DPD::trans4_mat_irrep_rd(dpdtrans4 *Trans, int irrep)
-{
+int DPD::trans4_mat_irrep_rd(dpdtrans4 *Trans, int irrep) {
     int pq, rs, all_buf_irrep;
     int rows, cols;
     dpdbuf4 *Buf;
@@ -60,10 +59,10 @@ int DPD::trans4_mat_irrep_rd(dpdtrans4 *Trans, int irrep)
   */
     /* Transpose using BLAS DCOPY */
     rows = Buf->params->rowtot[irrep];
-    cols = Buf->params->coltot[irrep^all_buf_irrep];
+    cols = Buf->params->coltot[irrep ^ all_buf_irrep];
 
-    if(rows && cols) {
-        for(rs=0; rs < cols; rs++) {
+    if (rows && cols) {
+        for (rs = 0; rs < cols; rs++) {
             A = &(Buf->matrix[irrep][0][rs]);
             B = &(Trans->matrix[irrep][rs][0]);
             C_DCOPY(rows, A, cols, B, 1);
@@ -77,4 +76,4 @@ int DPD::trans4_mat_irrep_rd(dpdtrans4 *Trans, int irrep)
     return 0;
 }
 
-}
+}  // namespace psi

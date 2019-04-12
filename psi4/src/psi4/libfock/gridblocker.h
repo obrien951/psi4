@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -43,9 +43,7 @@ class BlockOPoints;
  * efficient sparse evaluation of density
  */
 class GridBlocker {
-
-protected:
-
+   protected:
     int debug_;
     int print_;
     int bench_;
@@ -67,6 +65,8 @@ protected:
     int npoints_;
     int max_points_;
     int max_functions_;
+    // The total collocation size
+    size_t collocation_size_;
     double* x_;
     double* y_;
     double* z_;
@@ -74,11 +74,10 @@ protected:
     int* index_;
     std::vector<std::shared_ptr<BlockOPoints> > blocks_;
 
-public:
-
+   public:
     GridBlocker(const int npoints_ref, double const* x_ref, double const* y_ref, double const* z_ref,
-        double const* w_ref, int const* index_ref, const int max_points, const int min_points, const double max_radius,
-        std::shared_ptr<BasisExtents> extents);
+                double const* w_ref, int const* index_ref, const int max_points, const int min_points,
+                const double max_radius, std::shared_ptr<BasisExtents> extents);
     virtual ~GridBlocker();
 
     virtual void block() = 0;
@@ -86,6 +85,7 @@ public:
     int npoints() const { return npoints_; }
     int max_points() const { return max_points_; }
     int max_functions() const { return max_functions_; }
+    int collocation_size() const { return collocation_size_; }
     double* x() const { return x_; }
     double* y() const { return y_; }
     double* z() const { return z_; }
@@ -96,38 +96,32 @@ public:
     void set_print(int print) { print_ = print; }
     void set_debug(int debug) { debug_ = debug; }
     void set_bench(int bench) { bench_ = bench; }
-
 };
 
 /**
  * Naive stride-based blocking
  */
 class NaiveGridBlocker : public GridBlocker {
-
-public:
-
+   public:
     NaiveGridBlocker(const int npoints_ref, double const* x_ref, double const* y_ref, double const* z_ref,
-        double const* w_ref, int const* index_ref, const int max_points, const int min_points, const double max_radius,
-        std::shared_ptr<BasisExtents> extents);
-    virtual ~NaiveGridBlocker();
+                     double const* w_ref, int const* index_ref, const int max_points, const int min_points,
+                     const double max_radius, std::shared_ptr<BasisExtents> extents);
+    ~NaiveGridBlocker() override;
 
-    virtual void block();
+    void block() override;
 };
 
 /**
  * Octree-based blocking
  */
 class OctreeGridBlocker : public GridBlocker {
-
-public:
-
+   public:
     OctreeGridBlocker(const int npoints_ref, double const* x_ref, double const* y_ref, double const* z_ref,
-        double const* w_ref, int const* index_ref, const int max_points, const int min_points, const double max_radius,
-        std::shared_ptr<BasisExtents> extents);
-    virtual ~OctreeGridBlocker();
+                      double const* w_ref, int const* index_ref, const int max_points, const int min_points,
+                      const double max_radius, std::shared_ptr<BasisExtents> extents);
+    ~OctreeGridBlocker() override;
 
-    virtual void block();
+    void block() override;
 };
-
 }
 #endif

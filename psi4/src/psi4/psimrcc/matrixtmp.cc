@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -29,30 +29,27 @@
 #include "matrix.h"
 #include "matrixtmp.h"
 
-namespace psi{ namespace psimrcc{
+namespace psi {
+namespace psimrcc {
 
-CCMatTmp::CCMatTmp(CCMatrix* Matrix,DiskOpt disk_option):Matrix_(Matrix),disk_option_(disk_option)
-{
+CCMatTmp::CCMatTmp(CCMatrix* Matrix, DiskOpt disk_option) : Matrix_(Matrix), disk_option_(disk_option) {}
+
+CCMatTmp::~CCMatTmp() {
+    if (disk_option_ == dump)
+        Matrix_->dump_to_disk();
+    else if (disk_option_ == release)
+        Matrix_->free_memory();
 }
 
-CCMatTmp::~CCMatTmp()
-{
-  if(disk_option_ == dump)
-    Matrix_->dump_to_disk();
-  else if(disk_option_ == release)
-    Matrix_->free_memory();
+CCMatIrTmp::CCMatIrTmp(CCMatrix* Matrix, int irrep, DiskOpt disk_option)
+    : Matrix_(Matrix), irrep_(irrep), disk_option_(disk_option) {}
+
+CCMatIrTmp::~CCMatIrTmp() {
+    if (disk_option_ == dump)
+        Matrix_->dump_to_disk();
+    else if (disk_option_ == release)
+        Matrix_->free_memory();
 }
 
-CCMatIrTmp::CCMatIrTmp(CCMatrix* Matrix,int irrep,DiskOpt disk_option):Matrix_(Matrix),irrep_(irrep),disk_option_(disk_option)
-{
-}
-
-CCMatIrTmp::~CCMatIrTmp()
-{
-  if(disk_option_ == dump)
-    Matrix_->dump_to_disk();
-  else if(disk_option_ == release)
-    Matrix_->free_memory();
-}
-
-}} /* End Namespaces */
+}  // namespace psimrcc
+}  // namespace psi

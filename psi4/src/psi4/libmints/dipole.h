@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -45,29 +45,29 @@ class Molecule;
  *  \brief Computes dipole integrals.
  *
  * Use an IntegralFactory to create this object. */
-class PSI_API DipoleInt : public OneBodyAOInt
-{
+class DipoleInt : public OneBodyAOInt {
     //! Obara and Saika recursion object to be used.
     ObaraSaikaTwoCenterRecursion overlap_recur_;
 
     //! Computes the dipole between two gaussian shells.
-    void compute_pair(const GaussianShell&, const GaussianShell&);
+    void compute_pair(const GaussianShell &, const GaussianShell &) override;
     //! Computes the dipole derivative between two gaussian shells.
-    void compute_pair_deriv1(const GaussianShell&, const GaussianShell&);
+    void compute_pair_deriv1(const GaussianShell &, const GaussianShell &) override;
 
-public:
+   public:
     //! Constructor. Do not call directly use an IntegralFactory.
-    DipoleInt(std::vector<SphericalTransform>&, std::shared_ptr<BasisSet>, std::shared_ptr<BasisSet>, int deriv=0);
+    DipoleInt(std::vector<SphericalTransform> &, std::shared_ptr<BasisSet>, std::shared_ptr<BasisSet>, int deriv = 0);
     //! Virtual destructor
-    virtual ~DipoleInt();
+    ~DipoleInt() override;
 
     //! Does the method provide first derivatives?
-    bool has_deriv1() { return true; }
+    bool has_deriv1() override { return true; }
 
     /// Returns the nuclear contribution to the dipole moment
     static SharedVector nuclear_contribution(std::shared_ptr<Molecule> mol, const Vector3 &origin);
+    static SharedMatrix nuclear_gradient_contribution(std::shared_ptr<Molecule> mol);
 };
 
-}
+}  // namespace psi
 
 #endif

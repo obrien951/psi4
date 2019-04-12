@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -27,21 +27,23 @@
  */
 
 #include "soscf.h"
-#include "jk.h"
 
-#include "psi4/libqt/qt.h"
+#include <cmath>
+#include <ctime>
+
 #include "psi4/psi4-dec.h"
-
-#include "psi4/libdpd/dpd.h"
 #include "psi4/psifiles.h"
-#include "psi4/libtrans/integraltransform.h"
-#include "psi4/libpsio/psio.hpp"
+
+#include "psi4/lib3index/dfhelper.h"
+#include "psi4/libdpd/dpd.h"
 #include "psi4/libmints/matrix.h"
 #include "psi4/libmints/vector.h"
 #include "psi4/libpsi4util/PsiOutStream.h"
-#include "psi4/lib3index/dfhelper.h"
+#include "psi4/libpsio/psio.hpp"
+#include "psi4/libqt/qt.h"
+#include "psi4/libtrans/integraltransform.h"
 
-#include <cmath>
+#include "jk.h"
 
 namespace psi {
 
@@ -59,15 +61,15 @@ SOMCSCF::SOMCSCF(std::shared_ptr<JK> jk, SharedMatrix AOTOSO, SharedMatrix H) : 
 }
 SOMCSCF::~SOMCSCF() {}
 void SOMCSCF::transform(bool approx_only) {
-    throw PSIEXCEPTION("The SOMCSCF object must be initilized as a DF or Disk object.");
+    throw PSIEXCEPTION("The SOMCSCF object must be initialized as a DF or Disk object.");
 }
 SharedMatrix SOMCSCF::compute_Q(SharedMatrix TPDM) {
-    throw PSIEXCEPTION("The SOMCSCF object must be initilized as a DF or Disk object.");
+    throw PSIEXCEPTION("The SOMCSCF object must be initialized as a DF or Disk object.");
 }
 SharedMatrix SOMCSCF::compute_Qk(SharedMatrix TPDM, SharedMatrix U, SharedMatrix Uact) {
-    throw PSIEXCEPTION("The SOMCSCF object must be initilized as a DF or Disk object.");
+    throw PSIEXCEPTION("The SOMCSCF object must be initialized as a DF or Disk object.");
 }
-void SOMCSCF::set_act_MO() { throw PSIEXCEPTION("The SOMCSCF object must be initilized as a DF or Disk object."); }
+void SOMCSCF::set_act_MO() { throw PSIEXCEPTION("The SOMCSCF object must be initialized as a DF or Disk object."); }
 void SOMCSCF::set_ras(std::vector<Dimension> ras_spaces) {
     ras_spaces_ = ras_spaces;
     casscf_ = false;
@@ -124,7 +126,7 @@ double SOMCSCF::rhf_energy(SharedMatrix C) {
     J[0]->add(matrices_["H"]);
     J[0]->add(matrices_["H"]);
 
-    SharedMatrix D = Matrix::doublet(C, C, false, true);
+    SharedMatrix D = linalg::doublet(C, C, false, true);
     double erhf = J[0]->vector_dot(D);
     D.reset();
     return erhf;
@@ -155,7 +157,7 @@ SharedMatrix SOMCSCF::form_rotation_matrix(SharedMatrix x, size_t order) {
 SharedMatrix SOMCSCF::Ck(SharedMatrix C, SharedMatrix x) {
     // C' = C U
     SharedMatrix U = form_rotation_matrix(x);
-    SharedMatrix Cp = Matrix::doublet(C, U);
+    SharedMatrix Cp = linalg::doublet(C, U);
 
     return Cp;
 }
@@ -177,7 +179,7 @@ void SOMCSCF::update(SharedMatrix Cocc, SharedMatrix Cact, SharedMatrix Cvir, Sh
     matrices_["Cvir"] = Cvir;
     fullC.push_back(Cvir);
 
-    matrices_["C"] = Matrix::horzcat(fullC);
+    matrices_["C"] = linalg::horzcat(fullC);
     matrices_["C"]->set_name("C");
 
     nirrep_ = matrices_["C"]->nirrep();
@@ -205,7 +207,7 @@ void SOMCSCF::update(SharedMatrix Cocc, SharedMatrix Cact, SharedMatrix Cvir, Sh
     Cr.clear();
 
     // For active Fock
-    SharedMatrix CL_COPDM = Matrix::doublet(matrices_["Cact"], matrices_["OPDM"]);
+    SharedMatrix CL_COPDM = linalg::doublet(matrices_["Cact"], matrices_["OPDM"]);
     Cl.push_back(CL_COPDM);
     Cr.push_back(matrices_["Cact"]);
 
@@ -223,7 +225,7 @@ void SOMCSCF::update(SharedMatrix Cocc, SharedMatrix Cact, SharedMatrix Cvir, Sh
     // AFock build
     K[0]->scale(0.5);
     J[0]->subtract(K[0]);
-    matrices_["AFock"] = Matrix::triplet(matrices_["C"], J[0], matrices_["C"], true, false, false);
+    matrices_["AFock"] = linalg::triplet(matrices_["C"], J[0], matrices_["C"], true, false, false);
     matrices_["AFock"]->set_name("AFock");
 
     // IFock build
@@ -234,10 +236,10 @@ void SOMCSCF::update(SharedMatrix Cocc, SharedMatrix Cact, SharedMatrix Cvir, Sh
         if (has_fzc_) {
             J[1]->add(matrices_["FZC_JK_AO"]);
         }
-        matrices_["IFock"] = Matrix::triplet(matrices_["C"], J[1], matrices_["C"], true, false, false);
+        matrices_["IFock"] = linalg::triplet(matrices_["C"], J[1], matrices_["C"], true, false, false);
         matrices_["IFock"]->set_name("IFock");
     } else {
-        matrices_["IFock"] = Matrix::triplet(matrices_["C"], matrices_["AO_IFock"], matrices_["C"], true, false, false);
+        matrices_["IFock"] = linalg::triplet(matrices_["C"], matrices_["AO_IFock"], matrices_["C"], true, false, false);
         matrices_["IFock"]->set_name("IFock");
     }
 
@@ -305,9 +307,9 @@ void SOMCSCF::update(SharedMatrix Cocc, SharedMatrix Cact, SharedMatrix Cvir, Sh
     energy_ci_ = 0.0;
     J[0]->add(matrices_["H"]);
 
-    SharedMatrix tmpD = Matrix::doublet(matrices_["Cocc"], matrices_["Cocc"], false, true);
+    SharedMatrix tmpD = linalg::doublet(matrices_["Cocc"], matrices_["Cocc"], false, true);
     if (has_fzc_) {
-        SharedMatrix tmpDf = Matrix::doublet(matrices_["Cfzc"], matrices_["Cfzc"], false, true);
+        SharedMatrix tmpDf = linalg::doublet(matrices_["Cfzc"], matrices_["Cfzc"], false, true);
         tmpD->add(tmpDf);
     }
     energy_drc_ = J[0]->vector_dot(tmpD);
@@ -508,7 +510,7 @@ SharedMatrix SOMCSCF::compute_AFock(SharedMatrix OPDM) {
     Cr.clear();
 
     // For active Fock
-    SharedMatrix CL_COPDM = Matrix::doublet(matrices_["Cact"], OPDM);
+    SharedMatrix CL_COPDM = linalg::doublet(matrices_["Cact"], OPDM);
     Cl.push_back(CL_COPDM);
     Cr.push_back(matrices_["Cact"]);
 
@@ -520,7 +522,7 @@ SharedMatrix SOMCSCF::compute_AFock(SharedMatrix OPDM) {
     // AFock build
     K[0]->scale(0.5);
     J[0]->subtract(K[0]);
-    SharedMatrix AFock = Matrix::triplet(matrices_["C"], J[0], matrices_["C"], true, false, false);
+    SharedMatrix AFock = linalg::triplet(matrices_["C"], J[0], matrices_["C"], true, false, false);
     AFock->set_name("AFock");
     return AFock;
 }
@@ -571,12 +573,12 @@ SharedMatrix SOMCSCF::Hk(SharedMatrix x) {
 
     // For inactive Fock
 
-    SharedMatrix CLUocc = Matrix::doublet(matrices_["C"], Uocc, false, true);
+    SharedMatrix CLUocc = linalg::doublet(matrices_["C"], Uocc, false, true);
     Cl.push_back(CLUocc);
     Cr.push_back(matrices_["Cocc"]);
 
     // For active Fock
-    SharedMatrix CLUact = Matrix::triplet(matrices_["C"], Uact, matrices_["OPDM"], false, true, true);
+    SharedMatrix CLUact = linalg::triplet(matrices_["C"], Uact, matrices_["OPDM"], false, true, true);
     Cr.push_back(CLUact);
     Cl.push_back(matrices_["Cact"]);
 
@@ -588,24 +590,24 @@ SharedMatrix SOMCSCF::Hk(SharedMatrix x) {
     const std::vector<SharedMatrix>& K = jk_->K();
 
     // Rotated inactive fock
-    SharedMatrix IFk = Matrix::doublet(matrices_["IFock"], U, false, true);
+    SharedMatrix IFk = linalg::doublet(matrices_["IFock"], U, false, true);
     IFk->gemm(false, false, 1.0, U, matrices_["IFock"], 1.0);
 
     J[0]->scale(4.0);
     J[0]->subtract(K[0]);
     J[0]->subtract(K[0]->transpose());
-    SharedMatrix trans_half = Matrix::doublet(J[0], matrices_["C"]);
+    SharedMatrix trans_half = linalg::doublet(J[0], matrices_["C"]);
     IFk->gemm(true, false, 1.0, matrices_["C"], trans_half, 1.0);
 
     // Rotated active fock
-    SharedMatrix ret = Matrix::doublet(matrices_["AFock"], U, false, true);
+    SharedMatrix ret = linalg::doublet(matrices_["AFock"], U, false, true);
     ret->gemm(false, false, 1.0, U, matrices_["AFock"], 1.0);
 
     J[1]->scale(2.0);
     K[1]->scale(0.5);
     J[1]->subtract(K[1]);
     J[1]->subtract(K[1]->transpose());
-    trans_half = Matrix::doublet(J[1], matrices_["C"]);
+    trans_half = linalg::doublet(J[1], matrices_["C"]);
     ret->gemm(true, false, 1.0, matrices_["C"], trans_half, 1.0);
 
     trans_half.reset();
@@ -682,9 +684,9 @@ SharedMatrix SOMCSCF::solve(int max_iter, double conv, bool print) {
         outfile->Printf("    ---------------------------------------\n");
     }
 
-    time_t start;
-    time_t stop;
-    start = time(nullptr);
+    std::time_t start;
+    std::time_t stop;
+    start = std::time(nullptr);
 
     // Initial guess
     SharedMatrix x = matrices_["Gradient"]->clone();
@@ -706,7 +708,7 @@ SharedMatrix SOMCSCF::solve(int max_iter, double conv, bool print) {
     r->subtract(Ap);
     if (print) {
         double rconv = r->rms();
-        stop = time(nullptr);
+        stop = std::time(nullptr);
         outfile->Printf("    %-4d %11.3E %10ld\n", 0, rconv, stop - start);
     }
 
@@ -730,7 +732,7 @@ SharedMatrix SOMCSCF::solve(int max_iter, double conv, bool print) {
 
         // Get residual
         double rconv = r->rms();
-        stop = time(nullptr);
+        stop = std::time(nullptr);
         if (print) {
             outfile->Printf("    %-4d %11.3E %10ld\n", iter + 1, rconv, stop - start);
         }
@@ -813,8 +815,7 @@ void SOMCSCF::zero_ras(SharedMatrix vector) {
 /// End SOMCSCF class
 
 /// DFSOMCSCF class
-DFSOMCSCF::DFSOMCSCF(std::shared_ptr<JK> jk, std::shared_ptr<DFHelper> df, SharedMatrix AOTOSO,
-                     SharedMatrix H)
+DFSOMCSCF::DFSOMCSCF(std::shared_ptr<JK> jk, std::shared_ptr<DFHelper> df, SharedMatrix AOTOSO, SharedMatrix H)
     : SOMCSCF(jk, AOTOSO, H) {
     dfh_ = df;
 }
@@ -833,15 +834,15 @@ void DFSOMCSCF::transform(bool approx_only) {
 
     auto AO_R = std::make_shared<Matrix>("AO_R", nao, nrot);
     auto AO_a = std::make_shared<Matrix>("AO_a", nao, aoc_rowdim - nrot);
-    
+
     double** rp = AO_R->pointer();
     double** ap = AO_a->pointer();
-    
+
     for (int h = 0, offset = 0, offset_act = 0; h < nirrep_; h++) {
         int hnso = nsopi_[h];
         if (hnso == 0) continue;
         double** Up = matrices_["AOTOSO"]->pointer(h);
-    
+
         int noccpih = Cocc->colspi()[h];
         int nactpih = Cact->colspi()[h];
         int nvirpih = Cvir->colspi()[h];
@@ -856,7 +857,7 @@ void DFSOMCSCF::transform(bool approx_only) {
             double** CSOp = Cact->pointer(h);
             C_DGEMM('N', 'N', nao, nactpih, hnso, 1.0, Up[0], hnso, CSOp[0], nactpih, 0.0, &rp[0][offset], nrot);
             offset += nactpih;
-    
+
             C_DGEMM('N', 'N', nao, nactpih, hnso, 1.0, Up[0], hnso, CSOp[0], nactpih, 0.0, &ap[0][offset_act],
                     aoc_rowdim - nrot);
             offset_act += nactpih;
@@ -868,10 +869,10 @@ void DFSOMCSCF::transform(bool approx_only) {
             offset += nvirpih;
         }
     }
-   
+
     // safety check
     dfh_->clear_spaces();
- 
+
     dfh_->add_space("R", AO_R);
     dfh_->add_space("a", AO_a);
 
@@ -892,7 +893,7 @@ void DFSOMCSCF::set_act_MO() {
 
     auto aaQ = std::make_shared<Matrix>("aaQ", nact_ * nact_, nQ);
     dfh_->fill_tensor("aaQ", aaQ);
-    matrices_["actMO"] = Matrix::doublet(aaQ, aaQ, false, true);
+    matrices_["actMO"] = linalg::doublet(aaQ, aaQ, false, true);
     aaQ.reset();
 }
 SharedMatrix DFSOMCSCF::compute_Q(SharedMatrix TPDM) {
@@ -1012,7 +1013,7 @@ SharedMatrix DFSOMCSCF::compute_Qk(SharedMatrix TPDM, SharedMatrix U, SharedMatr
     }
 
     // nwQ,xyQ => tmp_nwxy (NaQ, xyQ) NQa^3
-    SharedMatrix Gnwxy = Matrix::doublet(NaQ, xyQ, false, true);
+    SharedMatrix Gnwxy = linalg::doublet(NaQ, xyQ, false, true);
     double* Gnwxyp = Gnwxy->pointer()[0];
     NaQ.reset();
 
@@ -1072,7 +1073,7 @@ SharedMatrix DFSOMCSCF::compute_Qk(SharedMatrix TPDM, SharedMatrix U, SharedMatr
 
     // Symm block Qk
     SharedMatrix tQ = compute_Q(TPDM);
-    SharedMatrix Qk = Matrix::doublet(tQ, U, false, true);
+    SharedMatrix Qk = linalg::doublet(tQ, U, false, true);
     // dQk->print();
 
     int offset_act = 0;

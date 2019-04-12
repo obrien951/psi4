@@ -5,7 +5,7 @@
 #
 # Psi4: an open-source quantum chemistry software package
 #
-# Copyright (c) 2007-2018 The Psi4 Developers.
+# Copyright (c) 2007-2019 The Psi4 Developers.
 #
 # The copyrights for code used from other parties are included in
 # the corresponding files.
@@ -36,6 +36,7 @@ import datetime
 import argparse
 from argparse import RawTextHelpFormatter
 
+# yapf: disable
 parser = argparse.ArgumentParser(description="Psi4: Open-Source Quantum Chemistry", formatter_class=RawTextHelpFormatter)
 parser.add_argument("-i", "--input", default="input.dat",
                     help="Input file name. Default: input.dat.")
@@ -70,8 +71,8 @@ parser.add_argument("-k", "--skip-preprocessor", action='store_true',
                     help="Skips input preprocessing. !Warning! expert option.")
 parser.add_argument("--json", action='store_true',
                     help="Runs a JSON input file. !Warning! experimental option.")
-parser.add_argument("-t", "--test", action='store_true',
-                    help="Runs smoke tests.")
+parser.add_argument("-t", "--test", nargs='?', const='smoke', default=None,
+                    help="Runs pytest tests. If `pytest-xdist` installed, parallel with `--nthread`.")
 
 # For plugins
 parser.add_argument("--plugin-name", help="""\
@@ -88,6 +89,7 @@ Generates a CMake command for building a plugin against this Psi4 installation.
 >>> `psi4 --plugin-compile`
 >>> make
 >>> psi4""")
+# yapf: enable
 
 # print("Environment Variables\n");
 # print("     PSI_SCRATCH           Directory where scratch files are written.")
@@ -104,11 +106,13 @@ lib_dir = os.path.sep.join([cmake_install_prefix, "@CMAKE_INSTALL_LIBDIR@", "@PY
 
 if args["inplace"]:
     if "CMAKE_INSTALL_LIBDIR" not in lib_dir:
-        raise ImportError("Cannot run inplace from a installed directory.")
+        raise ImportError("Cannot run inplace from an installed directory.")
 
-    core_location = os.path.dirname(os.path.abspath(__file__)) + os.path.sep + "core.so"
+    import sysconfig
+    core_location = os.path.dirname(os.path.abspath(__file__)) + os.path.sep + "core" + sysconfig.get_config_var("EXT_SUFFIX")
     if not os.path.isfile(core_location):
-        raise ImportError("A compiled Psi4 core.so needs to be symlinked to the %s folder" % os.path.dirname(__file__))
+        raise ImportError("A compiled Psi4 core{} needs to be symlinked to the {} folder".format(
+            sysconfig.get_config_var("EXT_SUFFIX"), os.path.dirname(__file__)))
 
     lib_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     if ("PSIDATADIR" not in os.environ.keys()) and (not args["psidatadir"]):
@@ -131,9 +135,9 @@ if args["output"] is None:
     if args["input"] == "input.dat":
         args["output"] = "output.dat"
     elif args["input"].endswith(".in"):
-        args["output"] = args["input"].replace(".in", ".out")
+        args["output"] = args["input"][:-2] + "out"
     elif args["input"].endswith(".dat"):
-        args["output"] = args["input"].replace(".dat", ".out")
+        args["output"] = args["input"][:-3] + "out"
     else:
         args["output"] = args["input"] + ".dat"
 
@@ -143,7 +147,8 @@ if args['plugin_compile']:
 
     plugincachealongside = os.path.isfile(share_cmake_dir + os.path.sep + 'psi4PluginCache.cmake')
     if plugincachealongside:
-        print("""cmake -C {}/psi4PluginCache.cmake -DCMAKE_PREFIX_PATH={} .""".format(share_cmake_dir, cmake_install_prefix))
+        print("""cmake -C {}/psi4PluginCache.cmake -DCMAKE_PREFIX_PATH={} .""".format(
+            share_cmake_dir, cmake_install_prefix))
         sys.exit()
     else:
         print("""Install "psi4-dev" via `conda install psi4-dev -c psi4[/label/dev]`, then reissue command.""")
@@ -159,6 +164,13 @@ if args["psidatadir"] is not None:
     os.environ["PSIDATADIR"] = data_dir
 
 ### Actually import psi4 and apply setup ###
+
+# Arrange for warnings to ignore everything except the message
+def custom_formatwarning(msg, *args, **kwargs):
+    return str(msg) + '\n'
+
+import warnings
+warnings.formatwarning = custom_formatwarning
 
 # Import installed psi4
 sys.path.insert(1, lib_dir)
@@ -183,10 +195,17 @@ if args['plugin_name']:
 
     sys.exit()
 
+if args["test"] is not None:
+    if args["test"] not in ['smoke', 'quick', 'full', 'long']:
+        raise KeyError("The test category {} does not exist.".format(args["test"]))
 
-if args["test"]:
-    psi4.test()
-    sys.exit()
+    nthread = int(args["nthread"])
+    if nthread == 1:
+        extras = None
+    else:
+        extras = ['-n', str(nthread)]
+    retcode = psi4.test(args["test"], extras=extras)
+    sys.exit(retcode)
 
 if not os.path.isfile(args["input"]):
     raise KeyError("The file %s does not exist." % args["input"])
@@ -222,7 +241,7 @@ if args["json"]:
 
     psi4.extras._success_flag_ = True
     psi4.extras.exit_printing(start_time)
-    psi4.json_wrapper.run_json(json_data)
+    json_data = psi4.json_wrapper.run_json(json_data)
 
     with open(args["input"], 'w') as f:
         json.dump(json_data, f)
@@ -231,7 +250,6 @@ if args["json"]:
         os.unlink(args["output"])
 
     sys.exit()
-
 
 # Read input
 with open(args["input"]) as f:
@@ -258,7 +276,7 @@ if args["messy"]:
     else:
         for handler in atexit._exithandlers:
             for func in _clean_functions:
-                if handler[0] == func: 
+                if handler[0] == func:
                     atexit._exithandlers.remove(handler)
 
 # Register exit printing, failure GOTO coffee ELSE beer
@@ -276,17 +294,22 @@ except Exception as exception:
     tb_str = "Traceback (most recent call last):\n"
     tb_str += ''.join(traceback.format_tb(exc_traceback))
     tb_str += '\n'
-    tb_str += type(exception).__name__
-    tb_str += ': '
-    tb_str += str(exception)
+    tb_str += ''.join(traceback.format_exception_only(type(exception), exception))
     psi4.core.print_out("\n")
     psi4.core.print_out(tb_str)
-    psi4.core.print_out("\n")
+    psi4.core.print_out("\n\n")
+
+    in_str = "Printing out the relevant lines from the Psithon --> Python processed input file:\n"
+    lines = content.splitlines()
+    suspect_lineno = traceback.extract_tb(exc_traceback)[1].lineno - 1  # -1 for 0 indexing
+    first_line = max(0, suspect_lineno - 5)  # Try to show five lines back...
+    last_line = min(len(lines), suspect_lineno + 6)  # Try to show five lines forward
+    for lineno in range(first_line, last_line):
+        mark = "--> " if lineno == suspect_lineno else "    "
+        in_str += mark + lines[lineno] + "\n"
+    psi4.core.print_out(in_str)
+
     if psi4.core.get_output_file() != "stdout":
         print(tb_str)
+        print(in_str)
     sys.exit(1)
-
-
-#    elif '***HDF5 library version mismatched error***' in str(err):
-#        raise ImportError("{0}\nLikely cause: HDF5 used in compilation not prominent enough in RPATH/[DY]LD_LIBRARY_PATH".format(err))
-

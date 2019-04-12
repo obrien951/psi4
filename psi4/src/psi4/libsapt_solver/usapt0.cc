@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -27,22 +27,22 @@
  */
 
 #include "usapt0.h"
-#include "psi4/libfock/jk.h"
-#include "psi4/libmints/molecule.h"
+
+#include <ctime>
+
 #include "psi4/physconst.h"
+
+#include "psi4/lib3index/dfhelper.h"
+#include "psi4/libfock/jk.h"
 #include "psi4/libmints/basisset.h"
-#include "psi4/libmints/matrix.h"
-#include "psi4/libmints/vector.h"
 #include "psi4/libmints/integral.h"
+#include "psi4/libmints/matrix.h"
+#include "psi4/libmints/molecule.h"
+#include "psi4/libmints/vector.h"
 #include "psi4/libpsi4util/PsiOutStream.h"
 #include "psi4/libpsi4util/process.h"
-#include "psi4/lib3index/dfhelper.h"
-
-using namespace psi;
-using namespace std;
 
 namespace psi {
-
 namespace sapt {
 
 // TODO: ROHF orbitals for coupled induction
@@ -64,9 +64,9 @@ USAPT0::USAPT0(SharedWavefunction d, SharedWavefunction mA, SharedWavefunction m
     monomer_A_ = mA->molecule();
     monomer_B_ = mB->molecule();
 
-    E_dimer_ = d->reference_energy();
-    E_monomer_A_ = mA->reference_energy();
-    E_monomer_B_ = mB->reference_energy();
+    E_dimer_ = d->energy();
+    E_monomer_A_ = mA->energy();
+    E_monomer_B_ = mB->energy();
 
     primary_ = d->basisset();
     primary_A_ = mA->basisset();
@@ -187,7 +187,7 @@ void USAPT0::print_header() const {
 
     outfile->Printf("   => Resources <=\n\n");
 
-    outfile->Printf("    Memory (MB):       %11ld\n", (memory_ * 8L) / (1024L * 1024L));
+    outfile->Printf("    Memory [MiB]:      %11ld\n", (memory_ * 8L) / (1024L * 1024L));
     outfile->Printf("\n");
 
     outfile->Printf("   => Orbital Ranges <=\n\n");
@@ -381,10 +381,10 @@ void USAPT0::print_trailer() {
             if (coupled_ind_) {
                 Process::environment.globals["SAPT IND20,R ENERGY"] = energies_["Ind20,r"];
                 Process::environment.globals["SAPT EXCH-IND20,R ENERGY"] = energies_["Exch-Ind20,r"];
-            } // We always compute uncoupled induction in this routine
+            }  // We always compute uncoupled induction in this routine
             Process::environment.globals["SAPT IND20,U ENERGY"] = energies_["Ind20,u"];
             Process::environment.globals["SAPT EXCH-IND20,U ENERGY"] = energies_["Exch-Ind20,u"];
-            
+
             Process::environment.globals["SAPT HF TOTAL ENERGY"] = energies_["HF"];
             // Process::environment.globals["SAPT CT ENERGY"] = e_ind20_ + e_exch_ind20_;
 
@@ -406,17 +406,17 @@ void USAPT0::fock_terms() {
 
     // => Compute the D matrices <= //
 
-    std::shared_ptr<Matrix> Da_A = Matrix::doublet(Cocca_A_, Cocca_A_, false, true);
-    std::shared_ptr<Matrix> Db_A = Matrix::doublet(Coccb_A_, Coccb_A_, false, true);
-    std::shared_ptr<Matrix> Da_B = Matrix::doublet(Cocca_B_, Cocca_B_, false, true);
-    std::shared_ptr<Matrix> Db_B = Matrix::doublet(Coccb_B_, Coccb_B_, false, true);
+    std::shared_ptr<Matrix> Da_A = linalg::doublet(Cocca_A_, Cocca_A_, false, true);
+    std::shared_ptr<Matrix> Db_A = linalg::doublet(Coccb_A_, Coccb_A_, false, true);
+    std::shared_ptr<Matrix> Da_B = linalg::doublet(Cocca_B_, Cocca_B_, false, true);
+    std::shared_ptr<Matrix> Db_B = linalg::doublet(Coccb_B_, Coccb_B_, false, true);
 
     // => Compute the P matrices <= //
 
-    std::shared_ptr<Matrix> Pa_A = Matrix::doublet(Cvira_A_, Cvira_A_, false, true);
-    std::shared_ptr<Matrix> Pb_A = Matrix::doublet(Cvirb_A_, Cvirb_A_, false, true);
-    std::shared_ptr<Matrix> Pa_B = Matrix::doublet(Cvira_B_, Cvira_B_, false, true);
-    std::shared_ptr<Matrix> Pb_B = Matrix::doublet(Cvirb_B_, Cvirb_B_, false, true);
+    std::shared_ptr<Matrix> Pa_A = linalg::doublet(Cvira_A_, Cvira_A_, false, true);
+    std::shared_ptr<Matrix> Pb_A = linalg::doublet(Cvirb_A_, Cvirb_A_, false, true);
+    std::shared_ptr<Matrix> Pa_B = linalg::doublet(Cvira_B_, Cvira_B_, false, true);
+    std::shared_ptr<Matrix> Pb_B = linalg::doublet(Cvirb_B_, Cvirb_B_, false, true);
 
     // => Compute the S matrix <= //
 
@@ -445,11 +445,11 @@ void USAPT0::fock_terms() {
     if (jk_memory < 0L) {
         throw PSIEXCEPTION("Too little static memory for USAPT::fock_terms");
     }
-    
+
     std::shared_ptr<JK> jk = JK::build_JK(primary_, jkfit_, options_, false, (size_t)jk_memory);
 
     jk->set_memory((size_t)jk_memory);
-    
+
     // ==> Generalized Fock Source Terms [Elst/Exch] <== //
 
     // => Steric Interaction Density Terms (T) <= //
@@ -479,14 +479,14 @@ void USAPT0::fock_terms() {
 
     //    Create matrices needed for the S^{2} formula as well
 
-    std::shared_ptr<Matrix> S_CA = Matrix::doublet(S, Cocca_A_);
-    std::shared_ptr<Matrix> Ca_AS = Matrix::doublet(Pa_B, S_CA);
+    std::shared_ptr<Matrix> S_CA = linalg::doublet(S, Cocca_A_);
+    std::shared_ptr<Matrix> Ca_AS = linalg::doublet(Pa_B, S_CA);
     //    Next one for DM-based formula (debug purposes for now)
-    std::shared_ptr<Matrix> Ca_AB = Matrix::doublet(Da_B, S_CA);
-    S_CA = Matrix::doublet(S, Coccb_A_);
-    std::shared_ptr<Matrix> Cb_AS = Matrix::doublet(Pb_B, S_CA);
+    std::shared_ptr<Matrix> Ca_AB = linalg::doublet(Da_B, S_CA);
+    S_CA = linalg::doublet(S, Coccb_A_);
+    std::shared_ptr<Matrix> Cb_AS = linalg::doublet(Pb_B, S_CA);
     //    Next one for DM-based formula (debug purposes for now)
-    std::shared_ptr<Matrix> Cb_AB = Matrix::doublet(Db_B, S_CA);
+    std::shared_ptr<Matrix> Cb_AB = linalg::doublet(Db_B, S_CA);
     S_CA.reset();
 
     // => Load the JK Object <= //
@@ -606,13 +606,13 @@ void USAPT0::fock_terms() {
 
     // => Compute the T matrices <= //
 
-    std::shared_ptr<Matrix> Ta_A_n = Matrix::doublet(C_Ta_A_n, Cocca_A_, false, true);
-    std::shared_ptr<Matrix> Ta_B_n = Matrix::doublet(C_Ta_B_n, Cocca_B_, false, true);
-    std::shared_ptr<Matrix> Ta_BA_n = Matrix::doublet(C_Ta_BA_n, Cocca_A_, false, true);
+    std::shared_ptr<Matrix> Ta_A_n = linalg::doublet(C_Ta_A_n, Cocca_A_, false, true);
+    std::shared_ptr<Matrix> Ta_B_n = linalg::doublet(C_Ta_B_n, Cocca_B_, false, true);
+    std::shared_ptr<Matrix> Ta_BA_n = linalg::doublet(C_Ta_BA_n, Cocca_A_, false, true);
 
-    std::shared_ptr<Matrix> Tb_A_n = Matrix::doublet(C_Tb_A_n, Coccb_A_, false, true);
-    std::shared_ptr<Matrix> Tb_B_n = Matrix::doublet(C_Tb_B_n, Coccb_B_, false, true);
-    std::shared_ptr<Matrix> Tb_BA_n = Matrix::doublet(C_Tb_BA_n, Coccb_A_, false, true);
+    std::shared_ptr<Matrix> Tb_A_n = linalg::doublet(C_Tb_A_n, Coccb_A_, false, true);
+    std::shared_ptr<Matrix> Tb_B_n = linalg::doublet(C_Tb_B_n, Coccb_B_, false, true);
+    std::shared_ptr<Matrix> Tb_BA_n = linalg::doublet(C_Tb_BA_n, Coccb_A_, false, true);
 
     C_Ta_A_n.reset();
     C_Ta_B_n.reset();
@@ -688,33 +688,33 @@ void USAPT0::fock_terms() {
     // ==> Exchange Terms (S^2) <== //
     //    First, in the second quantized formalism
 
-    inter_a = std::shared_ptr<Matrix>(Matrix::triplet(El_pot_B, Da_A, S));
+    inter_a = std::shared_ptr<Matrix>(linalg::triplet(El_pot_B, Da_A, S));
     inter_a->add(Ka_AS);
-    inter_b = std::shared_ptr<Matrix>(Matrix::triplet(El_pot_B, Db_A, S));
+    inter_b = std::shared_ptr<Matrix>(linalg::triplet(El_pot_B, Db_A, S));
     inter_b->add(Kb_AS);
 
     double Exch10_2 = 0.0;
     std::vector<double> Exch10_2_terms;
     /*    Exch10_2_terms.resize(3);
-    Exch10_2_terms[0] -= Matrix::triplet(Matrix::triplet(Da_A,S,Da_B),S,Pa_A)->vector_dot(V_B);
-    Exch10_2_terms[0] -= Matrix::triplet(Matrix::triplet(Da_A,S,Da_B),S,Pa_A)->vector_dot(Ja_B);
-    Exch10_2_terms[0] -= Matrix::triplet(Matrix::triplet(Da_A,S,Da_B),S,Pa_A)->vector_dot(Jb_B);
-    Exch10_2_terms[1] -= Matrix::triplet(Matrix::triplet(Da_B,S,Da_A),S,Pa_B)->vector_dot(V_A);
-    Exch10_2_terms[1] -= Matrix::triplet(Matrix::triplet(Da_B,S,Da_A),S,Pa_B)->vector_dot(Ja_A);
-    Exch10_2_terms[1] -= Matrix::triplet(Matrix::triplet(Da_B,S,Da_A),S,Pa_B)->vector_dot(Jb_A);
-    Exch10_2_terms[2] -= Matrix::triplet(Pa_A,S,Da_B)->vector_dot(Ka_AS);
-    Exch10_2_terms[0] -= Matrix::triplet(Matrix::triplet(Db_A,S,Db_B),S,Pb_A)->vector_dot(V_B);
-    Exch10_2_terms[0] -= Matrix::triplet(Matrix::triplet(Db_A,S,Db_B),S,Pb_A)->vector_dot(Ja_B);
-    Exch10_2_terms[0] -= Matrix::triplet(Matrix::triplet(Db_A,S,Db_B),S,Pb_A)->vector_dot(Jb_B);
-    Exch10_2_terms[1] -= Matrix::triplet(Matrix::triplet(Db_B,S,Db_A),S,Pb_B)->vector_dot(V_A);
-    Exch10_2_terms[1] -= Matrix::triplet(Matrix::triplet(Db_B,S,Db_A),S,Pb_B)->vector_dot(Ja_A);
-    Exch10_2_terms[1] -= Matrix::triplet(Matrix::triplet(Db_B,S,Db_A),S,Pb_B)->vector_dot(Jb_A);
-    Exch10_2_terms[2] -= Matrix::triplet(Pb_A,S,Db_B)->vector_dot(Kb_AS);
+    Exch10_2_terms[0] -= linalg::triplet(linalg::triplet(Da_A,S,Da_B),S,Pa_A)->vector_dot(V_B);
+    Exch10_2_terms[0] -= linalg::triplet(linalg::triplet(Da_A,S,Da_B),S,Pa_A)->vector_dot(Ja_B);
+    Exch10_2_terms[0] -= linalg::triplet(linalg::triplet(Da_A,S,Da_B),S,Pa_A)->vector_dot(Jb_B);
+    Exch10_2_terms[1] -= linalg::triplet(linalg::triplet(Da_B,S,Da_A),S,Pa_B)->vector_dot(V_A);
+    Exch10_2_terms[1] -= linalg::triplet(linalg::triplet(Da_B,S,Da_A),S,Pa_B)->vector_dot(Ja_A);
+    Exch10_2_terms[1] -= linalg::triplet(linalg::triplet(Da_B,S,Da_A),S,Pa_B)->vector_dot(Jb_A);
+    Exch10_2_terms[2] -= linalg::triplet(Pa_A,S,Da_B)->vector_dot(Ka_AS);
+    Exch10_2_terms[0] -= linalg::triplet(linalg::triplet(Db_A,S,Db_B),S,Pb_A)->vector_dot(V_B);
+    Exch10_2_terms[0] -= linalg::triplet(linalg::triplet(Db_A,S,Db_B),S,Pb_A)->vector_dot(Ja_B);
+    Exch10_2_terms[0] -= linalg::triplet(linalg::triplet(Db_A,S,Db_B),S,Pb_A)->vector_dot(Jb_B);
+    Exch10_2_terms[1] -= linalg::triplet(linalg::triplet(Db_B,S,Db_A),S,Pb_B)->vector_dot(V_A);
+    Exch10_2_terms[1] -= linalg::triplet(linalg::triplet(Db_B,S,Db_A),S,Pb_B)->vector_dot(Ja_A);
+    Exch10_2_terms[1] -= linalg::triplet(linalg::triplet(Db_B,S,Db_A),S,Pb_B)->vector_dot(Jb_A);
+    Exch10_2_terms[2] -= linalg::triplet(Pb_A,S,Db_B)->vector_dot(Kb_AS);
 */ Exch10_2_terms.resize(4);
-    Exch10_2_terms[0] -= Matrix::triplet(Pa_A, S, Da_B)->vector_dot(inter_a);
-    Exch10_2_terms[1] -= Matrix::triplet(Pa_B, S, Da_A)->vector_dot(Matrix::triplet(El_pot_A, Da_B, S));
-    Exch10_2_terms[2] -= Matrix::triplet(Pb_A, S, Db_B)->vector_dot(inter_b);
-    Exch10_2_terms[3] -= Matrix::triplet(Pb_B, S, Db_A)->vector_dot(Matrix::triplet(El_pot_A, Db_B, S));
+    Exch10_2_terms[0] -= linalg::triplet(Pa_A, S, Da_B)->vector_dot(inter_a);
+    Exch10_2_terms[1] -= linalg::triplet(Pa_B, S, Da_A)->vector_dot(linalg::triplet(El_pot_A, Da_B, S));
+    Exch10_2_terms[2] -= linalg::triplet(Pb_A, S, Db_B)->vector_dot(inter_b);
+    Exch10_2_terms[3] -= linalg::triplet(Pb_B, S, Db_A)->vector_dot(linalg::triplet(El_pot_A, Db_B, S));
     for (int k = 0; k < Exch10_2_terms.size(); k++) {
         Exch10_2 += Exch10_2_terms[k];
     }
@@ -730,16 +730,16 @@ void USAPT0::fock_terms() {
     //    Now compute the same quantity but in the density matrix formalism,
     //    valid for both dimer- and monomer-centered basis sets.
 
-    inter_a = std::shared_ptr<Matrix>(Matrix::triplet(S, Da_B, El_pot_A));
+    inter_a = std::shared_ptr<Matrix>(linalg::triplet(S, Da_B, El_pot_A));
     inter_a->scale(-1.0);
-    inter_a->subtract(Matrix::triplet(El_pot_B, Da_A, S));
+    inter_a->subtract(linalg::triplet(El_pot_B, Da_A, S));
     inter_a->add(Ka_AB);
     inter_a->add(ha_A);
     inter_a->add(ha_B);
 
-    inter_b = std::shared_ptr<Matrix>(Matrix::triplet(S, Db_B, El_pot_A));
+    inter_b = std::shared_ptr<Matrix>(linalg::triplet(S, Db_B, El_pot_A));
     inter_b->scale(-1.0);
-    inter_b->subtract(Matrix::triplet(El_pot_B, Db_A, S));
+    inter_b->subtract(linalg::triplet(El_pot_B, Db_A, S));
     inter_b->add(Kb_AB);
     inter_b->add(hb_A);
     inter_b->add(hb_B);
@@ -749,42 +749,42 @@ void USAPT0::fock_terms() {
     Exch10_2dm_terms.resize(4);
     Exch10_2dm_terms[0] -= Da_A->vector_dot(Ka_B);
     Exch10_2dm_terms[1] -= Db_A->vector_dot(Kb_B);
-    Exch10_2dm_terms[2] -= Matrix::triplet(Da_A, S, Da_B)->vector_dot(inter_a);
-    Exch10_2dm_terms[3] -= Matrix::triplet(Db_A, S, Db_B)->vector_dot(inter_b);
+    Exch10_2dm_terms[2] -= linalg::triplet(Da_A, S, Da_B)->vector_dot(inter_a);
+    Exch10_2dm_terms[3] -= linalg::triplet(Db_A, S, Db_B)->vector_dot(inter_b);
 
     /*    double Exch10_2dm = 0.0;
     std::vector<double> Exch10_2dm_terms;
     Exch10_2dm_terms.resize(6);
-    Exch10_2dm_terms[0] += Matrix::triplet(Da_A,S,Da_B)->vector_dot(Ka_A);
-    Exch10_2dm_terms[0] -= Matrix::triplet(Da_A,S,Da_B)->vector_dot(Ja_A);
-    Exch10_2dm_terms[0] -= Matrix::triplet(Da_A,S,Da_B)->vector_dot(Jb_A);
-    Exch10_2dm_terms[0] -= Matrix::triplet(Da_A,S,Da_B)->vector_dot(V_A);
-    Exch10_2dm_terms[0] -= Matrix::triplet(Da_A,S,Da_B)->vector_dot(Ka_AB);
-    Exch10_2dm_terms[0] += Matrix::triplet(Da_A,S,Matrix::triplet(Da_B,Ja_A,Da_B))->vector_dot(S);
-    Exch10_2dm_terms[0] += Matrix::triplet(Da_A,S,Matrix::triplet(Da_B,Jb_A,Da_B))->vector_dot(S);
-    Exch10_2dm_terms[0] += Matrix::triplet(Da_A,S,Matrix::triplet(Da_B,V_A,Da_B))->vector_dot(S);
-    Exch10_2dm_terms[0] += Matrix::triplet(Da_A,S,Matrix::triplet(Da_B,S,Da_A))->vector_dot(Ja_B);
-    Exch10_2dm_terms[0] += Matrix::triplet(Da_A,S,Matrix::triplet(Da_B,S,Da_A))->vector_dot(Jb_B);
-    Exch10_2dm_terms[0] += Matrix::triplet(Da_A,S,Matrix::triplet(Da_B,S,Da_A))->vector_dot(V_B);
-    Exch10_2dm_terms[1] += Matrix::triplet(Db_A,S,Db_B)->vector_dot(Kb_A);
-    Exch10_2dm_terms[1] -= Matrix::triplet(Db_A,S,Db_B)->vector_dot(Jb_A);
-    Exch10_2dm_terms[1] -= Matrix::triplet(Db_A,S,Db_B)->vector_dot(Ja_A);
-    Exch10_2dm_terms[1] -= Matrix::triplet(Db_A,S,Db_B)->vector_dot(V_A);
-    Exch10_2dm_terms[1] -= Matrix::triplet(Db_A,S,Db_B)->vector_dot(Kb_AB);
-    Exch10_2dm_terms[1] += Matrix::triplet(Db_A,S,Matrix::triplet(Db_B,Jb_A,Db_B))->vector_dot(S);
-    Exch10_2dm_terms[1] += Matrix::triplet(Db_A,S,Matrix::triplet(Db_B,Ja_A,Db_B))->vector_dot(S);
-    Exch10_2dm_terms[1] += Matrix::triplet(Db_A,S,Matrix::triplet(Db_B,V_A,Db_B))->vector_dot(S);
-    Exch10_2dm_terms[1] += Matrix::triplet(Db_A,S,Matrix::triplet(Db_B,S,Db_A))->vector_dot(Jb_B);
-    Exch10_2dm_terms[1] += Matrix::triplet(Db_A,S,Matrix::triplet(Db_B,S,Db_A))->vector_dot(Ja_B);
-    Exch10_2dm_terms[1] += Matrix::triplet(Db_A,S,Matrix::triplet(Db_B,S,Db_A))->vector_dot(V_B);
-    Exch10_2dm_terms[2] += Matrix::triplet(Da_B,S,Da_A)->vector_dot(Ka_B);
-    Exch10_2dm_terms[2] -= Matrix::triplet(Da_B,S,Da_A)->vector_dot(Jb_B);
-    Exch10_2dm_terms[2] -= Matrix::triplet(Da_B,S,Da_A)->vector_dot(Ja_B);
-    Exch10_2dm_terms[2] -= Matrix::triplet(Da_B,S,Da_A)->vector_dot(V_B);
-    Exch10_2dm_terms[3] += Matrix::triplet(Db_B,S,Db_A)->vector_dot(Kb_B);
-    Exch10_2dm_terms[3] -= Matrix::triplet(Db_B,S,Db_A)->vector_dot(Ja_B);
-    Exch10_2dm_terms[3] -= Matrix::triplet(Db_B,S,Db_A)->vector_dot(Jb_B);
-    Exch10_2dm_terms[3] -= Matrix::triplet(Db_B,S,Db_A)->vector_dot(V_B);
+    Exch10_2dm_terms[0] += linalg::triplet(Da_A,S,Da_B)->vector_dot(Ka_A);
+    Exch10_2dm_terms[0] -= linalg::triplet(Da_A,S,Da_B)->vector_dot(Ja_A);
+    Exch10_2dm_terms[0] -= linalg::triplet(Da_A,S,Da_B)->vector_dot(Jb_A);
+    Exch10_2dm_terms[0] -= linalg::triplet(Da_A,S,Da_B)->vector_dot(V_A);
+    Exch10_2dm_terms[0] -= linalg::triplet(Da_A,S,Da_B)->vector_dot(Ka_AB);
+    Exch10_2dm_terms[0] += linalg::triplet(Da_A,S,triplet(Da_B,Ja_A,Da_B))->vector_dot(S);
+    Exch10_2dm_terms[0] += linalg::triplet(Da_A,S,triplet(Da_B,Jb_A,Da_B))->vector_dot(S);
+    Exch10_2dm_terms[0] += linalg::triplet(Da_A,S,triplet(Da_B,V_A,Da_B))->vector_dot(S);
+    Exch10_2dm_terms[0] += linalg::triplet(Da_A,S,triplet(Da_B,S,Da_A))->vector_dot(Ja_B);
+    Exch10_2dm_terms[0] += linalg::triplet(Da_A,S,triplet(Da_B,S,Da_A))->vector_dot(Jb_B);
+    Exch10_2dm_terms[0] += linalg::triplet(Da_A,S,triplet(Da_B,S,Da_A))->vector_dot(V_B);
+    Exch10_2dm_terms[1] += linalg::triplet(Db_A,S,Db_B)->vector_dot(Kb_A);
+    Exch10_2dm_terms[1] -= linalg::triplet(Db_A,S,Db_B)->vector_dot(Jb_A);
+    Exch10_2dm_terms[1] -= linalg::triplet(Db_A,S,Db_B)->vector_dot(Ja_A);
+    Exch10_2dm_terms[1] -= linalg::triplet(Db_A,S,Db_B)->vector_dot(V_A);
+    Exch10_2dm_terms[1] -= linalg::triplet(Db_A,S,Db_B)->vector_dot(Kb_AB);
+    Exch10_2dm_terms[1] += linalg::triplet(Db_A,S,triplet(Db_B,Jb_A,Db_B))->vector_dot(S);
+    Exch10_2dm_terms[1] += linalg::triplet(Db_A,S,triplet(Db_B,Ja_A,Db_B))->vector_dot(S);
+    Exch10_2dm_terms[1] += linalg::triplet(Db_A,S,triplet(Db_B,V_A,Db_B))->vector_dot(S);
+    Exch10_2dm_terms[1] += linalg::triplet(Db_A,S,triplet(Db_B,S,Db_A))->vector_dot(Jb_B);
+    Exch10_2dm_terms[1] += linalg::triplet(Db_A,S,triplet(Db_B,S,Db_A))->vector_dot(Ja_B);
+    Exch10_2dm_terms[1] += linalg::triplet(Db_A,S,triplet(Db_B,S,Db_A))->vector_dot(V_B);
+    Exch10_2dm_terms[2] += linalg::triplet(Da_B,S,Da_A)->vector_dot(Ka_B);
+    Exch10_2dm_terms[2] -= linalg::triplet(Da_B,S,Da_A)->vector_dot(Jb_B);
+    Exch10_2dm_terms[2] -= linalg::triplet(Da_B,S,Da_A)->vector_dot(Ja_B);
+    Exch10_2dm_terms[2] -= linalg::triplet(Da_B,S,Da_A)->vector_dot(V_B);
+    Exch10_2dm_terms[3] += linalg::triplet(Db_B,S,Db_A)->vector_dot(Kb_B);
+    Exch10_2dm_terms[3] -= linalg::triplet(Db_B,S,Db_A)->vector_dot(Ja_B);
+    Exch10_2dm_terms[3] -= linalg::triplet(Db_B,S,Db_A)->vector_dot(Jb_B);
+    Exch10_2dm_terms[3] -= linalg::triplet(Db_B,S,Db_A)->vector_dot(V_B);
     Exch10_2dm_terms[4] -= Da_A->vector_dot(Ka_B);
     Exch10_2dm_terms[5] -= Db_A->vector_dot(Kb_B);
 */ for (int k = 0; k < Exch10_2dm_terms.size(); k++) {
@@ -807,14 +807,14 @@ void USAPT0::fock_terms() {
 
     // ==> Uncorrelated Second-Order Response Terms [Induction] <== //
 
-    // => ExchInd pertubations <= //
+    // => ExchInd perturbations <= //
 
-    std::shared_ptr<Matrix> C_Oa_B = Matrix::triplet(Da_A, S, Cocca_B_);
-    std::shared_ptr<Matrix> C_Ob_B = Matrix::triplet(Db_A, S, Coccb_B_);
-    std::shared_ptr<Matrix> C_Pa_B = Matrix::triplet(Matrix::triplet(Da_B, S, Da_A), S, Cocca_B_);
-    std::shared_ptr<Matrix> C_Pb_B = Matrix::triplet(Matrix::triplet(Db_B, S, Db_A), S, Coccb_B_);
-    std::shared_ptr<Matrix> C_Pa_A = Matrix::triplet(Matrix::triplet(Da_A, S, Da_B), S, Cocca_A_);
-    std::shared_ptr<Matrix> C_Pb_A = Matrix::triplet(Matrix::triplet(Db_A, S, Db_B), S, Coccb_A_);
+    std::shared_ptr<Matrix> C_Oa_B = linalg::triplet(Da_A, S, Cocca_B_);
+    std::shared_ptr<Matrix> C_Ob_B = linalg::triplet(Db_A, S, Coccb_B_);
+    std::shared_ptr<Matrix> C_Pa_B = linalg::triplet(linalg::triplet(Da_B, S, Da_A), S, Cocca_B_);
+    std::shared_ptr<Matrix> C_Pb_B = linalg::triplet(linalg::triplet(Db_B, S, Db_A), S, Coccb_B_);
+    std::shared_ptr<Matrix> C_Pa_A = linalg::triplet(linalg::triplet(Da_A, S, Da_B), S, Cocca_A_);
+    std::shared_ptr<Matrix> C_Pb_A = linalg::triplet(linalg::triplet(Db_A, S, Db_B), S, Coccb_A_);
 
     Cl.clear();
     Cr.clear();
@@ -1087,7 +1087,7 @@ std::shared_ptr<Matrix> USAPT0::build_ind_pot(std::map<std::string, std::shared_
     std::shared_ptr<Matrix> Cr = vars["Cvir_A"];
     std::shared_ptr<Matrix> El_pot = vars["El_pot_B"];
 
-    return Matrix::triplet(Ca, El_pot, Cr, true, false, false);
+    return linalg::triplet(Ca, El_pot, Cr, true, false, false);
 }
 std::shared_ptr<Matrix> USAPT0::build_exch_ind_pot(std::map<std::string, std::shared_ptr<Matrix> >& vars) {
     // By convention, a denotes the spin of the D_A density matrix, and
@@ -1137,22 +1137,22 @@ std::shared_ptr<Matrix> USAPT0::build_exch_ind_pot(std::map<std::string, std::sh
 
     T = h_A->clone();
     T->scale(-1.0);
-    T->add(Matrix::triplet(S, D_A, El_pot_B));
-    T->add(Matrix::triplet(El_pot_A, D_B, S));
+    T->add(linalg::triplet(S, D_A, El_pot_B));
+    T->add(linalg::triplet(El_pot_A, D_B, S));
     T->subtract(K_O->transpose());
 
-    W->add(Matrix::triplet(S, D_B, T));
+    W->add(linalg::triplet(S, D_B, T));
 
     // 8 Use again T for intermediate
 
     T = h_B->clone();
     T->scale(-1.0);
-    T->add(Matrix::triplet(El_pot_B, D_A, S));
+    T->add(linalg::triplet(El_pot_B, D_A, S));
     T->subtract(K_O);
 
-    W->add(Matrix::triplet(T, D_B, S));
+    W->add(linalg::triplet(T, D_B, S));
 
-    return Matrix::triplet(Ca, W, Cr, true, false, false);
+    return linalg::triplet(Ca, W, Cr, true, false, false);
 }
 std::shared_ptr<Matrix> USAPT0::build_S(std::shared_ptr<BasisSet> basis) {
     auto factory = std::make_shared<IntegralFactory>(basis);
@@ -1404,10 +1404,10 @@ void CPKS_USAPT0::compute_cpks() {
     outfile->Printf("    Convergence = %11.3E\n", delta_);
     outfile->Printf("\n");
 
-    time_t start;
-    time_t stop;
+    std::time_t start;
+    std::time_t stop;
 
-    start = time(nullptr);
+    start = std::time(nullptr);
 
     outfile->Printf("    -----------------------------------------\n");
     outfile->Printf("    %-4s %11s  %11s  %10s\n", "Iter", "Monomer A", "Monomer B", "Time [s]");
@@ -1485,7 +1485,7 @@ void CPKS_USAPT0::compute_cpks() {
             r2B = sqrt(r2B) / b2B;
         }
 
-        stop = time(nullptr);
+        stop = std::time(nullptr);
         outfile->Printf("    %-4d %11.3E%1s %11.3E%1s %10ld\n", iter + 1, r2A, (r2A < delta_ ? "*" : " "), r2B,
                         (r2B < delta_ ? "*" : " "), stop - start);
 
@@ -1806,20 +1806,20 @@ void USAPT0::mp2_terms() {
     // => Auxiliary C matrices <= //
     //    We build them to maximize the reuse of intermediates
 
-    std::shared_ptr<Matrix> Ca_a2 = Matrix::doublet(Da_B, S);
-    std::shared_ptr<Matrix> Cb_a2 = Matrix::doublet(Db_B, S);
-    std::shared_ptr<Matrix> Ca_b2 = Matrix::doublet(Da_A, S);
-    std::shared_ptr<Matrix> Cb_b2 = Matrix::doublet(Db_A, S);
+    std::shared_ptr<Matrix> Ca_a2 = linalg::doublet(Da_B, S);
+    std::shared_ptr<Matrix> Cb_a2 = linalg::doublet(Db_B, S);
+    std::shared_ptr<Matrix> Ca_b2 = linalg::doublet(Da_A, S);
+    std::shared_ptr<Matrix> Cb_b2 = linalg::doublet(Db_A, S);
 
-    std::shared_ptr<Matrix> Ca_s1 = Matrix::doublet(Ca_b2, Cavira_B_);
-    std::shared_ptr<Matrix> Cb_s1 = Matrix::doublet(Cb_b2, Cavirb_B_);
-    std::shared_ptr<Matrix> Ca_r1 = Matrix::doublet(Ca_a2, Cavira_A_);
-    std::shared_ptr<Matrix> Cb_r1 = Matrix::doublet(Cb_a2, Cavirb_A_);
+    std::shared_ptr<Matrix> Ca_s1 = linalg::doublet(Ca_b2, Cavira_B_);
+    std::shared_ptr<Matrix> Cb_s1 = linalg::doublet(Cb_b2, Cavirb_B_);
+    std::shared_ptr<Matrix> Ca_r1 = linalg::doublet(Ca_a2, Cavira_A_);
+    std::shared_ptr<Matrix> Cb_r1 = linalg::doublet(Cb_a2, Cavirb_A_);
 
-    std::shared_ptr<Matrix> Ca_s3 = Matrix::triplet(Da_B, S, Ca_s1);
-    std::shared_ptr<Matrix> Cb_s3 = Matrix::triplet(Db_B, S, Cb_s1);
-    std::shared_ptr<Matrix> Ca_r3 = Matrix::triplet(Da_A, S, Ca_r1);
-    std::shared_ptr<Matrix> Cb_r3 = Matrix::triplet(Db_A, S, Cb_r1);
+    std::shared_ptr<Matrix> Ca_s3 = linalg::triplet(Da_B, S, Ca_s1);
+    std::shared_ptr<Matrix> Cb_s3 = linalg::triplet(Db_B, S, Cb_s1);
+    std::shared_ptr<Matrix> Ca_r3 = linalg::triplet(Da_A, S, Ca_r1);
+    std::shared_ptr<Matrix> Cb_r3 = linalg::triplet(Db_A, S, Cb_r1);
 
     Ca_s3->subtract(Ca_s1);
     Cb_s3->subtract(Cb_s1);
@@ -1834,38 +1834,38 @@ void USAPT0::mp2_terms() {
     Ca_r1->scale(-1.0);
     Cb_r1->scale(-1.0);
 
-    Ca_a2 = Matrix::doublet(Ca_a2, Caocca_A_);
-    Cb_a2 = Matrix::doublet(Cb_a2, Caoccb_A_);
-    Ca_b2 = Matrix::doublet(Ca_b2, Caocca_B_);
-    Cb_b2 = Matrix::doublet(Cb_b2, Caoccb_B_);
+    Ca_a2 = linalg::doublet(Ca_a2, Caocca_A_);
+    Cb_a2 = linalg::doublet(Cb_a2, Caoccb_A_);
+    Ca_b2 = linalg::doublet(Ca_b2, Caocca_B_);
+    Cb_b2 = linalg::doublet(Cb_b2, Caoccb_B_);
 
-    std::shared_ptr<Matrix> Ca_a4 = Matrix::triplet(Da_A, S, Ca_a2);
-    std::shared_ptr<Matrix> Cb_a4 = Matrix::triplet(Db_A, S, Cb_a2);
-    std::shared_ptr<Matrix> Ca_b4 = Matrix::triplet(Da_B, S, Ca_b2);
-    std::shared_ptr<Matrix> Cb_b4 = Matrix::triplet(Db_B, S, Cb_b2);
+    std::shared_ptr<Matrix> Ca_a4 = linalg::triplet(Da_A, S, Ca_a2);
+    std::shared_ptr<Matrix> Cb_a4 = linalg::triplet(Db_A, S, Cb_a2);
+    std::shared_ptr<Matrix> Ca_b4 = linalg::triplet(Da_B, S, Ca_b2);
+    std::shared_ptr<Matrix> Cb_b4 = linalg::triplet(Db_B, S, Cb_b2);
 
     // => Auxiliary Fock-derived matrices <= //
     // We build them to maximize intermediate reuse and minimize the number
     // of matrix multiplications
 
-    std::shared_ptr<Matrix> Da_BS = Matrix::doublet(Da_B, S);
-    std::shared_ptr<Matrix> Db_BS = Matrix::doublet(Db_B, S);
-    std::shared_ptr<Matrix> Da_AS = Matrix::doublet(Da_A, S);
-    std::shared_ptr<Matrix> Db_AS = Matrix::doublet(Db_A, S);
+    std::shared_ptr<Matrix> Da_BS = linalg::doublet(Da_B, S);
+    std::shared_ptr<Matrix> Db_BS = linalg::doublet(Db_B, S);
+    std::shared_ptr<Matrix> Da_AS = linalg::doublet(Da_A, S);
+    std::shared_ptr<Matrix> Db_AS = linalg::doublet(Db_A, S);
 
-    std::shared_ptr<Matrix> Ta_as = Matrix::doublet(El_pot_B, Da_AS);
-    std::shared_ptr<Matrix> Tb_as = Matrix::doublet(El_pot_B, Db_AS);
-    std::shared_ptr<Matrix> Ta_br = Matrix::doublet(El_pot_A, Da_BS);
-    std::shared_ptr<Matrix> Tb_br = Matrix::doublet(El_pot_A, Db_BS);
+    std::shared_ptr<Matrix> Ta_as = linalg::doublet(El_pot_B, Da_AS);
+    std::shared_ptr<Matrix> Tb_as = linalg::doublet(El_pot_B, Db_AS);
+    std::shared_ptr<Matrix> Ta_br = linalg::doublet(El_pot_A, Da_BS);
+    std::shared_ptr<Matrix> Tb_br = linalg::doublet(El_pot_A, Db_BS);
 
     std::shared_ptr<Matrix> Sa_Bar =
-        Matrix::triplet(Caocca_A_, S, Matrix::doublet(Da_BS, Cavira_A_), true, false, false);
+        linalg::triplet(Caocca_A_, S, linalg::doublet(Da_BS, Cavira_A_), true, false, false);
     std::shared_ptr<Matrix> Sb_Bar =
-        Matrix::triplet(Caoccb_A_, S, Matrix::doublet(Db_BS, Cavirb_A_), true, false, false);
+        linalg::triplet(Caoccb_A_, S, linalg::doublet(Db_BS, Cavirb_A_), true, false, false);
     std::shared_ptr<Matrix> Sa_Abs =
-        Matrix::triplet(Caocca_B_, S, Matrix::doublet(Da_AS, Cavira_B_), true, false, false);
+        linalg::triplet(Caocca_B_, S, linalg::doublet(Da_AS, Cavira_B_), true, false, false);
     std::shared_ptr<Matrix> Sb_Abs =
-        Matrix::triplet(Caoccb_B_, S, Matrix::doublet(Db_AS, Cavirb_B_), true, false, false);
+        linalg::triplet(Caoccb_B_, S, linalg::doublet(Db_AS, Cavirb_B_), true, false, false);
 
     Da_BS.reset();
     Db_BS.reset();
@@ -1874,10 +1874,10 @@ void USAPT0::mp2_terms() {
 
     //  Build the other auxiliary matrices in the AO basis
 
-    Ta_as->add(Matrix::triplet(S, Da_B, El_pot_A));
-    Tb_as->add(Matrix::triplet(S, Db_B, El_pot_A));
-    Ta_br->add(Matrix::triplet(S, Da_A, El_pot_B));
-    Tb_br->add(Matrix::triplet(S, Db_A, El_pot_B));
+    Ta_as->add(linalg::triplet(S, Da_B, El_pot_A));
+    Tb_as->add(linalg::triplet(S, Db_B, El_pot_A));
+    Ta_br->add(linalg::triplet(S, Da_A, El_pot_B));
+    Tb_br->add(linalg::triplet(S, Db_A, El_pot_B));
 
     Ta_as->subtract(ha_B);
     Tb_as->subtract(hb_B);
@@ -1889,20 +1889,20 @@ void USAPT0::mp2_terms() {
     Ta_br->subtract(Ka_O->transpose());
     Tb_br->subtract(Kb_O->transpose());
 
-    std::shared_ptr<Matrix> Sa_as = Matrix::triplet(Caocca_A_, S, Cavira_B_, true, false, false);
-    std::shared_ptr<Matrix> Sb_as = Matrix::triplet(Caoccb_A_, S, Cavirb_B_, true, false, false);
-    std::shared_ptr<Matrix> Sa_br = Matrix::triplet(Caocca_B_, S, Cavira_A_, true, false, false);
-    std::shared_ptr<Matrix> Sb_br = Matrix::triplet(Caoccb_B_, S, Cavirb_A_, true, false, false);
+    std::shared_ptr<Matrix> Sa_as = linalg::triplet(Caocca_A_, S, Cavira_B_, true, false, false);
+    std::shared_ptr<Matrix> Sb_as = linalg::triplet(Caoccb_A_, S, Cavirb_B_, true, false, false);
+    std::shared_ptr<Matrix> Sa_br = linalg::triplet(Caocca_B_, S, Cavira_A_, true, false, false);
+    std::shared_ptr<Matrix> Sb_br = linalg::triplet(Caoccb_B_, S, Cavirb_A_, true, false, false);
 
-    std::shared_ptr<Matrix> Qa_as = Matrix::triplet(Caocca_A_, Ta_as, Cavira_B_, true, false, false);
-    std::shared_ptr<Matrix> Qb_as = Matrix::triplet(Caoccb_A_, Tb_as, Cavirb_B_, true, false, false);
-    std::shared_ptr<Matrix> Qa_br = Matrix::triplet(Caocca_B_, Ta_br, Cavira_A_, true, false, false);
-    std::shared_ptr<Matrix> Qb_br = Matrix::triplet(Caoccb_B_, Tb_br, Cavirb_A_, true, false, false);
+    std::shared_ptr<Matrix> Qa_as = linalg::triplet(Caocca_A_, Ta_as, Cavira_B_, true, false, false);
+    std::shared_ptr<Matrix> Qb_as = linalg::triplet(Caoccb_A_, Tb_as, Cavirb_B_, true, false, false);
+    std::shared_ptr<Matrix> Qa_br = linalg::triplet(Caocca_B_, Ta_br, Cavira_A_, true, false, false);
+    std::shared_ptr<Matrix> Qb_br = linalg::triplet(Caoccb_B_, Tb_br, Cavirb_A_, true, false, false);
 
-    std::shared_ptr<Matrix> Qa_ar = Matrix::triplet(Caocca_A_, El_pot_B, Cavira_A_, true, false, false);
-    std::shared_ptr<Matrix> Qb_ar = Matrix::triplet(Caoccb_A_, El_pot_B, Cavirb_A_, true, false, false);
-    std::shared_ptr<Matrix> Qa_bs = Matrix::triplet(Caocca_B_, El_pot_A, Cavira_B_, true, false, false);
-    std::shared_ptr<Matrix> Qb_bs = Matrix::triplet(Caoccb_B_, El_pot_A, Cavirb_B_, true, false, false);
+    std::shared_ptr<Matrix> Qa_ar = linalg::triplet(Caocca_A_, El_pot_B, Cavira_A_, true, false, false);
+    std::shared_ptr<Matrix> Qb_ar = linalg::triplet(Caoccb_A_, El_pot_B, Cavirb_A_, true, false, false);
+    std::shared_ptr<Matrix> Qa_bs = linalg::triplet(Caocca_B_, El_pot_A, Cavira_B_, true, false, false);
+    std::shared_ptr<Matrix> Qb_bs = linalg::triplet(Caoccb_B_, El_pot_A, Cavirb_B_, true, false, false);
 
     Ta_as.reset();
     Tb_as.reset();
@@ -2197,7 +2197,7 @@ void USAPT0::mp2_terms() {
 
     // ==> Master Loop <== //
 
-    for (size_t aastart = 0, bastart = 0; aastart < max(naa, nba); aastart += maxa_a, bastart += maxb_a) {
+    for (size_t aastart = 0, bastart = 0; aastart < std::max(naa, nba); aastart += maxa_a, bastart += maxb_a) {
         size_t na_ablock = (aastart + maxa_a >= naa ? naa - aastart : maxa_a);
         size_t nb_ablock = (aastart + maxb_a >= nba ? nba - aastart : maxb_a);
 
@@ -2215,7 +2215,7 @@ void USAPT0::mp2_terms() {
             dfh->fill_tensor("Db_ar", Db_ar, {bastart, bastart + nb_ablock});
         }
 
-        for (size_t abstart = 0, bbstart = 0; abstart < max(nab, nbb); abstart += maxa_b, bbstart += maxb_b) {
+        for (size_t abstart = 0, bbstart = 0; abstart < std::max(nab, nbb); abstart += maxa_b, bbstart += maxb_b) {
             size_t na_bblock = (abstart + maxa_b >= nab ? nab - abstart : maxa_b);
             size_t nb_bblock = (abstart + maxb_b >= nbb ? nbb - abstart : maxb_b);
 
@@ -2407,5 +2407,5 @@ void USAPT0::mp2_terms() {
     outfile->Printf("    Exch-Disp20         = %18.12lf H\n", ExchDisp20);
     outfile->Printf("\n");
 }
-}
-}  // End namespaces
+}  // namespace sapt
+}  // namespace psi

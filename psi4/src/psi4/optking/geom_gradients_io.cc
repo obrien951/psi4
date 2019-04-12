@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -67,7 +67,7 @@ bool is_integer(const char *check) {
 }
 
 // read the number of atoms
-int read_natoms(void) {
+int read_natoms() {
   int natom=0;
 
 #if defined(OPTKING_PACKAGE_PSI)
@@ -93,7 +93,7 @@ int read_natoms(void) {
 // Read geometry and gradient into a molecule object.
 // The fragments must already exist with the number of atoms in each set
 // and with allocated memory.
-void MOLECULE::read_geom_grad(void) {
+void MOLECULE::read_geom_grad() {
   int nfrag = fragments.size();
   //int nallatom = g_natom();
 
@@ -118,7 +118,7 @@ void MOLECULE::read_geom_grad(void) {
       double **grad = fragments[f]->g_grad_pointer();
 
       for (int i=0; i<fragments[f]->g_natom(); ++i) {
-          Z[i] = mol->Z(atom);
+          Z[i] = mol->true_atomic_number(atom);
 
           geom[i][0] = geometry(atom, 0);
           geom[i][1] = geometry(atom, 1);
@@ -337,7 +337,7 @@ void MOLECULE::symmetrize_geom(bool flexible) {
 #endif
 }
 
-void MOLECULE::write_geom(void) {
+void MOLECULE::write_geom() {
 
 #if defined(OPTKING_PACKAGE_PSI)
 
@@ -360,7 +360,7 @@ void MOLECULE::write_geom(void) {
 #endif
 }
 
-double ** OPT_DATA::read_cartesian_H(void) const {
+double ** OPT_DATA::read_cartesian_H() const {
 
   double **H_cart = init_matrix(Ncart, Ncart);
 

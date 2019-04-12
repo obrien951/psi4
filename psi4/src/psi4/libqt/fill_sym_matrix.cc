@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -33,9 +33,9 @@
 */
 
 namespace psi {
-	
+
 /*!
-** fill_sym_matrix(): Fills a symmetric matrix by placing the elements of 
+** fill_sym_matrix(): Fills a symmetric matrix by placing the elements of
 ** the lower triangle into the upper triangle.
 **
 ** \param  A    = matrix to symmetrize
@@ -44,22 +44,21 @@ namespace psi {
 ** Returns: none
 ** \ingroup QT
 */
-void fill_sym_matrix(double **A, int size)
-{
-   double **row, *col; 
-   int rc, cc;
+void fill_sym_matrix(double **A, int size) {
+    double **row, *col;
+    int rc, cc;
 
-   row = A;
-   for (rc = 0; rc < (size-1); rc++) {
-     col = *row;
-     for (cc = 0; cc < size; cc++) {
-       if (cc > rc) {
-         *col = A[cc][rc];
-       }
-       col++;
-     }
-   row++;
-  }
+    row = A;
+    for (rc = 0; rc < (size - 1); rc++) {
+        col = *row;
+        for (cc = 0; cc < size; cc++) {
+            if (cc > rc) {
+                *col = A[cc][rc];
+            }
+            col++;
+        }
+        row++;
+    }
 }
 
-}
+}  // namespace psi

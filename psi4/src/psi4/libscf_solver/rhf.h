@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -37,8 +37,7 @@ namespace psi {
 namespace scf {
 
 class RHF : public HF {
-protected:
-
+   protected:
     // Temporary matrices
     SharedMatrix D_;
     SharedMatrix Dold_;
@@ -47,56 +46,48 @@ protected:
     SharedMatrix K_;
     SharedMatrix wK_;
 
-    void form_C();
-    void form_D();
-    virtual void damp_update();
-    double compute_initial_E();
-    virtual double compute_E();
-    virtual bool stability_analysis();
-
-    virtual void form_F();
-    virtual void form_G();
-    virtual void form_V();
-    virtual void compute_orbital_gradient(bool save_fock);
-
-    bool diis();
-
-    bool test_convergency();
+    double compute_initial_E() override;
 
     void common_init();
 
-    // Finalize memory/files
-    virtual void finalize();
-
-    void save_density_and_energy();
-
-    // Second-order convergence code
-    virtual int soscf_update(void);
-
-public:
+   public:
     RHF(SharedWavefunction ref_wfn, std::shared_ptr<SuperFunctional> functional);
-    RHF(SharedWavefunction ref_wfn, std::shared_ptr<SuperFunctional> functional,
-        Options& options, std::shared_ptr<PSIO> psio);
-    virtual ~RHF();
+    RHF(SharedWavefunction ref_wfn, std::shared_ptr<SuperFunctional> functional, Options& options,
+        std::shared_ptr<PSIO> psio);
+    ~RHF() override;
 
     virtual SharedMatrix Da() const;
 
     virtual bool same_a_b_orbs() const { return true; }
     virtual bool same_a_b_dens() const { return true; }
 
+    bool diis() override;
+    void save_density_and_energy() override;
+    double compute_orbital_gradient(bool save_fock, int max_diis_vectors) override;
+
+    void form_C() override;
+    void form_D() override;
+    void form_F() override;
+    void form_G() override;
+    void form_V() override;
+    double compute_E() override;
+    void finalize() override;
+
+    void damping_update(double) override;
+    int soscf_update(double soscf_conv, int soscf_min_iter, int soscf_max_iter, int soscf_print) override;
+    bool stability_analysis() override;
+
     /// Hessian-vector computers and solvers
-    virtual std::vector<SharedMatrix> onel_Hx(std::vector<SharedMatrix> x);
-    virtual std::vector<SharedMatrix> twoel_Hx(std::vector<SharedMatrix> x, bool combine = true,
-                                               std::string return_basis = "MO");
-    virtual std::vector<SharedMatrix> cphf_Hx(std::vector<SharedMatrix> x);
-    virtual std::vector<SharedMatrix> cphf_solve(std::vector<SharedMatrix> x_vec,
-                                                 double conv_tol = 1.e-4, int max_iter = 10,
-                                                 int print_lvl = 1);
+    std::vector<SharedMatrix> onel_Hx(std::vector<SharedMatrix> x) override;
+    std::vector<SharedMatrix> twoel_Hx(std::vector<SharedMatrix> x, bool combine = true,
+                                       std::string return_basis = "MO") override;
+    std::vector<SharedMatrix> cphf_Hx(std::vector<SharedMatrix> x) override;
+    std::vector<SharedMatrix> cphf_solve(std::vector<SharedMatrix> x_vec, double conv_tol = 1.e-4, int max_iter = 10,
+                                         int print_lvl = 1) override;
 
     std::shared_ptr<RHF> c1_deep_copy(std::shared_ptr<BasisSet> basis);
-
 };
-
-}}
+}  // namespace scf
+}  // namespace psi
 
 #endif

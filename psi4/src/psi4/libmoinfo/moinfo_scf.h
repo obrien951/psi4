@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -42,16 +42,17 @@
 namespace psi {
 
 class MOInfoSCF : public MOInfoBase {
-public:
-  MOInfoSCF(Wavefunction& ref_wfn_, Options& options_, bool silent_ = false);
-  ~MOInfoSCF();
-private:
-  void read_mo_spaces();
-  void print_mo();
+   public:
+    MOInfoSCF(Wavefunction& ref_wfn_, Options& options_, bool silent_ = false);
+    ~MOInfoSCF();
+
+   private:
+    void read_mo_spaces();
+    void print_mo();
 };
 
-extern MOInfoSCF  *moinfo_scf;
+extern MOInfoSCF* moinfo_scf;
 
-}
+}  // namespace psi
 
-#endif // _psi_src_lib_libmoinfo_moinfo_scf_h_
+#endif  // _psi_src_lib_libmoinfo_moinfo_scf_h_

@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -40,7 +40,6 @@ namespace dfep2 {
 
 class DFEP2Wavefunction : public Wavefunction {
    protected:
-
     // Auxiliary basis
     std::shared_ptr<BasisSet> ribasis_;
 
@@ -62,15 +61,15 @@ class DFEP2Wavefunction : public Wavefunction {
     size_t unit_;
     size_t num_threads_;
 
-
    public:
     DFEP2Wavefunction(std::shared_ptr<Wavefunction> wfn);
 
     // Compute the current set of orbitals, [[h1_orb, h1_orb], [h2_orb, ...]]
     // Return [[(value1, conv1), ...], ...]
     std::vector<std::vector<std::pair<double, double>>> compute(std::vector<std::vector<size_t>> solve_orbs);
-}; // End DFEP2
+};  // End DFEP2
 
-}}
+}  // namespace dfep2
+}  // namespace psi
 
 #endif

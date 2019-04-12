@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -29,23 +29,23 @@
 #ifndef libmints_gridblock_H
 #define libmints_gridblock_H
 /*
-* gridblock.h
-* Definition of class GridBlock for use with numerical integrators
-* (as in KS-DFT) and the various point property calculators
-*
-* Created by Robert Parrish on 04/15/2010
-*/
- #include "psi4/pragma.h"
- PRAGMA_WARNING_PUSH
- PRAGMA_WARNING_IGNORE_DEPRECATED_DECLARATIONS
- #include <memory>
- PRAGMA_WARNING_POP
+ * gridblock.h
+ * Definition of class GridBlock for use with numerical integrators
+ * (as in KS-DFT) and the various point property calculators
+ *
+ * Created by Robert Parrish on 04/15/2010
+ */
+#include "psi4/pragma.h"
+PRAGMA_WARNING_PUSH
+PRAGMA_WARNING_IGNORE_DEPRECATED_DECLARATIONS
+#include <memory>
+PRAGMA_WARNING_POP
 
 namespace psi {
 /*! \ingroup LIBMINTS */
 //! Integration Point/Weight container class (blocks, not individual)
-class GridBlock {
-public:
+class PSI_API GridBlock {
+   public:
     /// Weight vector
     double* w_;
     /// x vector
@@ -61,12 +61,12 @@ public:
     GridBlock() {}
     ~GridBlock() {}
 
-    int getMaxPoints() const {return max_points_; }
-    int getTruePoints() const {return true_points_; }
-    double* getWeights() const {return w_; }
-    double* getX() const {return x_; }
-    double* getY() const {return y_; }
-    double* getZ() const {return z_; }
+    int getMaxPoints() const { return max_points_; }
+    int getTruePoints() const { return true_points_; }
+    double* getWeights() const { return w_; }
+    double* getX() const { return x_; }
+    double* getY() const { return y_; }
+    double* getZ() const { return z_; }
 
     void setGrid(double* x, double* y, double* z, double* w) {
         x_ = x;
@@ -79,5 +79,5 @@ public:
     void setMaxPoints(int n) { max_points_ = n; }
 };
 typedef std::shared_ptr<GridBlock> SharedGridBlock;
-}
+}  // namespace psi
 #endif

@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -31,11 +31,11 @@
 
 #define ID(x) ints->DPD_ID(x)
 
-#define index2(i,j) ((i>j) ? ((i*(i+1)/2)+j) : ((j*(j+1)/2)+i))
-#define index4(i,j,k,l) index2(index2(i,j),index2(k,l))
+#define index2(i, j) ((i > j) ? ((i * (i + 1) / 2) + j) : ((j * (j + 1) / 2) + i))
+#define index4(i, j, k, l) index2(index2(i, j), index2(k, l))
 
-#define MIN0(a,b) (((a)<(b)) ? (a) : (b))
-#define MAX0(a,b) (((a)>(b)) ? (a) : (b))
+#define MIN0(a, b) (((a) < (b)) ? (a) : (b))
+#define MAX0(a, b) (((a) > (b)) ? (a) : (b))
 
 #define DIIS_MIN_DET 1.0E-16
 #define DIVERGE 1.0E+3

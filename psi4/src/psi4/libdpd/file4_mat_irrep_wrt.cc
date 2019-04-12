@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -35,29 +35,27 @@
 
 namespace psi {
 
-int DPD::file4_mat_irrep_wrt(dpdfile4 *File, int irrep)
-{
+int DPD::file4_mat_irrep_wrt(dpdfile4 *File, int irrep) {
     int rowtot, coltot, my_irrep;
     psio_address irrep_ptr, next_address;
     long int size;
 
-    if(File->incore) {
-        file4_cache_dirty(File);  /* Flag this cache entry for writing */
-        return 0;  /* We're keeping this data in core */
+    if (File->incore) {
+        file4_cache_dirty(File); /* Flag this cache entry for writing */
+        return 0;                /* We're keeping this data in core */
     }
 
     my_irrep = File->my_irrep;
     irrep_ptr = File->lfiles[irrep];
     rowtot = File->params->rowtot[irrep];
-    coltot = File->params->coltot[irrep^my_irrep];
-    size = ((long) rowtot) * ((long) coltot);
+    coltot = File->params->coltot[irrep ^ my_irrep];
+    size = ((long)rowtot) * ((long)coltot);
 
-    if(rowtot && coltot)
-        psio_write(File->filenum, File->label, (char *) File->matrix[irrep][0],
-                size*((long) sizeof(double)), irrep_ptr, &next_address);
+    if (rowtot && coltot)
+        psio_write(File->filenum, File->label, (char *)File->matrix[irrep][0], size * ((long)sizeof(double)), irrep_ptr,
+                   &next_address);
 
     return 0;
-
 }
 
-}
+}  // namespace psi

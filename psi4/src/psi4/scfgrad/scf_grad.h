@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -48,18 +48,21 @@ protected:
     std::shared_ptr<VBase> potential_;
     std::map<std::string, SharedMatrix> gradients_;
     std::map<std::string, SharedMatrix> hessians_;
+    SharedMatrix dipole_gradient_;
 
 public:
     SCFGrad(SharedWavefunction ref_wfn, Options& options);
-    virtual ~SCFGrad();
+    ~SCFGrad() override;
 
-    double compute_energy() { throw PSIEXCEPTION("SCFGrad needs a rehash, call Rob."); }
+    double compute_energy() override { throw PSIEXCEPTION("SCFGrad needs a rehash, call Rob."); }
 
-    SharedMatrix compute_gradient();
+    SharedMatrix compute_gradient() override;
 
-    SharedMatrix compute_hessian();
+    SharedMatrix compute_hessian() override;
 
     SharedMatrix rhf_hessian_response();
+
+    SharedMatrix dipole_gradient() const { return dipole_gradient_; }
 };
 
 }} // Namespaces

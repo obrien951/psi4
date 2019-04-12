@@ -3,7 +3,7 @@
 #
 # Psi4: an open-source quantum chemistry software package
 #
-# Copyright (c) 2007-2018 The Psi4 Developers.
+# Copyright (c) 2007-2019 The Psi4 Developers.
 #
 # The copyrights for code used from other parties are included in
 # the corresponding files.
@@ -106,10 +106,17 @@ def backtick(exelist):
 
 # run psi4 and collect testing status from any compare_* in input file
 if os.path.isfile(infile):
-    pyexitcode = backtick([psi, infile, outfile, '-l', psidatadir])
+    exelist = [psi, infile, outfile, '-l', psidatadir]
+    # On Windows set Python interpreter explicitly as the shebang is ignored
+    if sys.platform.startswith('win'):
+        exelist = [sys.executable] + exelist
+    pyexitcode = backtick(exelist)
 elif os.path.isfile(infile.replace(".dat", ".py")):
     infile = infile.replace(".dat", ".py")
-    os.environ["PYTHONPATH"] = psilibdir
+    if "PYTHONPATH" in os.environ:
+        os.environ["PYTHONPATH"] += os.pathsep + psilibdir
+    else:
+        os.environ["PYTHONPATH"] = psilibdir
     outfile = os.path.dirname(infile) + os.path.sep + outfile
     pyexitcode = backtick(["python", infile, " > ", outfile])
 else:

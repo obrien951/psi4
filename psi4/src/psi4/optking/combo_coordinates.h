@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -76,7 +76,7 @@ class COMBO_COORDINATES {
   string get_coord_definition(int lookup, int frag_atom_offset) const;
 
   // Clear current combination coordinates. Leave simples in place.
-  void clear_combos(void);
+  void clear_combos();
 
   // Remove a particular combination coordinate by index.
   void erase_combo(int cc);
@@ -97,7 +97,7 @@ class COMBO_COORDINATES {
   // Transform vector from simples to combination via linear combination
   double ** transform_simples_to_combo(double **mat_simples) const;
 
-  int Nsimples(void) const { return simples.size(); }
+  int Nsimples() const { return simples.size(); }
 
 };
 

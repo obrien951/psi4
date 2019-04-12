@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -46,9 +46,7 @@ namespace psi {
 **   double a, b, c, scalar prefactors
 */
 
-int DPD::buf4_axpbycz(dpdbuf4 *FileA, dpdbuf4 *FileB, dpdbuf4 *FileC,
-                      double a, double b, double c)
-{
+int DPD::buf4_axpbycz(dpdbuf4 *FileA, dpdbuf4 *FileB, dpdbuf4 *FileC, double a, double b, double c) {
     buf4_scm(FileC, c);
 
     buf4_axpy(FileB, FileC, b);
@@ -57,4 +55,4 @@ int DPD::buf4_axpbycz(dpdbuf4 *FileA, dpdbuf4 *FileB, dpdbuf4 *FileC,
     return 0;
 }
 
-}
+}  // namespace psi

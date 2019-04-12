@@ -1,5 +1,5 @@
 if(${ENABLE_CheMPS2})
-    find_package(CheMPS2 1.8.3 CONFIG QUIET)
+    find_package(CheMPS2 1.8.7 CONFIG QUIET)
 
     if(${CheMPS2_FOUND})
         get_property(_loc TARGET CheMPS2::chemps2 PROPERTY LOCATION)
@@ -27,10 +27,9 @@ if(${ENABLE_CheMPS2})
         ExternalProject_Add(chemps2_external
             DEPENDS lapack_external
                     hdf5_external
-            GIT_REPOSITORY https://github.com/SebWouters/CheMPS2
-            GIT_TAG v1.8.7
+            URL https://github.com/SebWouters/CheMPS2/archive/d8ac508.tar.gz  # v1.8.9 + 1
             UPDATE_COMMAND ""
-            CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}
+            CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${STAGED_INSTALL_PREFIX}
                        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
                        -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
                        -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
@@ -47,11 +46,12 @@ if(${ENABLE_CheMPS2})
                        -DCMAKE_AR=${CMAKE_AR}
                        -DCMAKE_NM=${CMAKE_NM}
                        -DENABLE_TESTS=OFF
+                       -DOpenMP_LIBRARY_DIRS=${OpenMP_LIBRARY_DIRS}
                        -DTargetLAPACK_DIR=${STAGED_INSTALL_PREFIX}/share/cmake/TargetLAPACK
                        -DTargetHDF5_DIR=${STAGED_INSTALL_PREFIX}/share/cmake/TargetHDF5
             CMAKE_CACHE_ARGS -DCMAKE_C_FLAGS:STRING=${CMAKE_C_FLAGS}
                              -DCMAKE_CXX_FLAGS:STRING=${CMAKE_CXX_FLAGS}
-            INSTALL_COMMAND DESTDIR=${CMAKE_BINARY_DIR}/stage ${CMAKE_MAKE_PROGRAM} install)
+                             -DTargetOpenMP_FIND_COMPONENTS:STRING=C;CXX)
 
         set(CheMPS2_DIR ${STAGED_INSTALL_PREFIX}/share/cmake/CheMPS2 CACHE PATH "path to internally built CheMPS2Config.cmake" FORCE)
     endif()

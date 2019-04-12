@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -27,34 +27,34 @@
  */
 
 #include <cstdio>
-#include <sstream>
-#include <map>
 #include <iomanip>
+#include <map>
+#include <sstream>
 #include <sys/stat.h>
+
+#include "psi4/psi4-dec.h"
+#include "psi4/psifiles.h"
 #include "psi4/pybind11.h"
-#include "psi4/libmints/vector.h"
+
+#include "psi4/cc/cclambda/cclambda.h"
+#include "psi4/cc/ccwave.h"
+#include "psi4/libmints/matrix.h"
 #include "psi4/libmints/matrix.h"
 #include "psi4/libmints/molecule.h"
 #include "psi4/libmints/pointgrp.h"
-#include "psi4/libefp_solver/efp_solver.h"
-#include "psi4/libpsio/psio.hpp"
-#include "psi4/libmints/matrix.h"
-#include "psi4/libplugin/plugin.h"
-#include "psi4/liboptions/liboptions.h"
-#include "psi4/liboptions/liboptions_python.h"
-#include "psi4/libpsi4util/libpsi4util.h"
-#include "psi4/libfilesystem/path.h"
-#include "psi4/libpsi4util/process.h"
-
-#include "psi4/psi4-dec.h"
-#include "psi4/libpsi4util/PsiOutStream.h"
-#include "psi4/ccenergy/ccwave.h"
-#include "psi4/cclambda/cclambda.h"
-#include "psi4/libqt/qt.h"
-#include "psi4/libpsio/psio.h"
+#include "psi4/libmints/vector.h"
 #include "psi4/libmints/wavefunction.h"
-#include "psi4/psifiles.h"
 #include "psi4/libmints/writer_file_prefix.h"
+#include "psi4/liboptions/liboptions.h"
+#include "psi4/libplugin/plugin.h"
+#include "psi4/libpsi4util/PsiOutStream.h"
+#include "psi4/libpsi4util/libpsi4util.h"
+#include "psi4/libpsi4util/process.h"
+#include "psi4/libpsio/psio.h"
+#include "psi4/libpsio/psio.hpp"
+#include "psi4/libqt/qt.h"
+
+#include "python_data_type.h"
 
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
@@ -67,17 +67,20 @@ int for_set_reentrancy(int*);
 }
 
 using namespace psi;
+namespace py = pybind11;
+using namespace pybind11::literals;
 
 // Python helper wrappers
 void export_benchmarks(py::module&);
 void export_blas_lapack(py::module&);
 void export_cubeprop(py::module&);
-void export_efp(py::module&);
+void export_diis(py::module&);
 void export_fock(py::module&);
 void export_functional(py::module&);
 void export_mints(py::module&);
 void export_misc(py::module&);
 void export_oeprop(py::module&);
+void export_pcm(py::module&);
 void export_plugins(py::module&);
 void export_psio(py::module&);
 void export_wavefunction(py::module&);
@@ -91,8 +94,8 @@ extern std::map<std::string, plugin_info> plugins;
 
 namespace opt {
 psi::PsiReturnType optking(psi::Options&);
-void opt_clean(void);
-}
+void opt_clean();
+}  // namespace opt
 // Forward declare /src/bin/ methods
 namespace psi {
 
@@ -163,20 +166,7 @@ SharedWavefunction dmrg(SharedWavefunction, Options&);
 namespace mrcc {
 PsiReturnType mrcc_generate_input(SharedWavefunction, Options&, const py::dict&);
 PsiReturnType mrcc_load_ccdensities(SharedWavefunction, Options&, const py::dict&);
-}
-
-// Finite difference functions
-namespace findif {
-std::vector<SharedMatrix> fd_geoms_1_0(std::shared_ptr<Molecule>, Options&);
-std::vector<SharedMatrix> fd_geoms_freq_0(std::shared_ptr<Molecule>, Options&, int irrep);
-std::vector<SharedMatrix> fd_geoms_freq_1(std::shared_ptr<Molecule>, Options&, int irrep);
-std::vector<SharedMatrix> atomic_displacements(std::shared_ptr<Molecule>, Options&);
-
-SharedMatrix fd_1_0(std::shared_ptr<Molecule>, Options&, const py::list&);
-SharedMatrix fd_freq_0(std::shared_ptr<Molecule>, Options&, const py::list&, int irrep);
-SharedMatrix fd_freq_1(std::shared_ptr<Molecule>, Options&, const py::list&, int irrep);
-void displace_atom(SharedMatrix geom, const int atom, const int coord, const int sign, const double disp_size);
-}
+}  // namespace mrcc
 
 // CC functions
 namespace cctransort {
@@ -198,22 +188,14 @@ namespace ccresponse {
 PsiReturnType ccresponse(SharedWavefunction, Options&);
 void scatter(std::shared_ptr<Molecule> molecule, Options&, double step, std::vector<SharedMatrix> dip,
              std::vector<SharedMatrix> rot, std::vector<SharedMatrix> quad);
-}
+}  // namespace ccresponse
 namespace cceom {
 PsiReturnType cceom(SharedWavefunction, Options&);
 }
 
-// No idea what to do with these yet
-namespace efp {
-PsiReturnType efp_init(Options&);
-}
-namespace efp {
-PsiReturnType efp_set_options();
-}
-
 extern int read_options(const std::string& name, Options& options, bool suppress_printing = false);
 // extern void print_version(std::string);
-}
+}  // namespace psi
 
 std::string to_upper(const std::string& key) {
     std::string nonconst_key = key;
@@ -233,14 +215,16 @@ void py_reopen_outfile() {
     if (outfile_name == "stdout") {
         // outfile = stdout;
     } else {
-        outfile = std::make_shared<PsiOutStream>(outfile_name, std::ostream::app);
+        auto mode = std::ostream::app;
+        outfile = std::make_shared<PsiOutStream>(outfile_name, mode);
         if (!outfile) throw PSIEXCEPTION("Psi4: Unable to reopen output file.");
     }
 }
 
 void py_be_quiet() {
     py_close_outfile();
-    outfile = std::make_shared<PsiOutStream>("/dev/null", std::ostream::app);
+    auto mode = std::ostream::app;
+    outfile = std::make_shared<PsiOutStream>("/dev/null", mode);
     if (!outfile) throw PSIEXCEPTION("Psi4: Unable to redirect output to /dev/null.");
 }
 
@@ -295,11 +279,6 @@ SharedWavefunction py_psi_dfocc(SharedWavefunction ref_wfn) {
     return dfoccwave::dfoccwave(ref_wfn, Process::environment.options);
 }
 
-SharedWavefunction py_psi_libfock(SharedWavefunction ref_wfn) {
-    py_psi_prepare_options_for_module("CPHF");
-    return libfock::libfock(ref_wfn, Process::environment.options);
-}
-
 SharedWavefunction py_psi_mcscf(SharedWavefunction ref_wfn) {
     py_psi_prepare_options_for_module("MCSCF");
     return mcscf::mcscf(ref_wfn, Process::environment.options);
@@ -313,46 +292,6 @@ PsiReturnType py_psi_mrcc_generate_input(SharedWavefunction ref_wfn, const py::d
 PsiReturnType py_psi_mrcc_load_densities(SharedWavefunction ref_wfn, const py::dict& level) {
     py_psi_prepare_options_for_module("MRCC");
     return mrcc::mrcc_load_ccdensities(ref_wfn, Process::environment.options, level);
-}
-
-std::vector<SharedMatrix> py_psi_fd_geoms_1_0(std::shared_ptr<Molecule> mol) {
-    py_psi_prepare_options_for_module("FINDIF");
-    return findif::fd_geoms_1_0(mol, Process::environment.options);
-}
-
-std::vector<SharedMatrix> py_psi_fd_geoms_freq_0(std::shared_ptr<Molecule> mol, int irrep) {
-    py_psi_prepare_options_for_module("FINDIF");
-    return findif::fd_geoms_freq_0(mol, Process::environment.options, irrep);
-}
-
-std::vector<SharedMatrix> py_psi_fd_geoms_freq_1(std::shared_ptr<Molecule> mol, int irrep) {
-    py_psi_prepare_options_for_module("FINDIF");
-    return findif::fd_geoms_freq_1(mol, Process::environment.options, irrep);
-}
-
-std::vector<SharedMatrix> py_psi_atomic_displacements(std::shared_ptr<Molecule> mol) {
-    py_psi_prepare_options_for_module("FINDIF");
-    return findif::atomic_displacements(mol, Process::environment.options);
-}
-
-SharedMatrix py_psi_fd_1_0(std::shared_ptr<Molecule> mol, const py::list& energies) {
-    py_psi_prepare_options_for_module("FINDIF");
-    return findif::fd_1_0(mol, Process::environment.options, energies);
-}
-
-SharedMatrix py_psi_fd_freq_0(std::shared_ptr<Molecule> mol, const py::list& energies, int irrep) {
-    py_psi_prepare_options_for_module("FINDIF");
-    return findif::fd_freq_0(mol, Process::environment.options, energies, irrep);
-}
-
-SharedMatrix py_psi_fd_freq_1(std::shared_ptr<Molecule> mol, const py::list& grads, int irrep) {
-    py_psi_prepare_options_for_module("FINDIF");
-    return findif::fd_freq_1(mol, Process::environment.options, grads, irrep);
-}
-
-void py_psi_displace_atom(SharedMatrix geom, const int atom, const int coord, const int sign,
-                                  const double disp_size) {
-    findif::displace_atom(geom, atom, coord, sign, disp_size);
 }
 
 SharedWavefunction py_psi_dcft(SharedWavefunction ref_wfn) {
@@ -518,7 +457,6 @@ SharedWavefunction py_psi_adc(SharedWavefunction ref_wfn) {
     return adc_wfn;
 }
 
-
 char const* py_psi_version() {
 #ifdef PSI_VERSION
     return PSI_VERSION;
@@ -547,14 +485,14 @@ void py_psi_clean_options() {
     Process::environment.options.clear();
     Process::environment.options.set_read_globals(true);
     read_options("", Process::environment.options, true);
-    for (std::map<std::string, plugin_info>::iterator it=plugins.begin(); it!=plugins.end(); ++it) {
+    for (std::map<std::string, plugin_info>::iterator it = plugins.begin(); it != plugins.end(); ++it) {
         // Get the plugin options back into the global space
         it->second.read_options(it->second.name, Process::environment.options);
     }
     Process::environment.options.set_read_globals(false);
 }
 
-void py_psi_print_out(std::string s) { (*outfile->stream()) << s; }
+void py_psi_print_out(std::string s) { (*outfile->stream()) << s << std::flush; }
 
 /**
  * @return whether key describes a convergence threshold or not
@@ -567,7 +505,11 @@ Options& py_psi_get_options() { return Process::environment.options; }
 
 bool py_psi_set_local_option_string(std::string const& module, std::string const& key, std::string const& value) {
     std::string nonconst_key = to_upper(key);
+
+    std::string module_temp = Process::environment.options.get_current_module();
+    Process::environment.options.set_current_module(module);
     Data& data = Process::environment.options[nonconst_key];
+    Process::environment.options.set_current_module(module_temp);
 
     if (data.type() == "string") {
         Process::environment.options.set_str(module, nonconst_key, value);
@@ -586,10 +528,14 @@ bool py_psi_set_local_option_string(std::string const& module, std::string const
 
 bool py_psi_set_local_option_int(std::string const& module, std::string const& key, int value) {
     std::string nonconst_key = to_upper(key);
-    Data& data = Process::environment.options[nonconst_key];
 
-    if (data.type() == "double" && specifies_convergence(nonconst_key)) {
-        double val = pow(10.0, -value);
+    std::string module_temp = Process::environment.options.get_current_module();
+    Process::environment.options.set_current_module(module);
+    Data& data = Process::environment.options[nonconst_key];
+    Process::environment.options.set_current_module(module_temp);
+
+    if (data.type() == "double") {
+        double val = (specifies_convergence(nonconst_key)) ? pow(10.0, -value) : double(value);
         Process::environment.options.set_double(module, nonconst_key, val);
     } else if (data.type() == "boolean") {
         Process::environment.options.set_bool(module, nonconst_key, value ? true : false);
@@ -629,8 +575,8 @@ bool py_psi_set_global_option_int(std::string const& key, int value) {
     std::string nonconst_key = to_upper(key);
     Data& data = Process::environment.options[nonconst_key];
 
-    if (data.type() == "double" && specifies_convergence(nonconst_key)) {
-        double val = pow(10.0, -value);
+    if (data.type() == "double") {
+        double val = (specifies_convergence(nonconst_key)) ? pow(10.0, -value) : double(value);
         Process::environment.options.set_global_double(nonconst_key, val);
     } else if (data.type() == "boolean") {
         Process::environment.options.set_global_bool(nonconst_key, value ? true : false);
@@ -652,10 +598,14 @@ bool py_psi_set_global_option_double(std::string const& key, double value) {
 bool py_psi_set_local_option_array(std::string const& module, std::string const& key, const py::list& values,
                                    DataType* entry = nullptr) {
     std::string nonconst_key = to_upper(key);
+
     // Assign a new head entry on the first time around only
     if (entry == nullptr) {
         // We just do a cheesy "get" to make sure keyword is valid.  This get will throw if not.
+        std::string module_temp = Process::environment.options.get_current_module();
+        Process::environment.options.set_current_module(module);
         Data& data = Process::environment.options[nonconst_key];
+        Process::environment.options.set_current_module(module_temp);
         // This "if" statement is really just here to make sure the compiler doesn't optimize out the get, above.
         if (data.type() == "array") Process::environment.options.set_array(module, nonconst_key);
     }
@@ -889,15 +839,6 @@ void py_psi_set_legacy_molecule(std::shared_ptr<Molecule> legacy_molecule) {
     Process::environment.set_legacy_molecule(legacy_molecule);
 }
 
-void py_psi_set_parent_symmetry(std::string pg) {
-    std::shared_ptr<PointGroup> group = std::shared_ptr<PointGroup>();
-    if (pg != "") {
-        group = std::make_shared<PointGroup>(pg);
-    }
-
-    Process::environment.set_parent_symmetry(group);
-}
-
 std::shared_ptr<Molecule> py_psi_get_active_molecule() { return Process::environment.molecule(); }
 std::shared_ptr<Molecule> py_psi_get_legacy_molecule() { return Process::environment.legacy_molecule(); }
 
@@ -905,64 +846,9 @@ void py_psi_set_gradient(SharedMatrix grad) { Process::environment.set_gradient(
 
 SharedMatrix py_psi_get_gradient() { return Process::environment.gradient(); }
 
-std::shared_ptr<psi::efp::EFP> py_psi_efp_init() {
-    py_psi_prepare_options_for_module("EFP");
-    if (psi::efp::efp_init(Process::environment.options) == Success) {
-        return Process::environment.get_efp();
-    } else
-        throw PSIEXCEPTION("Unable to initialize EFP library.");
-}
-
-std::shared_ptr<psi::efp::EFP> py_psi_get_active_efp() { return Process::environment.get_efp(); }
-
-#ifdef USING_libefp
-void py_psi_efp_set_options() {
-    py_psi_prepare_options_for_module("EFP");
-    Process::environment.get_efp()->set_options();
-}
-
-void py_psi_set_efp_torque(SharedMatrix torq) {
-    if (Process::environment.get_efp()->get_frag_count() > 0) {
-        Process::environment.get_efp()->set_torque(torq);
-    } else {
-        Process::environment.set_efp_torque(torq);
-    }
-}
-
-SharedMatrix py_psi_get_efp_torque() {
-    if (Process::environment.get_efp()->get_frag_count() > 0) {
-        std::shared_ptr<psi::efp::EFP> efp = Process::environment.get_efp();
-        return efp->torque();
-    } else {
-        return Process::environment.efp_torque();
-    }
-}
-#endif
-
-void py_psi_set_frequencies(std::shared_ptr<Vector> freq) { Process::environment.set_frequencies(freq); }
-
-std::shared_ptr<Vector> py_psi_get_frequencies() { return Process::environment.frequencies(); }
-
 std::shared_ptr<Vector> py_psi_get_atomic_point_charges() {
     auto empty = std::make_shared<psi::Vector>();
     return empty;  // charges not added to process.h for environment - yet(?)
-}
-
-bool py_psi_has_variable(const std::string& key) { return Process::environment.globals.count(to_upper(key)); }
-
-double py_psi_get_variable(const std::string& key) { return Process::environment.globals[to_upper(key)]; }
-
-SharedMatrix py_psi_get_array_variable(const std::string& key) { return Process::environment.arrays[to_upper(key)]; }
-
-void py_psi_set_variable(const std::string& key, double val) { Process::environment.globals[to_upper(key)] = val; }
-
-void py_psi_set_array_variable(const std::string& key, SharedMatrix val) {
-    Process::environment.arrays[to_upper(key)] = val;
-}
-
-void py_psi_clean_variable_map() {
-    Process::environment.globals.clear();
-    Process::environment.arrays.clear();
 }
 
 void py_psi_set_memory(size_t mem, bool quiet) {
@@ -1018,10 +904,6 @@ void py_psi_print_variable_map() {
     outfile->Printf("\n  ----------------------------------------------------------------------------\n");
     outfile->Printf("%s\n\n", line.str().c_str());
 }
-
-std::map<std::string, double> py_psi_return_variable_map() { return Process::environment.globals; }
-
-std::map<std::string, SharedMatrix> py_psi_return_array_variable_map() { return Process::environment.arrays; }
 
 std::string py_psi_top_srcdir() { return TOSTRING(PSI_TOP_SRCDIR); }
 
@@ -1128,8 +1010,10 @@ PYBIND11_MODULE(core, core) {
     // OEProp/GridProp
     export_oeprop(core);
 
-    // EFP
-    export_efp(core);
+#ifdef USING_PCMSolver
+    // PCM
+    export_pcm(core);
+#endif
 
     // CubeProperties
     export_cubeprop(core);
@@ -1147,40 +1031,26 @@ PYBIND11_MODULE(core, core) {
              "Returns the current legacy_wavefunction object from the most recent computation.");
     core.def("set_legacy_wavefunction", py_psi_set_legacy_wavefunction,
              "Returns the current legacy_wavefunction object from the most recent computation.");
-    core.def("get_gradient", py_psi_get_gradient,
-             "Returns the most recently computed gradient, as a N by 3 :py:class:`~psi4.core.Matrix` object.");
-    core.def("set_gradient", py_psi_set_gradient,
-             "Assigns the global gradient to the values stored in the N by 3 Matrix argument.");
-    core.def("efp_init", py_psi_efp_init, "Initializes the EFP library and returns an EFP object.");
-    core.def("get_active_efp", &py_psi_get_active_efp, "Returns the currently active EFP object.");
-#ifdef USING_libefp
-    core.def("efp_set_options", py_psi_efp_set_options, "Set EFP options from environment options object.");
-    core.def("get_efp_torque", py_psi_get_efp_torque,
-             "Returns the most recently computed gradient for the EFP portion, as a Nefp by 6 Matrix object.");
-    core.def("set_efp_torque", py_psi_set_efp_torque,
-             "Assigns the global EFP gradient to the values stored in the Nefp by 6 Matrix argument.");
-#endif
-    core.def("get_frequencies", py_psi_get_frequencies,
-             "Returns the most recently computed frequencies, as a 3N-6 Vector object.");
+    core.def("get_legacy_gradient", py_psi_get_gradient,
+             "Returns the global gradient as a (nat, 3) :py:class:`~psi4.core.Matrix` object. FOR INTERNAL OPTKING USE "
+             "ONLY.");
+    core.def(
+        "set_legacy_gradient", py_psi_set_gradient,
+        "Assigns the global gradient to the values in the (nat, 3) Matrix argument. FOR INTERNAL OPTKING USE ONLY.");
     core.def("get_atomic_point_charges", py_psi_get_atomic_point_charges,
              "Returns the most recently computed atomic point charges, as a double * object.");
-    core.def("set_frequencies", py_psi_set_frequencies,
-             "Assigns the global frequencies to the values stored in the 3N-6 Vector argument.");
-    core.def("set_memory_bytes", py_psi_set_memory, py::arg("memory"), py::arg("quiet") = false,
+    core.def("set_memory_bytes", py_psi_set_memory, "memory"_a, "quiet"_a = false,
              "Sets the memory available to Psi (in bytes).");
     core.def("get_memory", py_psi_get_memory, "Returns the amount of memory available to Psi (in bytes).");
     core.def("set_datadir", [](const std::string& pdd) { Process::environment.set_datadir(pdd); },
              "Returns the amount of memory available to Psi (in bytes).");
     core.def("get_datadir", []() { return Process::environment.get_datadir(); },
              "Sets the path to shared text resources, PSIDATADIR");
-    core.def("set_num_threads", py_psi_set_n_threads, py::arg("nthread"), py::arg("quiet") = false,
+    core.def("set_num_threads", py_psi_set_n_threads, "nthread"_a, "quiet"_a = false,
              "Sets the number of threads to use in SMP parallel computations.");
     core.def("get_num_threads", py_psi_get_n_threads,
              "Returns the number of threads to use in SMP parallel computations.");
     //    core.def("mol_from_file",&LibBabel::ParseFile,"Reads a molecule from another input file");
-    core.def("set_parent_symmetry", py_psi_set_parent_symmetry,
-             "Sets the symmetry of the 'parent' (undisplaced) geometry, by Schoenflies symbol, at the beginning of a "
-             "finite difference computation.");
     core.def("print_options", py_psi_print_options,
              "Prints the currently set options (to the output file) for the current module.");
     core.def("print_global_options", py_psi_print_global_options,
@@ -1254,21 +1124,39 @@ PYBIND11_MODULE(core, core) {
              "valid option for *arg0*.");
 
     // These return/set/print PSI variables found in Process::environment.globals
-    core.def("has_variable", py_psi_has_variable, "Returns true if the PSI variable exists/is set.");
-    core.def("get_variable", py_psi_get_variable,
-             "Returns one of the PSI variables set internally by the modules or python driver (see manual for full "
-             "listing of variables available).");
-    core.def("set_variable", py_psi_set_variable, "Sets a PSI variable, by name.");
+    core.def("has_scalar_variable",
+             [](const std::string& key) { return bool(Process::environment.globals.count(to_upper(key))); },
+             "Is the double QC variable (case-insensitive) set?");
+    core.def("has_array_variable",
+             [](const std::string& key) { return bool(Process::environment.arrays.count(to_upper(key))); },
+             "Is the Matrix QC variable (case-insensitive) set?");
+    core.def("scalar_variable", [](const std::string& key) { return Process::environment.globals[to_upper(key)]; },
+             "Returns the requested (case-insensitive) double QC variable.");
+    core.def("array_variable",
+             [](const std::string& key) { return Process::environment.arrays[to_upper(key)]->clone(); },
+             "Returns copy of the requested (case-insensitive) Matrix QC variable.");
+    core.def("set_scalar_variable",
+             [](const std::string& key, double val) { Process::environment.globals[to_upper(key)] = val; },
+             "Sets the requested (case-insensitive) double QC variable.");
+    core.def(
+        "set_array_variable",
+        [](const std::string& key, SharedMatrix val) { Process::environment.arrays[to_upper(key)] = val->clone(); },
+        "Sets the requested (case-insensitive) Matrix QC variable.");
+    core.def("del_scalar_variable", [](const std::string key) { Process::environment.globals.erase(to_upper(key)); },
+             "Removes the requested (case-insensitive) double QC variable.");
+    core.def("del_array_variable", [](const std::string key) { Process::environment.arrays.erase(to_upper(key)); },
+             "Removes the requested (case-insensitive) Matrix QC variable.");
     core.def("print_variables", py_psi_print_variable_map, "Prints all PSI variables that have been set internally.");
-    core.def("clean_variables", py_psi_clean_variable_map, "Empties all PSI variables that have set internally.");
-    core.def("get_variables", py_psi_return_variable_map,
-             "Returns dictionary of the PSI variables set internally by the modules or python driver.");
-    core.def("get_array_variable", py_psi_get_array_variable,
-             "Returns one of the PSI variables set internally by the modules or python driver (see manual for full "
-             "listing of variables available).");
-    core.def("set_array_variable", py_psi_set_array_variable, "Sets a PSI variable, by name.");
-    core.def("get_array_variables", py_psi_return_array_variable_map,
-             "Returns dictionary of the PSI variables set internally by the modules or python driver.");
+    core.def("clean_variables",
+             []() {
+                 Process::environment.globals.clear();
+                 Process::environment.arrays.clear();
+             },
+             "Empties all PSI scalar and array variables that have been set internally.");
+    core.def("scalar_variables", []() { return Process::environment.globals; },
+             "Returns dictionary of all double QC variables.");
+    core.def("array_variables", []() { return Process::environment.arrays; },
+             "Returns dictionary of all Matrix QC variables.");
 
     // Returns the location where the Psi4 source is located.
     core.def("psi_top_srcdir", py_psi_top_srcdir, "Returns the location of the source code.");
@@ -1286,28 +1174,11 @@ PYBIND11_MODULE(core, core) {
 
     // core.def("scf", py_psi_scf, "Runs the SCF code.");
     core.def("dcft", py_psi_dcft, "Runs the density cumulant functional theory code.");
-    core.def("libfock", py_psi_libfock, "Runs a CPHF calculation, using libfock.");
     core.def("dfmp2", py_psi_dfmp2, "Runs the DF-MP2 code.");
     core.def("mcscf", py_psi_mcscf, "Runs the MCSCF code, (N.B. restricted to certain active spaces).");
     core.def("mrcc_generate_input", py_psi_mrcc_generate_input, "Generates an input for Kallay's MRCC code.");
     core.def("mrcc_load_densities", py_psi_mrcc_load_densities,
              "Reads in the density matrices from Kallay's MRCC code.");
-    core.def("fd_geoms_1_0", py_psi_fd_geoms_1_0,
-             "Gets list of displacements needed for a finite difference gradient computation, from energy points.");
-    core.def("fd_geoms_freq_0", py_psi_fd_geoms_freq_0,
-             "Gets list of displacements needed for a finite difference frequency computation, from energy points, for "
-             "a given irrep.");
-    core.def("fd_geoms_freq_1", py_psi_fd_geoms_freq_1,
-             "Gets list of displacements needed fof a finite difference frequency computation, from gradients, for a "
-             "given irrep");
-    core.def("fd_1_0", py_psi_fd_1_0, "Performs a finite difference gradient computation, from energy points.");
-    core.def("fd_freq_0", py_psi_fd_freq_0,
-             "Performs a finite difference frequency computation, from energy points, for a given irrep.");
-    core.def("fd_freq_1", py_psi_fd_freq_1,
-             "Performs a finite difference frequency computation, from gradients, for a given irrep.");
-    core.def("atomic_displacements", py_psi_atomic_displacements,
-             "Returns list of displacements generated by displacing each atom in the +/- x, y, z directions");
-    core.def("displace_atom", py_psi_displace_atom, "Displaces one coordinate of single atom.");
     core.def("sapt", py_psi_sapt, "Runs the symmetry adapted perturbation theory code.");
     // core.def("fisapt", py_psi_fisapt, "Runs the functional-group intramolecular symmetry adapted perturbation theory
     // code.");
@@ -1333,11 +1204,13 @@ PYBIND11_MODULE(core, core) {
     core.def("opt_clean", py_psi_opt_clean, "Cleans up the optimizer's scratch files.");
     core.def("get_options", py_psi_get_options, py::return_value_policy::reference, "Get options");
     core.def("set_output_file", [](const std::string ofname) {
-        outfile = std::make_shared<PsiOutStream>(ofname, std::ostream::trunc);
+        auto mode = std::ostream::trunc;
+        outfile = std::make_shared<PsiOutStream>(ofname, mode);
         outfile_name = ofname;
     });
     core.def("set_output_file", [](const std::string ofname, bool append) {
-        outfile = std::make_shared<PsiOutStream>(ofname, (append ? std::ostream::app : std::ostream::trunc));
+        auto mode = append ? std::ostream::app : std::ostream::trunc;
+        outfile = std::make_shared<PsiOutStream>(ofname, mode);
         outfile_name = ofname;
     });
     core.def("get_output_file", []() { return outfile_name; });
@@ -1346,6 +1219,7 @@ PYBIND11_MODULE(core, core) {
 
     // Define library classes
     export_psio(core);
+    export_diis(core);
     export_mints(core);
     export_functional(core);
     export_misc(core);

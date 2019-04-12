@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -362,10 +362,12 @@ class PSI_API JK {
     static std::shared_ptr<JK> build_JK(std::shared_ptr<BasisSet> primary, std::shared_ptr<BasisSet> auxiliary,
                                         Options& options, std::string jk_type);
     static std::shared_ptr<JK> build_JK(std::shared_ptr<BasisSet> primary, std::shared_ptr<BasisSet> auxiliary,
-                                 Options& options, bool do_wK, size_t doubles);
+                                        Options& options, bool do_wK, size_t doubles);
 
     /// Do we need to backtransform to C1 under the hood?
     virtual bool C1() const = 0;
+    virtual std::string name() = 0;
+    virtual size_t memory_estimate() = 0;
 
     // => Knobs <= //
 
@@ -377,6 +379,7 @@ class PSI_API JK {
      *        ignored if possible
      */
     void set_cutoff(double cutoff) { cutoff_ = cutoff; }
+    double get_cutoff() const { return cutoff_; }
     /**
      * Maximum memory to use, in doubles (for tensor-based methods,
      * integral generation objects typically ignore this)
@@ -393,6 +396,8 @@ class PSI_API JK {
      *        run with their original maximum number)
      */
     void set_omp_nthread(int omp_nthread) { omp_nthread_ = omp_nthread; }
+    int get_omp_nthread() const { return omp_nthread_; }
+
     /// Print flag (defaults to 1)
     void set_print(int print) { print_ = print; }
     /// Debug flag (defaults to 0)
@@ -526,7 +531,10 @@ class PSI_API JK {
  * JK implementation using disk-based PK
  * integral technology
  */
-class DiskJK : public JK {
+class PSI_API DiskJK : public JK {
+    std::string name() override { return "DiskJK"; }
+    size_t memory_estimate() override;
+
     /// Absolute AO index to relative SO index
     int* so2index_;
     /// Absolute AO index to irrep
@@ -536,13 +544,13 @@ class DiskJK : public JK {
     Options& options_;
 
     /// Do we need to backtransform to C1 under the hood?
-    virtual bool C1() const { return false; }
+    bool C1() const override { return false; }
     /// Setup integrals, files, etc
-    virtual void preiterations();
+    void preiterations() override;
     /// Compute J/K for current C/D
-    virtual void compute_JK();
+    void compute_JK() override;
     /// Delete integrals, files, etc
-    virtual void postiterations();
+    void postiterations() override;
 
     /// Common initialization
     void common_init();
@@ -559,7 +567,7 @@ class DiskJK : public JK {
      */
     DiskJK(std::shared_ptr<BasisSet> primary, Options& options);
     /// Destructor
-    virtual ~DiskJK();
+    ~DiskJK() override;
 
     // => Accessors <= //
 
@@ -567,7 +575,7 @@ class DiskJK : public JK {
     * Print header information regarding JK
     * type on output file
     */
-    virtual void print_header() const;
+    void print_header() const override;
 };
 
 /**
@@ -577,6 +585,10 @@ class DiskJK : public JK {
  * integral technology
  */
 class PSI_API PKJK : public JK {
+
+    std::string name() override { return "PKJK"; }
+    size_t memory_estimate() override;
+
     /// The PSIO instance to use for I/O
     std::shared_ptr<PSIO> psio_;
 
@@ -593,13 +605,13 @@ class PSI_API PKJK : public JK {
     std::shared_ptr<pk::PKManager> PKmanager_;
 
     /// Do we need to backtransform to C1 under the hood?
-    virtual bool C1() const;
+    bool C1() const override;
     /// Setup integrals, files, etc
-    virtual void preiterations();
+    void preiterations() override;
     /// Compute J/K for current C/D
-    virtual void compute_JK();
+    void compute_JK() override;
     /// Delete integrals, files, etc
-    virtual void postiterations();
+    void postiterations() override;
 
     /// Common initialization
     void common_init();
@@ -624,7 +636,7 @@ class PSI_API PKJK : public JK {
      */
     PKJK(std::shared_ptr<BasisSet> primary, Options& options);
     /// Destructor
-    virtual ~PKJK();
+    ~PKJK() override;
 
     // => Accessors <= //
 
@@ -632,7 +644,7 @@ class PSI_API PKJK : public JK {
     * Print header information regarding JK
     * type on output file
     */
-    virtual void print_header() const;
+    void print_header() const override;
 };
 
 /**
@@ -646,23 +658,26 @@ class PSI_API PKJK : public JK {
  * you have a high core-to-memory ratio. Clamp the
  * DF_INTS_NUM_THREADS value if this fate befalls you.
  */
-class DirectJK : public JK {
+class PSI_API DirectJK : public JK {
    protected:
     /// Number of threads for DF integrals TODO: DF_INTS_NUM_THREADS
     int df_ints_num_threads_;
     /// ERI Sieve
     std::shared_ptr<ERISieve> sieve_;
 
+    std::string name() override { return "DirectJK"; }
+    size_t memory_estimate() override;
+
     // => Required Algorithm-Specific Methods <= //
 
     /// Do we need to backtransform to C1 under the hood?
-    virtual bool C1() const { return true; }
+    bool C1() const override { return true; }
     /// Setup integrals, files, etc
-    virtual void preiterations();
+    void preiterations() override;
     /// Compute J/K for current C/D
-    virtual void compute_JK();
+    void compute_JK() override;
     /// Delete integrals, files, etc
-    virtual void postiterations();
+    void postiterations() override;
 
     /// Build the J and K matrices for this integral class
     void build_JK(std::vector<std::shared_ptr<TwoBodyAOInt> >& ints, std::vector<std::shared_ptr<Matrix> >& D,
@@ -683,7 +698,7 @@ class DirectJK : public JK {
      */
     DirectJK(std::shared_ptr<BasisSet> primary);
     /// Destructor
-    virtual ~DirectJK();
+    ~DirectJK() override;
 
     // => Knobs <= //
 
@@ -699,7 +714,7 @@ class DirectJK : public JK {
     * Print header information regarding JK
     * type on output file
     */
-    virtual void print_header() const;
+    void print_header() const override;
 };
 
 /** \brief Derived class extending the JK object to GTFock
@@ -721,17 +736,20 @@ class GTFockJK : public JK {
     std::shared_ptr<MinimalInterface> Impl_;
     int NMats_ = 0;
 
+    std::string name() override { return "GTFockJK"; }
+    size_t memory_estimate() override;
+
    protected:
     /// Do we need to backtransform to C1 under the hood?
-    virtual bool C1() const { return true; }
+    bool C1() const override { return true; }
     /// Setup integrals, files, etc
-    virtual void preiterations() {}
+    void preiterations() override {}
     /// Compute J/K for current C/D
-    virtual void compute_JK();
+    void compute_JK() override;
     /// Delete integrals, files, etc
-    virtual void postiterations() {}
+    void postiterations() override {}
     /// I don't fell the need to further clutter the output...
-    virtual void print_header() const {}
+    void print_header() const override {}
 
    public:
     /** \brief Your public interface to GTFock
@@ -764,6 +782,9 @@ class GTFockJK : public JK {
 class PSI_API DiskDFJK : public JK {
    protected:
     // => DF-Specific stuff <= //
+
+    std::string name() override { return "DiskDFJK"; }
+    size_t memory_estimate() override;
 
     /// Auxiliary basis set
     std::shared_ptr<BasisSet> auxiliary_;
@@ -806,18 +827,18 @@ class PSI_API DiskDFJK : public JK {
     // => Required Algorithm-Specific Methods <= //
 
     /// Do we need to backtransform to C1 under the hood?
-    virtual bool C1() const { return true; }
+    bool C1() const override { return true; }
     /// Setup integrals, files, etc
-    virtual void preiterations();
+    void preiterations() override;
     /// Compute J/K for current C/D
-    virtual void compute_JK();
+    void compute_JK() override;
     /// Delete integrals, files, etc
-    virtual void postiterations();
+    void postiterations() override;
 
     /// Common initialization
     void common_init();
 
-    bool is_core() const;
+    bool is_core();
     size_t memory_temp() const;
     int max_rows() const;
     int max_nocc() const;
@@ -856,7 +877,7 @@ class PSI_API DiskDFJK : public JK {
     DiskDFJK(std::shared_ptr<BasisSet> primary, std::shared_ptr<BasisSet> auxiliary);
 
     /// Destructor
-    virtual ~DiskDFJK();
+    ~DiskDFJK() override;
 
     /**
      * Method to provide (ia|ia) integrals for
@@ -864,7 +885,7 @@ class PSI_API DiskDFJK : public JK {
      * Only available in DF-type JK integrals
      * Throws by default
      */
-    virtual SharedVector iaia(SharedMatrix Ci, SharedMatrix Ca);
+    SharedVector iaia(SharedMatrix Ci, SharedMatrix Ca) override;
 
     // => Knobs <= //
 
@@ -898,7 +919,7 @@ class PSI_API DiskDFJK : public JK {
     * Print header information regarding JK
     * type on output file
     */
-    virtual void print_header() const;
+    void print_header() const override;
 };
 /**
  * Class CDJK
@@ -906,8 +927,12 @@ class PSI_API DiskDFJK : public JK {
  * JK implementation using
  * cholesky decomposition technology
  */
-class CDJK : public DiskDFJK {
+class PSI_API CDJK : public DiskDFJK {
    protected:
+    std::string name() override { return "CDJK"; }
+    size_t memory_estimate() override;
+
+
     // the number of cholesky vectors
     long int ncholesky_;
 
@@ -916,9 +941,9 @@ class CDJK : public DiskDFJK {
     virtual bool is_core() { return true; }
 
     // => J <= //
-    virtual void initialize_JK_core();
-    virtual void initialize_JK_disk();
-    virtual void manage_JK_core();
+    void initialize_JK_core() override;
+    void initialize_JK_disk() override;
+    void manage_JK_core() override;
 
     double cholesky_tolerance_;
 
@@ -928,7 +953,7 @@ class CDJK : public DiskDFJK {
     * Print header information regarding JK
     * type on output file
     */
-    virtual void print_header() const;
+    void print_header() const override;
 
    public:
     // => Constructors < = //
@@ -944,7 +969,7 @@ class CDJK : public DiskDFJK {
     CDJK(std::shared_ptr<BasisSet> primary, double cholesky_tolerance);
 
     /// Destructor
-    virtual ~CDJK();
+    ~CDJK() override;
 };
 
 /**
@@ -955,10 +980,12 @@ class CDJK : public DiskDFJK {
  * under slightly different paradigm than DiskDFJK
  * wraps lib3index/DFHelper class
  */
-class MemDFJK : public JK {
-
+class PSI_API MemDFJK : public JK {
    protected:
     // => DF-Specific stuff <= //
+
+    std::string name() override { return "MemDFJK"; }
+    size_t memory_estimate() override;
 
     /// This class wraps a DFHelper object
     std::shared_ptr<DFHelper> dfh_;
@@ -974,20 +1001,19 @@ class MemDFJK : public JK {
 
     int max_nocc() const;
     /// Do we need to backtransform to C1 under the hood?
-    virtual bool C1() const { return true; }
+    bool C1() const override { return true; }
     /// Setup integrals, files, etc
     /// calls initialize(), JK_blocking
-    virtual void preiterations();
+    void preiterations() override;
     /// Compute J/K for current C/D
-    virtual void compute_JK();
+    void compute_JK() override;
     /// Delete integrals, files, etc
-    virtual void postiterations();
+    void postiterations() override;
 
     /// Common initialization
     void common_init();
 
-
-  public:
+   public:
     // => Constructors < = //
 
     /**
@@ -997,9 +1023,8 @@ class MemDFJK : public JK {
     MemDFJK(std::shared_ptr<BasisSet> primary, std::shared_ptr<BasisSet> auxiliary);
 
     /// Destructor
-    virtual ~MemDFJK();
-    
-    
+    ~MemDFJK() override;
+
     // => Knobs <= //
 
     /**
@@ -1010,21 +1035,25 @@ class MemDFJK : public JK {
      *        defaults to 1.0E-12
      */
     void set_condition(double condition) { condition_ = condition; }
-    
+
     /**
      * What number of threads to compute integrals on
      * @param val a positive integer
      */
     void set_df_ints_num_threads(int val) { df_ints_num_threads_ = val; }
-    
-    
+
     // => Accessors <= //
 
     /**
     * Print header information regarding JK
     * type on output file
     */
-    virtual void print_header() const;
+    void print_header() const override;
+
+    /**
+     * Returns the DFHelper object
+     */
+    std::shared_ptr<DFHelper> dfh() { return dfh_; }
 };
 }
 #endif

@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -30,34 +30,36 @@
 #define _psi_src_lib_libmemtrix_vector_base_h_
 
 #include "psi4/libpsi4util/memory_manager.h"
-#include <cstring> // for size_t
+#include <cstring>  // for size_t
 
-namespace psi{ namespace mcscf{
+namespace psi {
+namespace mcscf {
 
-class VectorBase
-{
-public:
-  VectorBase();
-  VectorBase(int rows);
-  ~VectorBase();
+class VectorBase {
+   public:
+    VectorBase();
+    VectorBase(int rows);
+    ~VectorBase();
 
-  //Inlines
-  int     get_elements()    {return(elements_);}
-  void    set(int i, double value) {vector_[i]  = value;}
-  void    add(int i, double value) {vector_[i] += value;}
-  double  get(int i)               {return(vector_[i]);}
-  double* get_vector()  {return(vector_);}
+    // Inlines
+    int get_elements() { return (elements_); }
+    void set(int i, double value) { vector_[i] = value; }
+    void add(int i, double value) { vector_[i] += value; }
+    double get(int i) { return (vector_[i]); }
+    double* get_vector() { return (vector_); }
 
-  void print();
-  void copy(VectorBase& source);
-private:
-  // Vector size
-  size_t  elements_;
+    void print();
+    void copy(VectorBase& source);
 
-  // Vector data
-  double* vector_;
+   private:
+    // Vector size
+    size_t elements_;
+
+    // Vector data
+    double* vector_;
 };
 
-}}
+}  // namespace mcscf
+}  // namespace psi
 
-#endif // _psi_src_lib_libmemtrix_vector_base_h_
+#endif  // _psi_src_lib_libmemtrix_vector_base_h_

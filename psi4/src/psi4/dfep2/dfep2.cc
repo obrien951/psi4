@@ -3,7 +3,7 @@
  *
  * Psi4: an open-source quantum chemistry software package
  *
- * Copyright (c) 2007-2018 The Psi4 Developers.
+ * Copyright (c) 2007-2019 The Psi4 Developers.
  *
  * The copyrights for code used from other parties are included in
  * the corresponding files.
@@ -26,29 +26,27 @@
  * @END LICENSE
  */
 
-#include "psi4/dfep2/dfep2.h"
+#include "dfep2.h"
+
+#include <algorithm>
+#include <iomanip>
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
+#include "psi4/psifiles.h"
+#include "psi4/psi4-dec.h"
 
 #include "psi4/libpsi4util/process.h"
 #include "psi4/libmints/basisset.h"
 #include "psi4/libqt/qt.h"
-#include "psi4/psifiles.h"
 #include "psi4/libmints/vector.h"
-#include "psi4/psi4-dec.h"
 #include "psi4/libmints/matrix.h"
 #include "psi4/libpsio/psio.hpp"
 #include "psi4/libpsio/psio.h"
 #include "psi4/libpsio/aiohandler.h"
 #include "psi4/libpsi4util/PsiOutStream.h"
 #include "psi4/lib3index/dfhelper.h"
-
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-#include <iomanip>
-
-#ifdef _OPENMP
-#include <omp.h>
-#endif
 
 namespace psi {
 namespace dfep2 {
@@ -192,7 +190,7 @@ std::vector<std::vector<std::pair<double, double>>> DFEP2Wavefunction::compute(
     // AO_Cvir_->print();
     // AO_CE->print();
 
-    SharedMatrix C_Full = Matrix::horzcat({AO_Cocc_, AO_Cvir_, AO_CE});
+    SharedMatrix C_Full = linalg::horzcat({AO_Cocc_, AO_Cvir_, AO_CE});
     C_Full->set_name("Full C matrix");
     // C_Full->print();
 
@@ -200,7 +198,7 @@ std::vector<std::vector<std::pair<double, double>>> DFEP2Wavefunction::compute(
 
     // safety check
     dfh_->clear_spaces();
-    
+
     // add spaces
     dfh_->add_space("i", AO_Cocc_);
     dfh_->add_space("a", AO_Cvir_);
@@ -505,5 +503,5 @@ std::vector<std::vector<std::pair<double, double>>> DFEP2Wavefunction::compute(
 
     return ret;
 }
-}
-}
+}  // namespace dfep2
+}  // namespace psi
