@@ -1063,5 +1063,39 @@ class PSI_API MemDFJK : public JK {
      */
     std::shared_ptr<DFHelper> dfh() { return dfh_; }
 };
+
+class PSI_API DirectDFJK : public JK {
+    private:
+    /// Condition cutoff in fitting metric, defaults to 1.0E-12
+    double condition_;
+
+    //only calls the sieve object
+    void preiterations() override;
+
+    public:
+
+    // => Constructor <=
+    /**
+    * @param primary: primary basis set for this system
+    *
+    * @param auxiliary: auxiliary basis set for this system
+    *
+    */
+
+    DirectDFJK(std::shared_pointer<Basis_Set> primary, std::shared_pointer<Basis_Set> auxiliary);
+    DirectJK::compute_JK();
+    /// Destructor 
+    ~DirectDFJK override;
+    
+    compute_JK();
+
+    DirectDFJK::compute_AO_block_Qpq();
+    
+    void print_header() const override;
+
 }
+
+}
+
 #endif
+
