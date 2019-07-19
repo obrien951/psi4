@@ -1067,7 +1067,7 @@ class PSI_API MemDFJK : public JK {
 class PSI_API DirectDFJK : public JK {
     protected:
 	// uses pQq storage for integrals
-	bool pQq_ = false;
+	bool pQq_ = true;
 	bool Qpq_ = !pQq_;
 	bool Qpq_store_sparse_ = false;
 
@@ -1097,12 +1097,16 @@ class PSI_API DirectDFJK : public JK {
 	// Number of blocks over which AO's will be constructed
 	size_t num_blocks_;
 	size_t ABX_block_size_;
+    
+    // if Qpq_, AO integrals in the biggest block
+    // if pQq_, (functions in biggest block) * naux_
 	size_t biggest_block_;
 
 	// size of the tensor x used in K construction.
 	size_t x_size_;
 
     // sparse funcs per function
+    //     takes the place of nbf_ for sparse storage
 	size_t sparse_fpf_ = 0;
 
 	// size of each block of x. In the rhf case, this vector will only
@@ -1176,6 +1180,8 @@ class PSI_API DirectDFJK : public JK {
 
 //	void compute_AO_block_p_pQq(size_t start_p, size_t stop_p, double* ao_block, std::vector<std::shared_ptr<TwoBodyAOInt>> eri);
 
+    void compute_dense_AO_block_p_pQq(size_t shell, double* ao_block, std::vector<std::shared_ptr<TwoBodyAOInt>> eri);
+    
 	void compute_sparse_AO_block_p_pQq(size_t start_p, size_t stop_p, double* ao_block, std::vector<std::shared_ptr<TwoBodyAOInt>> eri);
 
 	std::string name() override { return "DirectDFJK"; }

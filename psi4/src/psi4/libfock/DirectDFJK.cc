@@ -461,6 +461,7 @@ void DirectDFJK::sparsity_prep_pQq(){
 void DirectDFJK::compute_JK() {
 
 	printf("%s\n", (lr_symmetric_ ? "true" : "false") );
+    printf("%zu \n", C_left_ao_.size());
 
 	if ( pQq_ ) {
 	build_jk_CC_pQq_blocks();
@@ -537,7 +538,7 @@ void DirectDFJK::our_needs(){
 size_t DirectDFJK::memory_estimate(){
 	printf("memory_estimate()\n");
 	if (pQq_) { 
-		sparsity_prep_pQq(); 
+//		sparsity_prep_pQq();
 		prepare_p_blocks();
 	}
 
@@ -604,11 +605,20 @@ void DirectDFJK::prepare_p_blocks() {
 
 	size_t block_size = 0;
 	size_t shell_funcs;
-
-	for (size_t func_it = 0; func_it < schwarz_func_ints_.size(); func_it++) {
+    size_t biggest_shell = 0;
+    
+/*	for (size_t func_it = 0; func_it < schwarz_func_ints_.size(); func_it++) {
 		sparse_fpf_ += schwarz_func_ints_[func_it];
-	}	
+	}	*/
 
+// We need to figure out the biggest shell in the primary basis set
+    // to allocate memory for AO construction
+    for (size_t i = 0; i < primary_->nshell(); i++) {
+        if (primary_->shell(i).nfunction() > biggest_shell ) {
+            biggest_shell = primary_->shell(i).nfunction();
+        }
+    }
+    
 	std::shared_ptr<Molecule> mol_ptr = primary_->molecule();
 
 	for (int atom_iter = 0; atom_iter < mol_ptr->natom(); atom_iter++)
@@ -619,52 +629,52 @@ void DirectDFJK::prepare_p_blocks() {
 	charges_z = static_cast<size_t>(charges_f);
 	++charges_z;
 
+//
+    
+// D_ao_ and D_
 	current_costs += 3*sizeof(size_t)*nbf_*nbf_;
+// Coulomb Metrics
 	current_costs += 2*sizeof(double)*naux_*naux_;
 	current_costs += 4*sizeof(double)*nbf_*nbf_;
 	current_costs += 4*sizeof(double)*nbf_*nbf_;
-
+// adding in costs for U and A
+    current_costs += sizeof(double)*biggest_shell*naux_*charges_z;
+    current_costs += sizeof(double)*naux_*charges_z;
+    
 	Shell_starts_.push_back(0);
 
 	for (size_t shell_iter = 0; shell_iter < p_shells_; shell_iter++) {
-
 		shell_funcs = primary_->shell(shell_iter).nfunction();
 // The 5 is where we're getting our fudge factor we're getting charges_z
 //   to stand in for n_occ, and there should only be a factor of 2 included for
 //   the number of tensors with dimension occ. The extra 3 is a massive amount of 
 //   memory that should cover the overhead from the reast of the calculation.
-
-		if (  (block_size + shell_funcs + 5 ) * naux_ * ( charges_z + sparse_fpf_) >  memory_ - current_costs ){
-
+//   charges_z also includes a fudge factor
+		if (  (block_size + shell_funcs + 2) * naux_ * ( 2*charges_z ) >  memory_ - current_costs ){
 			Block_funcs_.push_back(block_size);
-
 			block_size = shell_funcs;
-
 			Shell_stops_.push_back(shell_iter - 1);
-
 			Shell_starts_.push_back(shell_iter);
 		} else {
-
 			block_size += shell_funcs;
-
 			if (block_size > bmf) {
-
-				biggest_block_ = bmf;
+				 bmf = block_size;
 			}
 		}
 	}
+    biggest_block_ = bmf * naux_;
 	Shell_stops_.push_back(p_shells_ - 1);
 
 	Block_funcs_.push_back(block_size);
 
-	biggest_block_ = bmf * naux_ * sparse_fpf_;
+	biggest_block_ = bmf * naux_ * nbf_;
 	num_blocks_ = Block_funcs_.size();
 
-	schwarz_func_lstarts_pQq_.resize(nbf_);
+//	schwarz_func_lstarts_pQq_.resize(nbf_);
 
-	for (size_t i = 0; i < Shell_starts_.size(); i++) {
-		printf("Shell_starts_[%zu] is %zu\n", i, Shell_starts_[i]);
-	}
+//	for (size_t i = 0; i < Shell_starts_.size(); i++) {
+//		printf("Shell_starts_[%zu] is %zu\n", i, Shell_starts_[i]);
+//	}
 
 
 	size_t subtrahend;
@@ -733,14 +743,56 @@ void DirectDFJK::prepare_Q_blocks() {
 	num_blocks_ = Shell_starts_.size();
 }
 
-
+void DirectDFJK::compute_dense_AO_block_p_pQq(size_t shell, double* ao_block, std::vector<std::shared_ptr<TwoBodyAOInt>> eri){
+    int procs = 1;
+    
+    std::vector<const double*> buffer(procs);
+    
+    int rank = 0;
+    
+    buffer[rank] = eri[rank]->buffer();
+    
+    size_t shell_count = primary_->shell(shell).nfunction();
+    size_t ShellP_count;
+    size_t ShellN_count;
+    size_t Shell_ind_0;
+    size_t Buff_ind_0;
+// the value put in mat_size is nbf*naux
+    size_t mat_size = nbf_ * naux_;
+    
+// In Matt's Code and Rob's code (and, indeed, some of mine), we see 3 loops.
+//   however, in this code, we only need two because we only have one shell
+//   to compute in the slowest running index, so we're just going to write
+//   2 loops to accomodate that.
+    
+    for (size_t ShellP = 0; ShellP < Q_shells_; ShellP++) {
+        ShellP_count = primary_->shell(ShellP).nfunction();
+        for (size_t ShellN = 0; ShellN < p_shells_; ShellN++ ) {
+            ShellN_count = primary_->shell(ShellN).nfunction();
+            Shell_ind_0 = ShellP_count * ShellN_count;
+            Buff_ind_0 = ShellN_count * shell_count;
+            eri[rank]->compute_shell( ShellP, 0, shell, ShellN);
+            for (size_t func_m  = 0; func_m < shell_count; func_m++){
+                for (size_t func_p = 0; func_p < ShellP_count; func_p++ ) {
+                    for (size_t func_n = 0; func_n < ShellN_count; func_n++) {
+                        ao_block[func_m * Shell_ind_0 + func_p * ShellN_count + func_n] =
+                        buffer[rank][func_p * Buff_ind_0 + func_m * ShellN_count + func_n];
+                    }
+                }
+            }
+        }
+    }
+    
+    
+}
+    
+    
 void DirectDFJK::compute_sparse_AO_block_p_pQq(size_t start_p, size_t stop_p, double* ao_block, std::vector<std::shared_ptr<TwoBodyAOInt>> eri){
 	int procs = 1;
 #ifdef _OPENMP
 	procs = df_ints_num_threads_;
 #endif
-
-
+    
 	std::vector<const double*> buffer(procs);
 #pragma omp parallel num_threads(procs)
 	{
@@ -775,7 +827,6 @@ void DirectDFJK::compute_sparse_AO_block_p_pQq(size_t start_p, size_t stop_p, do
 #ifdef _OPENMP
 		rank = omp_get_thread_num();
 #endif
-
 
 		ShellM_start = primary_->shell(ShellM).function_index();
 		ShellM_count = primary_->shell(ShellM).nfunction();
@@ -1058,7 +1109,7 @@ void DirectDFJK::build_jk_CC_Qpq_direct() {
 	double* met_m_1_0 = get_metric_power(-1.0);
 	double* met_m_0_5 = get_metric_power(-0.5);
 
-	printf("%zu %zu %zu \n", C_left_ao_[0]->ncol() , nbf_ , naux_);
+	printf("%d %zu %zu \n", C_left_ao_[0]->ncol() , nbf_ , naux_);
 
 
 	std::unique_ptr<double[]> A(new double[nbf_*nbf_*naux_]);
@@ -1237,6 +1288,71 @@ void DirectDFJK::build_jk_CC_Qpq_blocks() {
 	x_slice_.erase( x_slice_.begin(), x_slice_.end() ); 
  }
 
+void DirectDFJK::pQp(){
+    int procs = 1;
+    int rank = 0;
+    
+//dirty
+    size_t biggest_shell = 0;
+    
+    for (int i = 0; i < primary_->nshell(); i++){
+        if (primary_->shell(i).nfunction() > biggest_shell) {
+            biggest_shell = primary_->shell(i).nfunction();
+        }
+    }
+//end dirty
+
+    std::shared_ptr<BasisSet> zero_ = BasisSet::zero_ao_basis_set();
+    auto rifactory = std::make_shared<IntegralFactory>(auxiliary_, zero_, primary_, primary_);
+    std::vector<std::shared_ptr<TwoBodyAOInt>> eri(procs);
+    
+    double* c = C_left_ao_[0]->pointer()[0];
+    
+    int nocc = C_left_ao_[0]->ncol();
+    
+    double** Dp = D_ao_[0]->pointer();
+    double* d = Dp[0];
+    
+    double* met_m_1_0 = get_metric_power(-1.0);
+    double* met_m_0_5 = get_metric_power(-0.5);
+    
+    double* j = J_ao_[0]->pointer(0)[0];
+    double* k = K_ao_[0]->pointer(0)[0];
+    
+    std::unique_ptr<double[]> A(new double[biggest_shell*naux_*nbf_]);
+    std::unique_ptr<double[]> U(new double[naux_*nbf_]);
+    std::unique_ptr<double[]> XR(new double[biggest_block_*nocc]);
+    std::unique_ptr<double[]> XL(new double[biggest_block_*nocc]);
+    std::unique_ptr<double[]> V(new double[naux_]);
+    std::unique_ptr<double[]> PHI(new double[naux_]);
+
+    double* a = A.get();
+    double* u = U.get();
+    double* xl = XL.get();
+    double* xr = XR.get();
+    double* v = V.get();
+    double* phi = PHI.get();
+    
+    char first_char = ( num_blocks_ == 0 ? 'V' : 'B');
+    
+    X_Block(first_char, true, 0, a, xl, v, eri);
+    C_DGEMM('N', 'T', Block_funcs_[0], Block_funcs_[0], naux_*nocc, 0.0, xl, naux_*nocc, xl, naux_*nocc, 0.0, k, nbf_);
+    
+    for (size_t xl_iter = 0; xl_iter < num_blocks_; xl_iter++){
+        for (size_t xr_iter = 1; j < num_blocks_ - xl_iter; xr_iter++){
+            if (i == 0) {
+                X_Block('V', true, j, a, xr, v, eri);
+                C_DGEMM('N', 'T', Block_funcs_[xr_iter], Block_funcs_[xr_iter], naux_*nocc, 0.0, xr, naux_*nocc, xr, naux_*nocc, 0.0, k + );
+            }
+        }
+        xl = xr
+    }
+            
+    X_Block('P', false, num_blocks_ - 1, a, nullptr, phi, eri);
+    
+    C_DGEMV()
+    
+}
 
 void DirectDFJK::build_jk_CC_pQq_blocks(){
 	printf("in build_jk\n");
@@ -1454,6 +1570,29 @@ void DirectDFJK::prune_pQq( size_t bf, size_t nocc, double* pruned_c, double* ra
 		}
 	}
 
+}
+
+// Function that produces tensors for the final contraction
+//    of the exchange matrix build. The issue is that it may or may not
+//    have to construct one of various terms for the coulomb matrix.
+//    We handle this with a switch.
+// coul_work \in { 'V', 'P', 'B', 'N'}
+// 'V' means we compute a vector to be contracted against the coulomb Metric.
+void DirectDFJK::X_Block( char coul_work, bool compute_k, size_t block, double* ao_block, double* coulomb_vector, std::vector<std::shared_ptr<TwoBodyAOInt>> eri){
+
+//  for loop over AO blocks
+    for (size_t shell_iter = shell_start; shell_iter <= shell_stop; shell_iter++){
+        //compute ao blocks
+        compute_dense_AO_block_p_pQq(shell_iter, ao_block , eri);
+        // either contracts over A or \cmpq to make
+        
+    }
+}
+
+// overloaded function for constructing tensors to build the exchange matrix
+//    does not do any work for the coulomb matrix
+void DirectDFJK::X_Block( double* ao_block, double* x){
+        
 }
 
 void DirectDFJK::unprune_j_pQq( size_t mu, double* pruned_j, double* j){
