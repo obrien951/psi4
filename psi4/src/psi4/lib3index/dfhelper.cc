@@ -177,7 +177,6 @@ void DFHelper::initialize() {
                         (required_core_size_ * 8 / (1024 * 1024 * 1024.0)), (memory_ * 8 / (1024 * 1024 * 1024.0)));
         outfile->Printf("%s in-core AOs.\n\n", (memory_ < required_core_size_) ? "Turning off" : "Using");
     }
-
     // prepare AOs for STORE method
     if (AO_core_) {
         prepare_AO_core();
@@ -446,12 +445,15 @@ void DFHelper::prepare_AO() {
         timer_off("DFH: Total Workflow");
 
         // put
+        timer_on("DFH: Write AO");
         put_tensor_AO(putf, Fp, size, count, op);
+        timer_off("DFH: Write AO");
         count += size;
     }
 }
 
 void DFHelper::prepare_AO_core() {
+	FILE* run_print = fopen("run_print.txt", "w");
     // get each thread an eri object
     std::shared_ptr<BasisSet> zero = BasisSet::zero_ao_basis_set();
     auto rifactory = std::make_shared<IntegralFactory>(aux_, zero, primary_, primary_);
@@ -464,18 +466,15 @@ void DFHelper::prepare_AO_core() {
 #endif
         eri[rank] = std::shared_ptr<TwoBodyAOInt>(rifactory->eri());
     }
-
     // determine blocking
     std::vector<std::pair<size_t, size_t>> psteps;
     std::pair<size_t, size_t> plargest = pshell_blocks_for_AO_build(memory_, 1, psteps);
-
     // allocate final AO vector
     if (direct_iaQ_) {
         Ppq_ = std::unique_ptr<double[]>(new double[naux_ * nbf_ * nbf_]);
     } else {
         Ppq_ = std::unique_ptr<double[]>(new double[big_skips_[nbf_]]);
     }
-
     // outfile->Printf("\n    ==> Begin AO Blocked Construction <==\n\n");
     if (direct_iaQ_ || direct_) {
         timer_on("DFH: AO Construction");
@@ -486,21 +485,35 @@ void DFHelper::prepare_AO_core() {
         }
         timer_off("DFH: AO Construction");
 
-    } else {
+    } else {	
+		fprintf(run_print, "runs in your case\n");
         // declare sparse buffer
-        std::unique_ptr<double[]> Qpq(new double[std::get<0>(plargest)]);
+//        std::unique_ptr<double[]> Qpq(new double[std::get<0>(plargest)]);
+		std::unique_ptr<double[]> Qpq(new double[naux_ * nbf_ * nbf_]);
         double* Mp = Qpq.get();
         std::unique_ptr<double[]> metric;
         double* metp;
-
         if (!hold_met_) {
             metric = std::unique_ptr<double[]>(new double[naux_ * naux_]);
             metp = metric.get();
             std::string filename = return_metfile(mpower_);
             get_tensor_(std::get<0>(files_[filename]), metp, 0, naux_ - 1, 0, naux_ - 1);
-        } else
+        } else 
             metp = metric_prep_core(mpower_);
 
+//joejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoe
+FILE* mat_file;
+mat_file = fopen("/theoryfs2/ds/obrien/Debug/Psi4/memdfjk_MET.txt", "a");
+fprintf(mat_file, "joejoejoejoejoejoejoejoejoejoe\n");
+fprintf(mat_file, "mpower_ is %f\n", mpower_);
+for (size_t i = 0; i < naux_; i++) {
+	for (size_t j = 0; j < naux_; j++) {
+		fprintf(mat_file, "%f ", metp[i*naux_ + j]);
+	}
+	fprintf(mat_file, "\n");
+}
+fclose(mat_file);
+//joejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoe
         for (size_t i = 0; i < psteps.size(); i++) {
             size_t start = std::get<0>(psteps[i]);
             size_t stop = std::get<1>(psteps[i]);
@@ -511,16 +524,17 @@ void DFHelper::prepare_AO_core() {
             timer_on("DFH: AO Construction");
             compute_sparse_pQq_blocking_p_symm(start, stop, Mp, eri);
             timer_off("DFH: AO Construction");
-
             // contract metric
             timer_on("DFH: AO-Met. Contraction");
             contract_metric_AO_core_symm(Mp, metp, begin, end);
             timer_off("DFH: AO-Met. Contraction");
         }
+
         // no more need for metrics
         if (hold_met_) metrics_.clear();
     }
     // outfile->Printf("\n    ==> End AO Blocked Construction <==");
+	fclose(run_print);
 }
 std::pair<size_t, size_t> DFHelper::pshell_blocks_for_AO_build(const size_t mem, size_t symm,
                                                                std::vector<std::pair<size_t, size_t>>& b) {
@@ -574,6 +588,7 @@ std::pair<size_t, size_t> DFHelper::pshell_blocks_for_AO_build(const size_t mem,
         }
     }
     // returns pair(largest buffer size, largest block size)
+	printf("largest is %zu\n", largest);
     return std::make_pair(largest, block_size);
 }
 
@@ -764,6 +779,7 @@ void DFHelper::put_tensor(std::string file, double* b, std::pair<size_t, size_t>
 }
 void DFHelper::put_tensor(std::string file, double* Mp, const size_t start1, const size_t stop1, const size_t start2,
                           const size_t stop2, std::string op) {
+    timer_on("DFH: Put Tensor");
     size_t a0 = stop1 - start1 + 1;
     size_t a1 = stop2 - start2 + 1;
     size_t A0 = std::get<0>(sizes_[file]);
@@ -804,6 +820,7 @@ void DFHelper::put_tensor(std::string file, double* Mp, const size_t start1, con
             throw PSIEXCEPTION(error.str().c_str());
         }
     }
+    timer_off("DFH: Put Tensor");
 }
 void DFHelper::put_tensor_AO(std::string file, double* Mp, size_t size, size_t start, std::string op) {
     // begin stream
@@ -1140,6 +1157,17 @@ void DFHelper::compute_sparse_pQq_blocking_p_symm(const size_t start, const size
                     size_t omu = primary_->shell(MU).function_index() + mu;
                     for (size_t nu = 0; nu < numnu; nu++) {
                         size_t onu = primary_->shell(NU).function_index() + nu;
+//						for (size_t P = 0; P < numP; P++) {
+//						 p_chase = primary_->shell(NU).function_index()
+//						 Q_chase = aux_->shell(Pshell).function_index()
+//						 q_chase = primary_->shell(MU).function_index()
+//							Mp[(primary_->shell(MU).function_index() + mu ) * naux_ * nbf_ +
+//							   (aux_->shell(Pshell).function_index() + P  ) * nbf_ +
+//							    primary_->shell(NU).function_index() + nu ] = 
+//							  buffer[rank][ P  * primary_->shell(MU).nfunction() * primary_->shell(NU).nfunction() + 
+//									  mu * primary_->shell(NU).nfunction() +
+//									  nu ];
+//						}
 
                         // Remove sieved integrals or lower triangular
                         if (!schwarz_fun_mask_[omu * nbf_ + onu] || omu > onu) {
@@ -1156,6 +1184,37 @@ void DFHelper::compute_sparse_pQq_blocking_p_symm(const size_t start, const size
             }
         }
     }
+/*
+printf("start is %zu\n", start);
+// loop from start to stop to get shell nfunctions
+size_t num_bfs=0;
+for (size_t p_iter = start; p_iter <= stop; p_iter++){
+num_bfs+=primary_->shell(p_iter).nfunction();
+}
+printf("num_bfs is %zu\n", num_bfs);
+printf("stop is %zu\n", stop);
+
+	if ( naux_ == 84 ) {
+		size_t print_ind;
+		FILE* AO_Print;
+		AO_Print = fopen( "dfhelper_aos.txt","a");
+		fprintf(AO_Print, "nbf_ is %zu\n", nbf_);
+		fprintf(AO_Print, "naux_ is %zu\n", naux_);
+		for ( size_t Q_iter = 0; Q_iter < naux_; Q_iter++ ) {
+			for ( size_t p_iter = 0; p_iter < nbf_; p_iter++ ) {
+				for ( size_t q_iter = 0; q_iter < nbf_; q_iter++ ) { // A^{Q}_[p][q] < == >  pQq[p][Q][q]
+					print_ind = (p_iter * naux_ * nbf_) + 
+								(Q_iter * nbf_) +
+								 q_iter;
+					fprintf(AO_Print, "%f ", Mp[print_ind ] );
+				}
+				fprintf(AO_Print, "\n");
+			}
+			fprintf(AO_Print, "\n\n");
+		}
+		fclose(AO_Print);
+	}
+*/
 }
 void DFHelper::grab_AO(const size_t start, const size_t stop, double* Mp) {
     size_t begin = Qshell_aggs_[start];
@@ -2799,6 +2858,7 @@ void DFHelper::compute_JK(std::vector<SharedMatrix> Cleft, std::vector<SharedMat
 
         if (do_J) {
             timer_on("DFH: compute_J");
+
             if (lr_symmetric) {
                 compute_J_symm(D, J, Mp, T1p, T2p, C_buffers, bcount, block_size);
             } else {
@@ -2887,6 +2947,17 @@ void DFHelper::fill(double* b, size_t count, double value) {
 }
 void DFHelper::compute_J(std::vector<SharedMatrix> D, std::vector<SharedMatrix> J, double* Mp, double* T1p, double* T2p,
                          std::vector<std::vector<double>>& D_buffers, size_t bcount, size_t block_size) {
+
+
+
+
+
+
+
+
+
+
+
     for (size_t i = 0; i < J.size(); i++) {
         // grab orbital spaces
         double* Dp = D[i]->pointer()[0];

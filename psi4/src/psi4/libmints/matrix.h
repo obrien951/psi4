@@ -432,6 +432,7 @@ class PSI_API Matrix : public std::enable_shared_from_this<Matrix> {
      * @return value at position (m, n)
      */
     double get(const int& m, const int& n) const { return matrix_[0][m][n]; }
+	double get(size_t m, size_t n) const { return matrix_[0][m][n]; }
 
     /**
      * Returns a single row of matrix_

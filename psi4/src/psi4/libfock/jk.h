@@ -1057,12 +1057,187 @@ class PSI_API MemDFJK : public JK {
 };
 
 class PSI_API DirectDFJK : public JK {
-    private:
+    protected:
+	// uses pQq storage for integrals
+	bool pQq_ = false;
+	bool Qpq_ = !pQq_;
+	bool Qpq_store_sparse_ = false;
+
     /// Condition cutoff in fitting metric, defaults to 1.0E-12
-    double condition_;
+    double condition_ = 1e-12;
+
+	/// threads for openmp
+    int df_ints_num_threads_ = 1;
 
     //only calls the sieve object
     void preiterations() override;
+
+	// Is this for an unrestricted Hartree Fock calculation
+	bool uhf_ = false;
+
+    // auxiliary basis set object
+    std::shared_ptr<BasisSet> auxiliary_;
+
+    // Numbers of basis functions
+    size_t nbf_;
+    size_t naux_;
+	size_t p_shells_;
+	size_t Q_shells_;
+
+	// The amount of memory we can use for AO tensors
+	size_t free_memory_;
+	// Number of blocks over which AO's will be constructed
+	size_t num_blocks_;
+	size_t ABX_block_size_;
+	size_t biggest_block_;
+
+	// size of the tensor x used in K construction.
+	size_t x_size_;
+
+    // sparse funcs per function
+	size_t sparse_fpf_ = 0;
+
+	// size of each block of x. In the rhf case, this vector will only
+	//   have one element, but in the uhf case, we will have:
+	//   x_slices_[0] is C_left_ao.ncols() & 
+	//   x_slices_[1] is C_right_ao.ncols()
+	std::vector<size_t> x_slice_;
+	
+	//  from starts_[i] to stops_[i]
+	//  Be aware that these arrays store shell indices and not sizes.
+	std::vector<size_t> Shell_starts_;
+	std::vector<size_t> Shell_stops_;
+
+	// Block_funcs[i] is the number of functions in the [i]th AO Block
+	std::vector<size_t> Block_funcs_;
+	
+	// Amount of memory DirectDFJK plans on using
+	size_t total_needs_;
+
+	//fills total_needs;
+	void our_needs();
+
+    void common_init();
+
+	// sparsity mask for AO_construction
+	std::vector<size_t> schwarz_shell_mask_pQq_;
+	//We're going to use a 
+
+	// Global index for integral A_[mu][0][0]
+	std::vector<size_t> schwarz_func_starts_pQq_;
+	std::vector<size_t> schwarz_func_lstarts_pQq_;
+
+
+	//Addresses for symmetric integral construction. When A_mu_P_nu
+	//   is constructed, we need to know where to put A_nu_P_mu for instance:
+//  A[ schwarz_func_starts_pQq_[mu] + schwarz_func_ints_pQq_[mu] * P + schwarz_func_map_pQq_[mu][nu] ]
+// =A[ schwarz_func_starts_pQq_[nu] + schwarz_func_ints_pQq_[nu] * P + schwarz_func_map_pQq_[nu][mu] ]
+	// also acts as a mask. if A_mu_P_nu isn't calculated then
+	//    shwarz_func_map_pQq_[mu][nu] = 0
+	std::vector<size_t> schwarz_func_map_pQq_;
+
+	// Functions to prepare sparsity. These will work differently
+	//   for different memory layouts
+	
+	// Number of integrals NOT screened out: 
+	std::vector<size_t> schwarz_func_ints_;
+
+	// Determines which elements of A_mu_Q_nui need to be computed
+	// Determines which shell pairs are significant
+	//	(schwarz_shell_map_pQq_)
+	// Determines global starting indices for basis functions
+	//  (schwarz_func_starts_pQq_)
+	// Determines the number of significant integrals per primary
+	//    basis function
+	//  (schwarz_func_ints_)
+	// Will be called in sparsity prep in memory estimator
+	void sparsity_prep_pQq();
+
+	void prune_pQq( size_t bf, size_t nocc, double* pruned_c, double* raw_c );
+
+	void unprune_j_pQq( size_t mu, double* pruned_j, double* j);
+
+	//I find it helpful to have a good description of 
+	//  what these functions do and don't do.
+	//  we'll try to add it.
+    void compute_JK() override;
+
+	void postiterations() override;
+
+    void compute_AO_block_Qpq(size_t start_Q, size_t stop_Q, double* ao_block, std::vector<std::shared_ptr<TwoBodyAOInt>> eri);
+
+//	void compute_AO_block_p_pQq(size_t start_p, size_t stop_p, double* ao_block, std::vector<std::shared_ptr<TwoBodyAOInt>> eri);
+
+	void compute_sparse_AO_block_p_pQq(size_t start_p, size_t stop_p, double* ao_block, std::vector<std::shared_ptr<TwoBodyAOInt>> eri);
+
+	std::string name() override { return "DirectDFJK"; }
+
+	bool C1() const override { return true; }
+
+    size_t memory_estimate() override;
+
+	void prepare_blocking();
+
+	// fills up starts and stops in a pQq scheme
+	void prepare_p_blocks();
+
+	// fills up starts and stops in a Qpq scheme
+	void prepare_Q_blocks();
+
+
+	// works the same as in dfhelper
+	//std::map<double, SharedMatrix> metric_;
+
+	// DO NOT CHANGE ELEMENTS OF metric_ WITHOUT CORRESPONDINGLY CHANGING
+    //   THE CORRESPONDING ELEMENTS OF met_powers_! OTHERWISE, YOU WILL 
+    //   HAVE NON-PHYSICAL RESULTS WITH VERY LITTLE IN THE WAY OF TELLING
+    //   YOURSELF WHY!
+	std::vector<double> met_powers_;
+	std::vector<SharedMatrix> metric_;
+
+
+	void prepare_metric_power(double power);
+
+	// I want to be able to compute powers without the machinery to get them
+	double* get_metric_power(double power);
+
+	//computes D_ao_[ind] to correspond to C_right_ao_[ind] and C_left_ao_[ind]
+	void compute_D_ao(size_t ind);
+
+	void dgemm_trial(size_t i, size_t j, size_t k);
+
+	// Line  7 algorithm  8
+	void V_gets_AD( size_t stop, double* v, double* a, double* d);
+
+	// Line  7 algorithm 10
+	void F_gets_AD_pQq( size_t stop, double* f, double* a, double* d);
+
+	// Line  9 algorithm  8
+	void Accumulate_J( size_t stop, double* j, double* a, double* phi);
+	void Accumulate_J_pQq( size_t stop, double* j, double* a, double* phi);
+
+	// Line 10 algorithm  8
+	// change the name of stop says the boss
+	void U_gets_AC( size_t stop, size_t c_cols, double* u, double* a, double* c);
+	void U_gets_AC_pQq( size_t stop, size_t c_cols, double* u, double* a, double* c);
+
+	// Line 11 algorithm  8
+	void X_accumulates_JU( size_t x_stop, size_t u_stop, size_t slice_size, size_t x_off, size_t u_off, size_t c_cols, double* x, double* j, double* u);
+	void X_accumulates_JU_pQq( size_t x_stop, size_t u_stop, size_t slice_size, size_t x_off, size_t u_off, size_t c_cols, double* x, double* j, double* u);
+
+	// Line 12 algorithm  8
+	void Accumulate_K_c_is_c( size_t stop, size_t slice_size, size_t c_cols, double* k, double* x);
+	void Accumulate_K_c_is_c_pQq( size_t stop, size_t slice_size, size_t c_cols, double* k, double* x);
+
+
+	void set_uhf(std::string uhf) { if (uhf == "UHF") uhf_ = true; }
+	//prepares the Density matrix if C* == C
+	//void prepare_D_symm();
+
+    void build_jk_CC_Qpq_direct();
+	void build_jk_CC_Qpq_blocks();
+
+	void build_jk_CC_pQq_blocks();
 
     public:
 
@@ -1074,18 +1249,19 @@ class PSI_API DirectDFJK : public JK {
     *
     */
 
-    DirectDFJK(std::shared_pointer<Basis_Set> primary, std::shared_pointer<Basis_Set> auxiliary);
-    DirectJK::compute_JK();
+    DirectDFJK(std::shared_ptr<BasisSet> primary, std::shared_ptr<BasisSet> auxiliary);
     /// Destructor 
-    ~DirectDFJK override;
-    
-    compute_JK();
+    ~DirectDFJK() override;
 
-    DirectDFJK::compute_AO_block_Qpq();
+    void set_condition( double condition ) { condition_ = condition; }
+
+	void set_df_ints_num_threads(int threads) { df_ints_num_threads_ = threads; }
+
+    void pytemplate();
     
     void print_header() const override;
 
-}
+};
 
 }
 
