@@ -2849,7 +2849,7 @@ void Matrix::save(const std::string &filename, bool append, bool saveLowerTriang
             for (int h = 0; h < nirrep_; ++h) {
                 for (int i = 0; i < rowspi_[h]; ++i) {
                     for (int j = 0; j < colspi_[h ^ symmetry_]; ++j) {
-                        if (std::fabs(matrix_[h][i][j]) > 1.0e-12) {
+                        if (std::fabs(matrix_[h][i][j]) > 1.0e-16) {
                             count++;
                         }
                     }
@@ -2859,7 +2859,7 @@ void Matrix::save(const std::string &filename, bool append, bool saveLowerTriang
             for (int h = 0; h < nirrep_; ++h) {
                 for (int i = 0; i < rowspi_[h]; ++i) {
                     for (int j = 0; j < colspi_[h ^ symmetry_]; ++j) {
-                        if (std::fabs(matrix_[h][i][j]) > 1.0e-12) {
+                        if (std::fabs(matrix_[h][i][j]) > 1.0e-16) {
                             printer->Printf(str_block_format, h, i, j, matrix_[h][i][j]);
                         }
                     }

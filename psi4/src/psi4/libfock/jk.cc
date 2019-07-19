@@ -107,7 +107,12 @@ std::shared_ptr<JK> JK::build_JK(std::shared_ptr<BasisSet> primary, std::shared_
 
         return std::shared_ptr<JK>(jk);
 
-    } else if (jk_type == "PK") {
+    } else if (jk_type == "DIRECT_DF") {
+		DirectDFJK* jk = new DirectDFJK(primary, auxiliary);
+		_set_dfjk_options<DirectDFJK>(jk, options);
+
+		return std::shared_ptr<JK>(jk);
+	} else if (jk_type == "PK") {
         PKJK* jk = new PKJK(primary, options);
 
         if (options["INTS_TOLERANCE"].has_changed()) jk->set_cutoff(options.get_double("INTS_TOLERANCE"));
@@ -216,7 +221,6 @@ void JK::common_init() {
 }
 size_t JK::memory_overhead() const {
     size_t mem = 0L;
-
     int JKwKD_factor = 1;
     if (do_J_) JKwKD_factor++;
     if (do_K_) JKwKD_factor++;
@@ -225,8 +229,13 @@ size_t JK::memory_overhead() const {
     int C_factor = 1;
     if (!lr_symmetric_) C_factor++;
 
+//joejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoe
+	printf("%zu \n", C_left_.size());
+//joejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoe
+
     // USO Quantities
     for (size_t N = 0; N < C_left_.size(); N++) {
+		printf("Joe's wrong\n");
         int symml = C_left_[N]->symmetry();
         for (int h = 0; h < C_left_[N]->nirrep(); h++) {
             int nbfl = C_left_[N]->rowspi()[h];
