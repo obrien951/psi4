@@ -1098,6 +1098,8 @@ class PSI_API DirectDFJK : public JK {
 	size_t num_blocks_;
 	size_t ABX_block_size_;
     
+    std::vector<std::vector<size_t>> k_disps_;
+    
     // if Qpq_, AO integrals in the biggest block
     // if pQq_, (functions in biggest block) * naux_
 	size_t biggest_block_;
@@ -1243,6 +1245,9 @@ class PSI_API DirectDFJK : public JK {
 	void Accumulate_K_c_is_c( size_t stop, size_t slice_size, size_t c_cols, double* k, double* x);
 	void Accumulate_K_c_is_c_pQq( size_t stop, size_t slice_size, size_t c_cols, double* k, double* x);
 
+    void X_Block( char coul_work, bool compute_k, size_t block, double* ao_block, double* x, double* u, double* coulomb_vector, std::vector<std::shared_ptr<TwoBodyAOInt>> eri);
+    
+    void pQp();
 
 	void set_uhf(std::string uhf) { if (uhf == "UHF") uhf_ = true; }
 	//prepares the Density matrix if C* == C
