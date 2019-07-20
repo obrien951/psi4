@@ -459,12 +459,10 @@ void DirectDFJK::sparsity_prep_pQq(){
 //   where they need to go. I don't think it makes sense to have seperate J and
 //   K function calls as J and K are never fully built in a single function.
 void DirectDFJK::compute_JK() {
-
-	printf("%s\n", (lr_symmetric_ ? "true" : "false") );
-    printf("%zu \n", C_left_ao_.size());
-
+    printf("compute_JK\n");
 	if ( pQq_ ) {
-	build_jk_CC_pQq_blocks();
+    pQp();
+	//build_jk_CC_pQq_blocks();
 	}  else {
 
 		if (num_blocks_ == 1) {
@@ -642,7 +640,7 @@ void DirectDFJK::prepare_p_blocks() {
     current_costs += sizeof(double)*naux_*charges_z;
     
 	Shell_starts_.push_back(0);
-
+    
 	for (size_t shell_iter = 0; shell_iter < p_shells_; shell_iter++) {
 		shell_funcs = primary_->shell(shell_iter).nfunction();
 // The 5 is where we're getting our fudge factor we're getting charges_z
@@ -669,6 +667,18 @@ void DirectDFJK::prepare_p_blocks() {
 
 	biggest_block_ = bmf * naux_ * nbf_;
 	num_blocks_ = Block_funcs_.size();
+    k_disps_.resize(num_blocks_);
+    size_t row_disp = 0;
+    size_t col_disp = 0;
+
+    for (size_t i = 0; i < num_blocks_; i++) {
+        col_disp = 0;
+        for (size_t j = 0; j < num_blocks_; j++) {
+            k_disps_[i].push_back(row_disp * nbf_ + col_disp);
+            col_disp += Block_funcs_[j];
+        }
+        row_disp+=Block_funcs_[i];
+    }
 
 //	schwarz_func_lstarts_pQq_.resize(nbf_);
 
@@ -676,7 +686,7 @@ void DirectDFJK::prepare_p_blocks() {
 //		printf("Shell_starts_[%zu] is %zu\n", i, Shell_starts_[i]);
 //	}
 
-
+/*
 	size_t subtrahend;
 	for (size_t i = 0; i < Shell_starts_.size(); i++) {
 		subtrahend = schwarz_func_starts_pQq_[primary_->shell(i).function_index()];
@@ -684,6 +694,7 @@ void DirectDFJK::prepare_p_blocks() {
 			schwarz_func_lstarts_pQq_[primary_->shell(i).function_index()+j] = schwarz_func_starts_pQq_[primary_->shell(i).function_index()+j] - subtrahend;
 		}
 	}
+ */
 
 	printf("end prepare_p_blocks()\n");
 }
@@ -747,11 +758,16 @@ void DirectDFJK::compute_dense_AO_block_p_pQq(size_t shell, double* ao_block, st
     int procs = 1;
     
     std::vector<const double*> buffer(procs);
+    printf("here from ao\n");
+
+    //int rank = 0;
+    double* a  = (double *) malloc(1*sizeof(double));
     
-    int rank = 0;
+    printf("eri has size %zu\n", eri.size());
     
-    buffer[rank] = eri[rank]->buffer();
-    
+    buffer[0] = eri[0]->buffer();
+    printf("here from ao\n");
+
     size_t shell_count = primary_->shell(shell).nfunction();
     size_t ShellP_count;
     size_t ShellN_count;
@@ -764,6 +780,7 @@ void DirectDFJK::compute_dense_AO_block_p_pQq(size_t shell, double* ao_block, st
 //   however, in this code, we only need two because we only have one shell
 //   to compute in the slowest running index, so we're just going to write
 //   2 loops to accomodate that.
+    printf("shell is %zu p_shells_ is %zu \n", shell, p_shells_);
     
     for (size_t ShellP = 0; ShellP < Q_shells_; ShellP++) {
         ShellP_count = primary_->shell(ShellP).nfunction();
@@ -771,19 +788,23 @@ void DirectDFJK::compute_dense_AO_block_p_pQq(size_t shell, double* ao_block, st
             ShellN_count = primary_->shell(ShellN).nfunction();
             Shell_ind_0 = ShellP_count * ShellN_count;
             Buff_ind_0 = ShellN_count * shell_count;
-            eri[rank]->compute_shell( ShellP, 0, shell, ShellN);
+            printf("shell is %zu ShellP is %zu ShellN is %zu\n", shell, ShellP, ShellN);
+            eri[0]->compute_shell( ShellP, 0, shell, ShellN);
+            int i = 0;
             for (size_t func_m  = 0; func_m < shell_count; func_m++){
                 for (size_t func_p = 0; func_p < ShellP_count; func_p++ ) {
                     for (size_t func_n = 0; func_n < ShellN_count; func_n++) {
-                        ao_block[func_m * Shell_ind_0 + func_p * ShellN_count + func_n] =
-                        buffer[rank][func_p * Buff_ind_0 + func_m * ShellN_count + func_n];
+                        i++;
+                        printf("%d\n", i);
+                        ao_block[func_m * Shell_ind_0 + func_p * ShellN_count + func_n]
+                        a[0] =
+                        buffer[0][func_p * Buff_ind_0 + func_m * ShellN_count + func_n];
                     }
                 }
             }
         }
     }
-    
-    
+    printf("over from ao\n");
 }
     
     
@@ -1167,8 +1188,8 @@ void DirectDFJK::build_jk_CC_Qpq_direct() {
 	C_DGEMM( 'N', 'T', (int) nbf_, (int) nbf_, ((int) naux_) * C_left_ao_[0]->ncol(), 1.0, x, ((int) naux_) * C_left_ao_[0]->ncol(), x, ((int) naux_) * C_left_ao_[0]->ncol()  , 0.0, k, (int) nbf_);
 	timer_off("Big DGEMM");
 
-	J_ao_[0]->save("/theoryfs2/ds/obrien/Debug/Psi4/directdfjk_J.txt", false, false, true);
-	K_ao_[0]->save("/theoryfs2/ds/obrien/Debug/Psi4/directdfjk_K.txt", false, false, true);
+//	J_ao_[0]->save("/theoryfs2/ds/obrien/Debug/Psi4/directdfjk_J.txt", false, false, true);
+//	K_ao_[0]->save("/theoryfs2/ds/obrien/Debug/Psi4/directdfjk_K.txt", false, false, true);
 
 //	C_left_ao_[0]->save("/theoryfs2/ds/obrien/Debug/Psi4/C_directdfjk.txt", false, false, true);
 
@@ -1305,52 +1326,56 @@ void DirectDFJK::pQp(){
     std::shared_ptr<BasisSet> zero_ = BasisSet::zero_ao_basis_set();
     auto rifactory = std::make_shared<IntegralFactory>(auxiliary_, zero_, primary_, primary_);
     std::vector<std::shared_ptr<TwoBodyAOInt>> eri(procs);
+    eri[rank] = std::shared_ptr<TwoBodyAOInt>(rifactory->eri());
     
-    double* c = C_left_ao_[0]->pointer()[0];
-    
+    printf("eri has size %zu\n", eri.size());
+    printf("auxiliary_ is %s \n", auxiliary_->name().c_str());
+    printf("biggest_shell is %zu \n", biggest_shell);
+    printf("auxiliary_ has %d shells\n", auxiliary_->nshell());
     int nocc = C_left_ao_[0]->ncol();
     
-    double** Dp = D_ao_[0]->pointer();
-    double* d = Dp[0];
-    
-    double* met_m_1_0 = get_metric_power(-1.0);
-    double* met_m_0_5 = get_metric_power(-0.5);
-    
-    double* j = J_ao_[0]->pointer(0)[0];
     double* k = K_ao_[0]->pointer(0)[0];
     
     std::unique_ptr<double[]> A(new double[biggest_shell*naux_*nbf_]);
     std::unique_ptr<double[]> U(new double[naux_*nbf_]);
-    std::unique_ptr<double[]> XR(new double[biggest_block_*nocc]);
-    std::unique_ptr<double[]> XL(new double[biggest_block_*nocc]);
+    std::unique_ptr<double[]> XN(new double[biggest_block_*nocc]);
+    std::unique_ptr<double[]> XO(new double[biggest_block_*nocc]);
     std::unique_ptr<double[]> V(new double[naux_]);
-    std::unique_ptr<double[]> PHI(new double[naux_]);
 
     double* a = A.get();
     double* u = U.get();
-    double* xl = XL.get();
-    double* xr = XR.get();
+    double* xn = XN.get();
+    double* xo = XO.get();
     double* v = V.get();
-    double* phi = PHI.get();
     
     char first_char = ( num_blocks_ == 0 ? 'V' : 'B');
     
-    X_Block(first_char, true, 0, a, xl, v, eri);
-    C_DGEMM('N', 'T', Block_funcs_[0], Block_funcs_[0], naux_*nocc, 0.0, xl, naux_*nocc, xl, naux_*nocc, 0.0, k, nbf_);
+    X_Block(first_char, true, 0, a, xo, u, v, eri);
+    C_DGEMM('N', 'T', Block_funcs_[0], Block_funcs_[0], naux_*nocc, 1.0, xo, naux_*nocc, xo, naux_*nocc, 0.0, k, nbf_);
     
-    for (size_t xl_iter = 0; xl_iter < num_blocks_; xl_iter++){
-        for (size_t xr_iter = 1; j < num_blocks_ - xl_iter; xr_iter++){
-            if (i == 0) {
-                X_Block('V', true, j, a, xr, v, eri);
-                C_DGEMM('N', 'T', Block_funcs_[xr_iter], Block_funcs_[xr_iter], naux_*nocc, 0.0, xr, naux_*nocc, xr, naux_*nocc, 0.0, k + );
+    for (size_t xo_iter = 0; xo_iter < num_blocks_; xo_iter++){
+        for (size_t xn_iter = 1; xn_iter < num_blocks_ - xo_iter; xn_iter++){
+            if ( xo_iter == 0 && xn_iter != num_blocks_ - 1) {
+                X_Block('V', true, xn_iter, a, xn, u, v, eri);
+                C_DGEMM('N', 'T', Block_funcs_[xn_iter], Block_funcs_[xn_iter], naux_*nocc, 1.0, xn, naux_*nocc, xn, naux_*nocc, 0.0, k + k_disps_[xn_iter][xn_iter], nbf_ );
+                C_DGEMM('N', 'T', Block_funcs_[xo_iter], Block_funcs_[xn_iter], naux_*nocc, 1.0, xo, naux_*nocc, xn, naux_*nocc, 0.0, k + k_disps_[xo_iter][xn_iter], nbf_ );
+            } else if (xo_iter == 0 && xn_iter == num_blocks_ - 1) {
+                X_Block('B', true, xn_iter, a, xn, u, v, eri);
+                C_DGEMM('N', 'T', Block_funcs_[xn_iter], Block_funcs_[xn_iter], naux_*nocc, 1.0, xn, naux_*nocc, xn, naux_*nocc, 0.0, k + k_disps_[xn_iter][xn_iter], nbf_);
+            } else if ( xo_iter != 0 ) {
+                X_Block('P', true, xo_iter, a, xn, u, v, eri);
+                C_DGEMM('N', 'T', Block_funcs_[xn_iter], Block_funcs_[xo_iter], naux_*nocc, 1.0, xn, naux_*nocc, xo, naux_*nocc, 0.0, k + k_disps_[xn_iter][xo_iter], nbf_);
             }
         }
-        xl = xr
+        xo = xn;
     }
-            
-    X_Block('P', false, num_blocks_ - 1, a, nullptr, phi, eri);
     
-    C_DGEMV()
+    printf("ping 1357\n");
+    
+    if (first_char != 'B') {
+        X_Block('P', false, num_blocks_ - 1, a, nullptr, u, v, eri);
+    }
+    
     
 }
 
@@ -1378,8 +1403,7 @@ void DirectDFJK::build_jk_CC_pQq_blocks(){
 
 	int nocc = C_left_ao_[0]->ncol();
 
-	double** Dp = D_ao_[0]->pointer();
-	double* d = Dp[0];
+	double* d = D_ao_[0]->pointer()[0];
 
 	double* met_m_1_0 = get_metric_power(-1.0);
 	double* met_m_0_5 = get_metric_power(-0.5);
@@ -1576,23 +1600,81 @@ void DirectDFJK::prune_pQq( size_t bf, size_t nocc, double* pruned_c, double* ra
 //    of the exchange matrix build. The issue is that it may or may not
 //    have to construct one of various terms for the coulomb matrix.
 //    We handle this with a switch.
-// coul_work \in { 'V', 'P', 'B', 'N'}
+// coul_work \in { 'V', 'P', 'B' }
 // 'V' means we compute a vector to be contracted against the coulomb Metric.
-void DirectDFJK::X_Block( char coul_work, bool compute_k, size_t block, double* ao_block, double* coulomb_vector, std::vector<std::shared_ptr<TwoBodyAOInt>> eri){
+void DirectDFJK::X_Block( char coul_work, bool compute_k, size_t block, double* ao_block, double* x, double* u, double* coulomb_vector, std::vector<std::shared_ptr<TwoBodyAOInt>> eri){
 
-//  for loop over AO blocks
-    for (size_t shell_iter = shell_start; shell_iter <= shell_stop; shell_iter++){
-        //compute ao blocks
-        compute_dense_AO_block_p_pQq(shell_iter, ao_block , eri);
-        // either contracts over A or \cmpq to make
-        
+    printf("pingX coul_work is %c\n", coul_work);
+    
+    size_t nocc = C_left_ao_[0]->ncol();
+    double* c = C_left_ao_[0]->pointer()[0];
+    double* met_m_0_5 = get_metric_power(-0.5);
+    double* j = J_ao_[0]->pointer()[0];
+    double* d = D_ao_[0]->pointer()[0];
+
+    
+    switch (coul_work) {
+        case 'V':
+            for (size_t shell_iter = Shell_starts_[shell_iter]; shell_iter <= Shell_stops_[shell_iter]; shell_iter++){
+                //compute ao blocks
+                compute_dense_AO_block_p_pQq(shell_iter, ao_block , eri);
+                for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++) {
+// Form V for Coulomb Matrix construction
+                    C_DGEMV( 'N', (int) naux_, (int) nbf_, 1.0, ao_block + func_it*naux_*nbf_, nbf_, d + primary_->shell(shell_iter).function_index()*nbf_ + func_it * nbf_, 1, 1.0, coulomb_vector, 1 );
+                }
+                if (compute_k) {
+// Form U for Exchange Matrix construction
+                    C_DGEMM('N', 'N', primary_->shell(shell_iter).nfunction()*naux_, nocc, nbf_, 1.0, ao_block, nbf_, c, nocc, 0.0, u, nocc);
+// Contract this u into the corresponding portion of x
+                    C_DGEMM('N', 'N', naux_, primary_->shell(shell_iter).nfunction()*nocc, naux_, 1.0, met_m_0_5, naux_, u, naux_ * primary_->shell(shell_iter).nfunction(), 0.0, x + naux_ * nbf_ * (primary_->shell(shell_iter).function_index() - primary_->shell(Shell_starts_[block]).function_index()), naux_ * primary_->shell(shell_iter).nfunction() );
+                }
+            }
+            break;
+        case 'P':
+            for (size_t shell_iter = Shell_starts_[block]; shell_iter <= Shell_stops_[block]; shell_iter++) {
+                compute_dense_AO_block_p_pQq(shell_iter, ao_block, eri);
+                for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++) {
+                    C_DGEMV('T', (int) naux_, (int) nbf_, 1.0, ao_block + func_it * naux_ * nbf_ , nbf_, coulomb_vector, 1, 1.0,  j + naux_*nbf_ * (primary_->shell(shell_iter).function_index() + func_it ), 1 );
+                }
+                if (compute_k) {
+                    C_DGEMM('N', 'N', primary_->shell(shell_iter).nfunction()*naux_, nocc, nbf_, 1.0, ao_block, nbf_, c, nocc, 0.0, u, nocc);
+                    C_DGEMM('N', 'N', naux_, primary_->shell(shell_iter).nfunction()*nocc, naux_, 1.0, met_m_0_5, naux_, u, naux_ * primary_->shell(shell_iter).nfunction(), 0.0, x + naux_ * nbf_ * (primary_->shell(shell_iter).function_index() - primary_->shell(Shell_starts_[block]).function_index()), naux_ * primary_->shell(shell_iter).nfunction() );
+                }
+            }
+            break;
+        case 'B':
+            std::unique_ptr<double[]> PHI(new double[naux_]);
+            double* phi = PHI.get();
+            double* met_m_1_0 = get_metric_power(-1.0);
+// This is the coulomb matrix. We will assume that this is zeroed in the
+//     wrapping function
+            printf("ping XBLOCK\n");
+            for (size_t shell_iter = Shell_starts_[block]; shell_iter <= Shell_stops_[block]; shell_iter++) {
+                printf("ping XBLOCK\n");
+                compute_dense_AO_block_p_pQq(shell_iter, ao_block, eri);
+                printf("ping XBLOCK\n");
+                for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++) {
+                    C_DGEMV('N', (int) naux_, (int) nbf_, 1.0, ao_block + func_it*naux_*nbf_, nbf_, d + primary_->shell(shell_iter).function_index()*nbf_ + func_it * nbf_, 1, 1.0, coulomb_vector, 1 );
+                    printf("ping XBLOCK\n");
+                }
+                if (compute_k) {
+                    C_DGEMM('N', 'N', primary_->shell(shell_iter).nfunction()*naux_, nocc, nbf_, 1.0, ao_block, nbf_, c, nocc, 0.0, u, nocc);
+                    printf("ping XBLOCK\n");
+                    C_DGEMM('N', 'N', naux_, primary_->shell(shell_iter).nfunction()*nocc, naux_, 1.0, met_m_0_5, naux_, u, naux_ * primary_->shell(shell_iter).nfunction(), 0.0, x + naux_ * nbf_ * (primary_->shell(shell_iter).function_index() - primary_->shell(Shell_starts_[block]).function_index()), naux_ * primary_->shell(shell_iter).nfunction() );
+                    printf("ping XBLOCK\n");
+                }
+            }
+            printf("ping XBLOCK\n");
+            C_DGEMV('N', (int) naux_, (int) naux_, 1.0, met_m_1_0, naux_, coulomb_vector, 1, 1.0, phi, 1);
+            for (size_t shell_iter = Shell_starts_[block]; shell_iter <= Shell_stops_[block]; shell_iter++) {
+                compute_dense_AO_block_p_pQq(shell_iter, ao_block, eri);
+                for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++) {
+                    C_DGEMV('T', (int) naux_, (int) nbf_, 1.0, ao_block + func_it * naux_ * nbf_ , nbf_, phi, 1, 1.0,  j + naux_*nbf_ * (primary_->shell(shell_iter).function_index() + func_it ), 1 );
+                }
+            }
+            C_DCOPY(naux_, phi, 1, coulomb_vector, 1);
+            break;
     }
-}
-
-// overloaded function for constructing tensors to build the exchange matrix
-//    does not do any work for the coulomb matrix
-void DirectDFJK::X_Block( double* ao_block, double* x){
-        
 }
 
 void DirectDFJK::unprune_j_pQq( size_t mu, double* pruned_j, double* j){
