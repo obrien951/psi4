@@ -1071,6 +1071,7 @@ class PSI_API DirectDFJK : public JK {
 	bool Qpq_ = !pQq_;
 	bool Qpq_store_sparse_ = false;
 
+	bool BB_;
     /// Condition cutoff in fitting metric, defaults to 1.0E-12
     double condition_ = 1e-12;
 
@@ -1100,9 +1101,10 @@ class PSI_API DirectDFJK : public JK {
     
     std::vector<std::vector<size_t>> k_disps_;
     
-    // if Qpq_, AO integrals in the biggest block
-    // if pQq_, (functions in biggest block) * naux_
+    // AO integrals in the biggest block
 	size_t biggest_block_;
+
+	size_t biggest_shell_;
 
 	// size of the tensor x used in K construction.
 	size_t x_size_;
@@ -1134,27 +1136,22 @@ class PSI_API DirectDFJK : public JK {
     void common_init();
 
 	// sparsity mask for AO_construction
-	std::vector<size_t> schwarz_shell_mask_pQq_;
+	std::vector<std::vector<size_t>> schwarz_shell_mask_pQq_;
 	//We're going to use a 
 
-	// Global index for integral A_[mu][0][0]
-	std::vector<size_t> schwarz_func_starts_pQq_;
-	std::vector<size_t> schwarz_func_lstarts_pQq_;
+	std::vector<std::vector<size_t>> schwarz_func_starts_pQq_;
 
-
-	//Addresses for symmetric integral construction. When A_mu_P_nu
-	//   is constructed, we need to know where to put A_nu_P_mu for instance:
-//  A[ schwarz_func_starts_pQq_[mu] + schwarz_func_ints_pQq_[mu] * P + schwarz_func_map_pQq_[mu][nu] ]
-// =A[ schwarz_func_starts_pQq_[nu] + schwarz_func_ints_pQq_[nu] * P + schwarz_func_map_pQq_[nu][mu] ]
-	// also acts as a mask. if A_mu_P_nu isn't calculated then
-	//    shwarz_func_map_pQq_[mu][nu] = 0
-	std::vector<size_t> schwarz_func_map_pQq_;
+	std::vector<size_t> schwarz_dense_funcs_;
 
 	// Functions to prepare sparsity. These will work differently
 	//   for different memory layouts
 	
 	// Number of integrals NOT screened out: 
 	std::vector<size_t> schwarz_func_ints_;
+
+	//LU solution for a CMPQ_LU_uu 
+	std::vector<double> CMPQ_LU_;
+	std::vector<int> PERMUTE_;
 
 	// Determines which elements of A_mu_Q_nui need to be computed
 	// Determines which shell pairs are significant
@@ -1184,7 +1181,7 @@ class PSI_API DirectDFJK : public JK {
 
     void compute_dense_AO_block_p_pQq(size_t shell, double* ao_block, std::vector<std::shared_ptr<TwoBodyAOInt>> eri);
     
-	void compute_sparse_AO_block_p_pQq(size_t start_p, size_t stop_p, double* ao_block, std::vector<std::shared_ptr<TwoBodyAOInt>> eri);
+
 
 	std::string name() override { return "DirectDFJK"; }
 
@@ -1211,11 +1208,19 @@ class PSI_API DirectDFJK : public JK {
 	std::vector<double> met_powers_;
 	std::vector<SharedMatrix> metric_;
 
+	std::vector<int> met_cols_;
+	std::vector<int> met_rows_;
 
 	void prepare_metric_power(double power);
 
 	// I want to be able to compute powers without the machinery to get them
 	double* get_metric_power(double power);
+
+	void get_met();
+
+	void prune_c( size_t &mu, size_t nocc, double* pruned_c, double* raw_c );
+	void prune_d( size_t &mu, double* pruned_d, double* raw_d);
+	void unprune_J( size_t &mu, double* raw_j, double* pruned_j );
 
 	//computes D_ao_[ind] to correspond to C_right_ao_[ind] and C_left_ao_[ind]
 	void compute_D_ao(size_t ind);
@@ -1246,17 +1251,21 @@ class PSI_API DirectDFJK : public JK {
 	void Accumulate_K_c_is_c_pQq( size_t stop, size_t slice_size, size_t c_cols, double* k, double* x);
 
     void X_Block( char coul_work, bool compute_k, size_t block, double* ao_block, double* x, double* u, double* coulomb_vector, std::vector<std::shared_ptr<TwoBodyAOInt>> eri);
+
+	void X_Block_sparse(char coul_work, bool compute_k, size_t block, double* pruned_c, double* pruned_d, double* ao_block, double* x, double* u, double* coulomb_vector, double* pruned_j, std::vector<std::shared_ptr<TwoBodyAOInt>> eri);
     
     void pQp();
+
+	void pQp_sparse();
 
 	void set_uhf(std::string uhf) { if (uhf == "UHF") uhf_ = true; }
 	//prepares the Density matrix if C* == C
 	//void prepare_D_symm();
 
+	void compute_sparse_AO_block_p_pQq( size_t shell, double* ao_block, std::vector<std::shared_ptr<TwoBodyAOInt>> eri );
+
     void build_jk_CC_Qpq_direct();
 	void build_jk_CC_Qpq_blocks();
-
-	void build_jk_CC_pQq_blocks();
 
     public:
 

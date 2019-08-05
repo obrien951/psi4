@@ -74,9 +74,6 @@ size_t DiskDFJK::memory_estimate() {
     if (!sieve_) {
         sieve_ = std::make_shared<ERISieve>(primary_, cutoff_);
     }
-//joejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoe
-	printf("From DiskDFJK::memory_estimate(),\nC_Left_ is of size %zu\n", C_left_.size());
-//joejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoe
     size_t ntri = sieve_->function_pairs().size();
     size_t three_memory = ((size_t)auxiliary_->nbf()) * ntri;
     size_t two_memory = 2 * ((size_t)auxiliary_->nbf()) * auxiliary_->nbf();
@@ -84,13 +81,7 @@ size_t DiskDFJK::memory_estimate() {
     if (do_wK_) { three_memory *= 3; }
 
     size_t memory = three_memory + two_memory;
-//joejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoe
-	printf("Calling memory_overhead() from DiskDFJK::memory_estimate()\n");
-//joejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoe
     memory += memory_overhead();
-//joejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoe
-	printf("Call to memory_overhead() from DiskDFJK::memory_estimate() finished\n");
-//joejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoe
     memory += memory_temp();
 
     return memory;
