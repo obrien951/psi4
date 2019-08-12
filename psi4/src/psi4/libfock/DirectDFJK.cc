@@ -568,10 +568,6 @@ void DirectDFJK::prepare_metric_power(double power){
     while (power < 0.0) {
         power = power + 1.0;
     }
-    std::stringstream met_name;
-    met_name << "/theoryfs2/ds/obrien/Debug/Psi4/"<< "Joe_met" << power;
-    my_met->save(met_name.str(), false, false, true);
-
 }
 
 double* DirectDFJK::get_metric_power(double power){
