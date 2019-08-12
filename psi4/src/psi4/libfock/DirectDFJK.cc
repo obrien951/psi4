@@ -181,7 +181,17 @@ void DirectDFJK::pytemplate(){
 //	free(five);
 //	free(twenty_four);
 //	sparsity_prep_pQq();
-dgemm_trial(1U, 2U, 3U);
+
+	double memories[300] = {19660800.0, 39321600.0, 58982400.0, 78643200.0, 98304000.0, 117964800.0, 137625600.0, 157286400.0, 176947200.0, 196608000.0, 216268800.0, 235929600.0, 255590400.0, 275251200.0, 294912000.0, 314572800.0, 334233600.0, 353894400.0, 373555200.0, 393216000.0, 412876800.0, 432537600.0, 452198400.0, 471859200.0, 491520000.0, 511180800.0, 530841600.0, 550502400.0, 570163200.0, 589824000.0, 609484800.0, 629145600.0, 648806400.0, 668467200.0, 688128000.0, 707788800.0, 727449600.0, 747110400.0, 766771200.0, 786432000.0, 806092800.0, 825753600.0, 845414400.0, 865075200.0, 884736000.0, 904396800.0, 924057600.0, 943718400.0, 963379200.0, 983040000.0, 1002700800.0, 1022361600.0, 1042022400.0, 1061683200.0, 1081344000.0, 1101004800.0, 1120665600.0, 1140326400.0, 1159987200.0, 1179648000.0, 1199308800.0, 1218969600.0, 1238630400.0, 1258291200.0, 1277952000.0, 1297612800.0, 1317273600.0, 1336934400.0, 1356595200.0, 1376256000.0, 1395916800.0, 1415577600.0, 1435238400.0, 1454899200.0, 1474560000.0, 1494220800.0, 1513881600.0, 1533542400.0, 1553203200.0, 1572864000.0, 1592524800.0, 1612185600.0, 1631846400.0, 1651507200.0, 1671168000.0, 1690828800.0, 1710489600.0, 1730150400.0, 1749811200.0, 1769472000.0, 1789132800.0, 1808793600.0, 1828454400.0, 1848115200.0, 1867776000.0, 1887436800.0, 1907097600.0, 1926758400.0, 1946419200.0, 1966080000.0, 1985740800.0, 2005401600.0, 2025062400.0, 2044723200.0, 2064384000.0, 2084044800.0, 2103705600.0, 2123366400.0, 2143027200.0, 2162688000.0, 2182348800.0, 2202009600.0, 2221670400.0, 2241331200.0, 2260992000.0, 2280652800.0, 2300313600.0, 2319974400.0, 2339635200.0, 2359296000.0, 2378956800.0, 2398617600.0, 2418278400.0, 2437939200.0, 2457600000.0, 2477260800.0, 2496921600.0, 2516582400.0, 2536243200.0, 2555904000.0, 2575564800.0, 2595225600.0, 2614886400.0, 2634547200.0, 2654208000.0, 2673868800.0, 2693529600.0, 2713190400.0, 2732851200.0, 2752512000.0, 2772172800.0, 2791833600.0, 2811494400.0, 2831155200.0, 2850816000.0, 2870476800.0, 2890137600.0, 2909798400.0, 2929459200.0, 2949120000.0, 2968780800.0, 2988441600.0, 3008102400.0, 3027763200.0, 3047424000.0, 3067084800.0, 3086745600.0, 3106406400.0, 3126067200.0, 3145728000.0, 3165388800.0, 3185049600.0, 3204710400.0, 3224371200.0, 3244032000.0, 3263692800.0, 3283353600.0, 3303014400.0, 3322675200.0, 3342336000.0, 3361996800.0, 3381657600.0, 3401318400.0, 3420979200.0, 3440640000.0, 3460300800.0, 3479961600.0, 3499622400.0, 3519283200.0, 3538944000.0, 3558604800.0, 3578265600.0, 3597926400.0, 3617587200.0, 3637248000.0, 3656908800.0, 3676569600.0, 3696230400.0, 3715891200.0, 3735552000.0, 3755212800.0, 3774873600.0, 3794534400.0, 3814195200.0, 3833856000.0, 3853516800.0, 3873177600.0, 3892838400.0, 3912499200.0, 3932160000.0, 3951820800.0, 3971481600.0, 3991142400.0, 4010803200.0, 4030464000.0, 4050124800.0, 4069785600.0, 4089446400.0, 4109107200.0, 4128768000.0, 4148428800.0, 4168089600.0, 4187750400.0, 4207411200.0, 4227072000.0, 4246732800.0, 4266393600.0, 4286054400.0, 4305715200.0, 4325376000.0, 4345036800.0, 4364697600.0, 4384358400.0, 4404019200.0, 4423680000.0, 4443340800.0, 4463001600.0, 4482662400.0, 4502323200.0, 4521984000.0, 4541644800.0, 4561305600.0, 4580966400.0, 4600627200.0, 4620288000.0, 4639948800.0, 4659609600.0, 4679270400.0, 4698931200.0, 4718592000.0, 4738252800.0, 4757913600.0, 4777574400.0, 4797235200.0, 4816896000.0, 4836556800.0, 4856217600.0, 4875878400.0, 4895539200.0, 4915200000.0, 4934860800.0, 4954521600.0, 4974182400.0, 4993843200.0, 5013504000.0, 5033164800.0, 5052825600.0, 5072486400.0, 5092147200.0, 5111808000.0, 5131468800.0, 5151129600.0, 5170790400.0, 5190451200.0, 5210112000.0, 5229772800.0, 5249433600.0, 5269094400.0, 5288755200.0, 5308416000.0, 5328076800.0, 5347737600.0, 5367398400.0, 5387059200.0, 5406720000.0, 5426380800.0, 5446041600.0, 5465702400.0, 5485363200.0, 5505024000.0, 5524684800.0, 5544345600.0, 5564006400.0, 5583667200.0, 5603328000.0, 5622988800.0, 5642649600.0, 5662310400.0, 5681971200.0, 5701632000.0, 5721292800.0, 5740953600.0, 5760614400.0, 5780275200.0, 5799936000.0, 5819596800.0, 5839257600.0, 5858918400.0, 5878579200.0, 5898240000.0};
+
+	for (int i = 0; i < 300; i++){
+		memory_ = static_cast<size_t>(memories[i]);
+		prepare_p_blocks();
+        printf("memory_ is %zu Mib num_blocks_ is %zu\n", memory_ * 4 * 8L / (3* 1024L * 1024L) ,num_blocks_ );
+	}
+	
+	
+
 //	printf("%p\n", (void *) c);
 // determine the largest shell size
 //	for (size_t shell_iter = 0; shell_iter < Q_shells_ ; shell_iter++ ) {
@@ -449,7 +459,7 @@ void DirectDFJK::sparsity_prep_pQq(){
 		}
 		schwarz_dense_funcs_[shell_it_out] = count;
 	}
-
+    printf("finished sparsity prep\n");
 }
 
 // calculates a block of AO's then conducts the proper contractions to get them
@@ -458,8 +468,8 @@ void DirectDFJK::sparsity_prep_pQq(){
 void DirectDFJK::compute_JK() {
 	BB_ = false;
 	if ( pQq_ ) {
-    	pQp();
-		//pQp_sparse();
+//    	pQp();
+		pQp_sparse();
 	//build_jk_CC_pQq_blocks();
 	}  else {
 
@@ -624,15 +634,18 @@ void DirectDFJK::prepare_p_blocks() {
 	size_t current_costs = 0;
 	// block max functions
 	size_t bmf = 0;
-	// atomic charges float
-	double charges_f;
-	// atomic charges integer
-	size_t charges_z;
 
 	size_t block_size = 0;
 	size_t shell_funcs;
     size_t biggest_shell = 0;
-    
+
+	// one of two things. Either nelectron/2 + 1 or C_left_ao->ncol()
+	size_t charges_z;
+
+	if (C_left_ao_.size() == 0) {
+	// atomic charges float
+	double charges_f;
+
 /*	for (size_t func_it = 0; func_it < schwarz_func_ints_.size(); func_it++) {
 		sparse_fpf_ += schwarz_func_ints_[func_it];
 	}	*/
@@ -654,22 +667,24 @@ void DirectDFJK::prepare_p_blocks() {
                                                                    
 	charges_z = static_cast<size_t>(charges_f);
 	++charges_z;
-
+	} else {
+		charges_z = C_left_ao_[0]->ncol();
+	}
 //
 // D_ao_ and D_
-	current_costs += 3*sizeof(size_t)*nbf_*nbf_;
+	current_costs += 3*nbf_*nbf_;
 // Coulomb Metrics
-	current_costs += 2*sizeof(double)*naux_*naux_;
-	current_costs += 4*sizeof(double)*nbf_*nbf_;
+	current_costs += 2*naux_*naux_;
+	current_costs += 4*nbf_*nbf_;
 // adding in costs for U and A
-    current_costs += sizeof(double)*biggest_shell*naux_*charges_z;
-    current_costs += sizeof(double)*biggest_shell*naux_*charges_z;
+    current_costs += biggest_shell*naux_*charges_z;
+    current_costs += biggest_shell*naux_*charges_z;
 
-	if ( memory_ - current_costs > memory_) {
-		std::stringstream error_message;
-		error_message << "DirectDFJK: not enough memory for overhead! Overhead requires " << current_costs * 8 / (1024*1024) << " [MiB].";
-		throw PSIEXCEPTION(error_message.str().c_str());
-	}
+//	if ( memory_ - current_costs > memory_) {
+//		std::stringstream error_message;
+//		error_message << "DirectDFJK: not enough memory for overhead! Overhead requires " << current_costs * 8 / (1024*1024) << " [MiB].";
+//		throw PSIEXCEPTION(error_message.str().c_str());
+//	}
    
 	Shell_starts_.push_back(0);
     
@@ -680,7 +695,7 @@ void DirectDFJK::prepare_p_blocks() {
 //   the number of tensors with dimension occ. The extra 3 is a massive amount of 
 //   memory that should cover the overhead from the reast of the calculation.
 //   charges_z also includes a fudge factor
-		if (  (block_size + shell_funcs + 2) * naux_ * ( 2*charges_z ) * sizeof(double) >  memory_ - current_costs ){
+		if (  (block_size + shell_funcs + 2) * naux_ * ( 2*charges_z )  >  memory_ - current_costs ){
 			Block_funcs_.push_back(block_size);
 			block_size = shell_funcs;
 			Shell_stops_.push_back(shell_iter - 1);
@@ -1512,27 +1527,37 @@ void DirectDFJK::pQp_sparse(){
 	outfile->Printf("num_blocks_ is %zu\n", num_blocks_);
 
 	X_Block_sparse(first_char, true, 0, pruned_c, pruned_d, a, xo, u, v, pruned_j, eri);
+timer_on("DDF pQq big K DGEMM");
 	C_DGEMM('N', 'T', Block_funcs_[0], Block_funcs_[0], naux_*nocc, 1.0, xo, naux_*nocc, xo, naux_*nocc, 1.0, k, nbf_);
+timer_off("DDF pQq big K DGEMM");
 	for (size_t xo_iter = 0; xo_iter < num_blocks_ - 1 ; xo_iter++){
 		for (size_t xn_iter = 1; xn_iter < num_blocks_ - xo_iter; xn_iter++){
 			if ( xo_iter == 0 && xn_iter != num_blocks_ - 1) {
 				X_Block_sparse('V', true, xn_iter, pruned_c, pruned_d, a, xn, u, v, pruned_j, eri);
 				xn_ind = xn_iter;
+timer_on("DDF pQq big K DGEMM");
 				C_DGEMM('N', 'T', Block_funcs_[xn_ind], Block_funcs_[xn_ind], naux_*nocc, 1.0, xn, naux_*nocc, xn, naux_*nocc, 1.0, k + k_disps_[xn_ind][xn_ind], nbf_ );
 				C_DGEMM('N', 'T', Block_funcs_[xo_ind], Block_funcs_[xn_ind], naux_*nocc, 1.0, xo, naux_*nocc, xn, naux_*nocc, 1.0, k + k_disps_[xo_ind][xn_ind], nbf_ );
+timer_off("DDF pQq big K DGEMM");
 			} else if (xo_iter == 0 && xn_iter == num_blocks_ - 1) {
 				X_Block_sparse('B', true, xn_iter, pruned_c, pruned_d, a, xn, u, v, pruned_j, eri);
 				xn_ind = xn_iter;
+timer_on("DDF pQq big K DGEMM");
 				C_DGEMM('N', 'T', Block_funcs_[xn_ind], Block_funcs_[xn_ind], naux_*nocc, 1.0, xn, naux_*nocc, xn, naux_*nocc, 1.0, k + k_disps_[xn_ind][xn_ind], nbf_);
 				C_DGEMM('N', 'T', Block_funcs_[xo_ind], Block_funcs_[xn_ind], naux_*nocc, 1.0, xo, naux_*nocc, xn, naux_*nocc, 1.0, k + k_disps_[xo_ind][xn_ind], nbf_ );
+timer_off("DDF pQq big K DGEMM");
 			} else if ( xo_iter == 1 ) {
 				X_Block_sparse('P', true, xn_iter, pruned_c, pruned_d, a, xn, u, v, pruned_j, eri);
 				xn_ind = xn_iter;
+timer_on("DDF pQq big K DGEMM");
 				C_DGEMM('N', 'T', Block_funcs_[xn_ind], Block_funcs_[xo_ind], naux_*nocc, 1.0, xn, naux_*nocc, xo, naux_*nocc, 1.0, k + k_disps_[xn_ind][xo_ind], nbf_);
+timer_off("DDF pQq big K DGEMM");
 			} else {
 				X_Block_sparse('N', true, xn_iter, pruned_c, pruned_d, a, xn, u, nullptr, nullptr, eri);
 				xn_ind = xn_iter;
+timer_on("DDF pQq big K DGEMM");
 				C_DGEMM('N', 'T', Block_funcs_[xn_ind], Block_funcs_[xo_ind], naux_*nocc, 1.0, xn, naux_*nocc, xo, naux_*nocc, 0.0, k + k_disps_[xn_ind][xo_ind], nbf_);
+timer_off("DDF pQq big K DGEMM");
 			}
 		}
 		xh = xn;
@@ -1656,49 +1681,67 @@ void DirectDFJK::X_Block_sparse( char coul_work, bool compute_k, size_t block, d
 	switch (coul_work) {
 		case 'N':
 			for (size_t shell_iter = Shell_starts_[block]; shell_iter <= Shell_stops_[block]; shell_iter++) {
+timer_on("DDF AO_SPARSE");
 	compute_sparse_AO_block_p_pQq(shell_iter, ao_block, eri);
+timer_off("DDF AO_SPARSE");
 				if (compute_k) {
+timer_on("DDF pQq prune_c");
 					prune_c( shell_iter, nocc, pruned_c, c );
+timer_off("DDF pQq prune_c");
+timer_on("DDF pQq small K DGEMM");
 					C_DGEMM('N', 'N', primary_->shell(shell_iter).nfunction()*naux_, nocc, schwarz_dense_funcs_[shell_iter], 1.0, ao_block, schwarz_dense_funcs_[shell_iter], pruned_c, nocc, 0.0, u, nocc);
 					for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++){
 						C_DGEMM( 'N', 'N', naux_, nocc, naux_, 1.0, met_m_0_5, naux_, u + func_it * naux_*nocc, nocc,  0.0, x + (primary_->shell(shell_iter).function_index() - primary_->shell(Shell_starts_[block]).function_index() + func_it)* naux_*nocc, nocc);
 					}
+timer_off("DDF pQq small K DGEMM");
 				}
 			}
 			break;
 		case 'V':
 			for (size_t shell_iter = Shell_starts_[block]; shell_iter <= Shell_stops_[block]; shell_iter++){
 				//compute ao blocks
+timer_on("DDF AO_SPARSE");
 	compute_sparse_AO_block_p_pQq(shell_iter, ao_block , eri);
+timer_off("DDF AO_SPARSE");
 				for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++) {
 					prune_d( shell_iter, pruned_d, d + nbf_ * (func_it + primary_->shell(shell_iter).function_index()) );
 // Form V for Coulomb Matrix construction
 					C_DGEMV( 'N', (int) naux_, (int) schwarz_dense_funcs_[shell_iter], 1.0, ao_block + func_it*naux_*schwarz_dense_funcs_[shell_iter], schwarz_dense_funcs_[shell_iter], pruned_d, 1, 1.0, coulomb_vector, 1 );
 				}
 				if (compute_k) {
+timer_on("DDF pQq prune_c");
 					prune_c( shell_iter, nocc, pruned_c, c );
+timer_off("DDF pQq prune_c");
 // Form U for Exchange Matrix construction
+timer_on("DDF pQq small K DGEMM");
 					C_DGEMM('N', 'N', primary_->shell(shell_iter).nfunction()*naux_, nocc, schwarz_dense_funcs_[shell_iter], 1.0, ao_block, schwarz_dense_funcs_[shell_iter], pruned_c, nocc, 0.0, u, nocc);
 // Contract this u into the corresponding portion of x
 					for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++){
 						C_DGEMM( 'N', 'N', naux_, nocc, naux_, 1.0, met_m_0_5, naux_, u + func_it * naux_*nocc, nocc,  0.0, x + (primary_->shell(shell_iter).function_index() - primary_->shell(Shell_starts_[block]).function_index() + func_it)* naux_*nocc, nocc);
 					}
+timer_off("DDF pQq small K DGEMM");
 				}
 			}
 			break;
 		case 'P':
 			for (size_t shell_iter = Shell_starts_[block]; shell_iter <= Shell_stops_[block]; shell_iter++) {
+timer_on("DDF AO_SPARSE");
 	compute_sparse_AO_block_p_pQq(shell_iter, ao_block, eri);
+timer_off("DDF AO_SPARSE");
 				for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++) {
 					C_DGEMV('T', (int) naux_, (int) schwarz_dense_funcs_[shell_iter], 1.0, ao_block + func_it * naux_ * schwarz_dense_funcs_[shell_iter], schwarz_dense_funcs_[shell_iter], coulomb_vector, 1, 0.0, pruned_j, 1 );
 					unprune_J( shell_iter, j + nbf_ * (primary_->shell(shell_iter).function_index() + func_it), pruned_j);
 				}
 				if (compute_k) {
+timer_on("DDF pQq prune_c");
 					prune_c( shell_iter, nocc, pruned_c, c );
+timer_off("DDF pQq prune_c");
+timer_on("DDF pQq small K DGEMM");
 					C_DGEMM('N', 'N', primary_->shell(shell_iter).nfunction()*naux_, nocc, schwarz_dense_funcs_[shell_iter], 1.0, ao_block, schwarz_dense_funcs_[shell_iter], pruned_c, nocc, 0.0, u, nocc);
 					for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++){
 						C_DGEMM( 'N', 'N', naux_, nocc, naux_, 1.0, met_m_0_5, naux_, u + func_it * naux_*nocc, nocc,  0.0, x + (primary_->shell(shell_iter).function_index() - primary_->shell(Shell_starts_[block]).function_index() + func_it)* naux_*nocc, nocc);
 					}
+timer_off("DDF pQq small K DGEMM");
 				}
 			}
 			break;
@@ -1706,11 +1749,21 @@ void DirectDFJK::X_Block_sparse( char coul_work, bool compute_k, size_t block, d
 			double* metp = &CMPQ_LU_.front();
             int* pert = &PERMUTE_.front();
 			for (size_t shell_iter = Shell_starts_[block]; shell_iter <= Shell_stops_[block]; shell_iter++) {
+timer_on("DDF pQq prune_c");
 				prune_c( shell_iter, nocc, pruned_c, c );
+timer_off("DDF pQq prune_c");
+timer_on("DDF AO_SPARSE");
     compute_sparse_AO_block_p_pQq(shell_iter, ao_block, eri);
-				C_DGEMM( 'N', 'N', primary_->shell(shell_iter).nfunction()*naux_, nocc, schwarz_dense_funcs_[shell_iter], 1.0, ao_block, schwarz_dense_funcs_[shell_iter], pruned_c, nocc, 0.0, u, nocc );
+timer_off("DDF AO_SPARSE");
+				if (compute_k) {
+timer_on("DDF pQq small K DGEMM");
+					C_DGEMM( 'N', 'N', primary_->shell(shell_iter).nfunction()*naux_, nocc, schwarz_dense_funcs_[shell_iter], 1.0, ao_block, schwarz_dense_funcs_[shell_iter], pruned_c, nocc, 0.0, u, nocc );
+					for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++ ){
+						C_DGEMM( 'N', 'N', naux_, nocc, naux_, 1.0, met_m_0_5, naux_, u + func_it * naux_*nocc, nocc,  0.0, x + (primary_->shell(shell_iter).function_index() - primary_->shell(Shell_starts_[block]).function_index() + func_it)* naux_*nocc, nocc);
+					}
+timer_off("DDF pQq small K DGEMM");
+				}
 				for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++ ){
-					C_DGEMM( 'N', 'N', naux_, nocc, naux_, 1.0, met_m_0_5, naux_, u + func_it * naux_*nocc, nocc,  0.0, x + (primary_->shell(shell_iter).function_index() - primary_->shell(Shell_starts_[block]).function_index() + func_it)* naux_*nocc, nocc);
 					prune_d( shell_iter, pruned_d, d + nbf_ * (func_it + primary_->shell(shell_iter).function_index()) );
 					C_DGEMV( 'N', naux_, schwarz_dense_funcs_[shell_iter], 1.0, ao_block +func_it*naux_*schwarz_dense_funcs_[shell_iter], schwarz_dense_funcs_[shell_iter], pruned_d, 1, 1.0, coulomb_vector, 1);
 				}
@@ -1719,7 +1772,9 @@ void DirectDFJK::X_Block_sparse( char coul_work, bool compute_k, size_t block, d
 
 			C_DGETRS( 'N', naux_, 1, metp, naux_, pert, coulomb_vector, naux_);
 			for (size_t shell_iter = Shell_starts_[block]; shell_iter <= Shell_stops_[block]; shell_iter++) {
+timer_on("DDF AO_SPARSE");
             	compute_sparse_AO_block_p_pQq(shell_iter, ao_block, eri);
+timer_off("DDF AO_SPARSE");
 				for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++){
 					C_DGEMV( 'T', (int) naux_, (int) schwarz_dense_funcs_[shell_iter], 1.0, ao_block + func_it * naux_ * schwarz_dense_funcs_[shell_iter], schwarz_dense_funcs_[shell_iter], coulomb_vector, 1, 0.0, pruned_j, 1 );
 					unprune_J( shell_iter, j + nbf_ * (primary_->shell(shell_iter).function_index() + func_it), pruned_j);
