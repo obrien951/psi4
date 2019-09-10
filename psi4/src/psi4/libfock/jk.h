@@ -1067,7 +1067,7 @@ class PSI_API MemDFJK : public JK {
 class PSI_API DirectDFJK : public JK {
     protected:
 	// uses pQq storage for integrals
-	bool pQq_ = true;
+	bool pQq_ = false;
 	bool Qpq_ = !pQq_;
 	bool Qpq_store_sparse_ = false;
 
