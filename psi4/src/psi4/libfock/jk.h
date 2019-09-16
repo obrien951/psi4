@@ -1059,7 +1059,7 @@ class PSI_API MemDFJK : public JK {
 class PSI_API DirectDFJK : public JK {
     protected:
 	// uses pQq storage for integrals
-	bool pQq_ = false;
+	bool pQq_ = true;
 	bool Qpq_ = !pQq_;
 	bool Qpq_store_sparse_ = false;
 
@@ -1245,10 +1245,14 @@ class PSI_API DirectDFJK : public JK {
     void X_Block( char coul_work, bool compute_k, size_t block, double* ao_block, double* x, double* u, double* coulomb_vector, std::vector<std::shared_ptr<TwoBodyAOInt>> eri);
 
 	void X_Block_sparse(char coul_work, bool compute_k, size_t block, double* pruned_c, double* pruned_d, double* ao_block, double* x, double* u, double* coulomb_vector, double* pruned_j, std::vector<std::shared_ptr<TwoBodyAOInt>> eri);
+
+	void X_Block_sparse_DGEMM_split(char coul_work, bool compute_k, size_t block, double* pruned_c, double* pruned_d, double* ao_block, double* x, double* u, double* coulomb_vector, double* pruned_j, std::vector<std::shared_ptr<TwoBodyAOInt>> eri);
     
     void pQp();
 
 	void pQp_sparse();
+
+	void pQp_sparse_DGEMM_split();
 
 	void set_uhf(std::string uhf) { if (uhf == "UHF") uhf_ = true; }
 	//prepares the Density matrix if C* == C
