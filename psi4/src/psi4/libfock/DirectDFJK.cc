@@ -2248,14 +2248,7 @@ void DirectDFJK::X_Block_sparse( char coul_work, bool compute_k, size_t block, d
 					unprune_J( shell_iter, j + nbf_ * (primary_->shell(shell_iter).function_index() + func_it), pruned_j);
 				}
 				if (compute_k) {
-<<<<<<< HEAD
 					prune_c( shell_iter, nocc, pruned_c, c );
-=======
-timer_on("DDF pQq prune_c");
-					prune_c( shell_iter, nocc, pruned_c, c );
-timer_off("DDF pQq prune_c");
-timer_on("DDF pQq small K DGEMM");
->>>>>>> 31ee3248ec396155c527e098a0bbeb6e6c09ac99
 					C_DGEMM('N', 'N', primary_->shell(shell_iter).nfunction()*naux_, nocc, schwarz_dense_funcs_[shell_iter], 1.0, ao_block, schwarz_dense_funcs_[shell_iter], pruned_c, nocc, 0.0, u, nocc);
 					for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++){
 						C_DGEMM( 'N', 'N', naux_, nocc, naux_, 1.0, met_m_0_5, naux_, u + func_it * naux_*nocc, nocc,  0.0, x + (primary_->shell(shell_iter).function_index() - primary_->shell(Shell_starts_[block]).function_index() + func_it)* naux_*nocc, nocc);
