@@ -600,11 +600,7 @@ void DirectDFJK::compute_JK() {
 		}
 
 	}
-<<<<<<< HEAD
 	printf("finishing compute_JK\n");
-=======
-
->>>>>>> 31ee3248ec396155c527e098a0bbeb6e6c09ac99
 }
 
 void DirectDFJK::postiterations() {
