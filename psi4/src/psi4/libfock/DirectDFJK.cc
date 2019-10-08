@@ -544,29 +544,16 @@ void DirectDFJK::sparsity_prep_pQq(){
 		}
 	}
 
-<<<<<<< HEAD
 	tolerance_ = cutoff_ * cutoff_ / global_max_int;
-=======
-
-	double tolerance = cutoff_ * cutoff_ / global_max_int;
->>>>>>> 31ee3248ec396155c527e098a0bbeb6e6c09ac99
 	schwarz_shell_mask_pQq_.resize(p_shells_);
 	schwarz_func_starts_pQq_.resize(p_shells_);
 	schwarz_dense_funcs_.resize(p_shells_);
 	size_t count;
 
-<<<<<<< HEAD
 	for ( size_t shell_it_out = 0U; shell_it_out < p_shells_; shell_it_out++ ) {
 		count = 0U;
 		for (size_t shell_it_in = 0U; shell_it_in < p_shells_; shell_it_in++ ) {
 			if(shel_maxes[shell_it_out*p_shells_ + shell_it_in] >  tolerance_) {
-=======
-
-	for ( size_t shell_it_out = 0U; shell_it_out < p_shells_; shell_it_out++ ) {
-		count = 0U;
-		for (size_t shell_it_in = 0U; shell_it_in < p_shells_; shell_it_in++ ) {
-			if(shel_maxes[shell_it_out*p_shells_ + shell_it_in] >  tolerance) {
->>>>>>> 31ee3248ec396155c527e098a0bbeb6e6c09ac99
 				schwarz_shell_mask_pQq_[shell_it_out].push_back(shell_it_in);
 				schwarz_func_starts_pQq_[shell_it_out].push_back(count);
 				count += primary_->shell(shell_it_in).nfunction();
