@@ -1122,7 +1122,6 @@ void DirectDFJK::compute_AO_block_Qpq( size_t start_Q, size_t stop_Q, double* ao
 	timer_off("DDF AO_CONST");
 }
 
-<<<<<<< HEAD
 void DirectDFJK::compute_AO_block_p_pQq_mn_sparse_set_mP( size_t shell, double* ao_block, std::vector<std::shared_ptr<TwoBodyAOInt>> eri ) {
 	int procs = 1;
 #ifdef _OPENMP
@@ -1312,11 +1311,6 @@ eri[rank]->compute_shell( mP_shel_map_pQq_[shell][ShellP], 0, shell, schwarz_she
 	printf("exiting compute_AO_block_p_pQq_mn_mP_sparse\n");
 }
 
-
-
-
-=======
->>>>>>> 31ee3248ec396155c527e098a0bbeb6e6c09ac99
 // The parameter ind says at which index of the D_ao_ vector we're going to
 //   store our new D_ao_.
 void DirectDFJK::compute_D_ao(size_t ind) {
