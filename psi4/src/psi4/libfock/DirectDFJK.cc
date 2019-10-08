@@ -2230,16 +2230,8 @@ void DirectDFJK::X_Block_sparse( char coul_work, bool compute_k, size_t block, d
 					C_DGEMV( 'N', (int) naux_, (int) schwarz_dense_funcs_[shell_iter], 1.0, ao_block + func_it*naux_*schwarz_dense_funcs_[shell_iter], schwarz_dense_funcs_[shell_iter], pruned_d, 1, 1.0, coulomb_vector, 1 );
 				}
 				if (compute_k) {
-<<<<<<< HEAD
 					prune_c( shell_iter, nocc, pruned_c, c );
 // Form U for Exchange Matrix construction
-=======
-timer_on("DDF pQq prune_c");
-					prune_c( shell_iter, nocc, pruned_c, c );
-timer_off("DDF pQq prune_c");
-// Form U for Exchange Matrix construction
-timer_on("DDF pQq small K DGEMM");
->>>>>>> 31ee3248ec396155c527e098a0bbeb6e6c09ac99
 					C_DGEMM('N', 'N', primary_->shell(shell_iter).nfunction()*naux_, nocc, schwarz_dense_funcs_[shell_iter], 1.0, ao_block, schwarz_dense_funcs_[shell_iter], pruned_c, nocc, 0.0, u, nocc);
 // Contract this u into the corresponding portion of x
 					for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++){
