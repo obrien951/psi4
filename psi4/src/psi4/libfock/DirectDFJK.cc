@@ -2287,7 +2287,6 @@ void DirectDFJK::X_Block_sparse( char coul_work, bool compute_k, size_t block, d
     }
 }
 
-<<<<<<< HEAD
 void DirectDFJK::X_Block_mn_sparse_set_mP(bool with_contraction, bool compute_k, size_t block, double* pruned_c, double* pruned_d, double* ao_block, double* x, double* u, double* coulomb_vector, double* pruned_coulomb_vector, double* pruned_j, double* pruned_cm, std::vector<std::shared_ptr<TwoBodyAOInt>> eri ){
 
     size_t nocc = C_left_ao_[0]->ncol();
@@ -2455,8 +2454,6 @@ void DirectDFJK::X_Block_mn_mP_sparse(char coul_work, bool compute_k, size_t blo
     }
 
 }
-=======
->>>>>>> 31ee3248ec396155c527e098a0bbeb6e6c09ac99
 
 void DirectDFJK::prune_c( size_t &mu, size_t nocc, double* pruned_c, double* raw_c ) {
 	int procs = 1;
