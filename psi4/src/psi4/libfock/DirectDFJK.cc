@@ -2267,10 +2267,6 @@ void DirectDFJK::X_Block_sparse( char coul_work, bool compute_k, size_t block, d
 					for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++ ){
 						C_DGEMM( 'N', 'N', naux_, nocc, naux_, 1.0, met_m_0_5, naux_, u + func_it * naux_*nocc, nocc,  0.0, x + (primary_->shell(shell_iter).function_index() - primary_->shell(Shell_starts_[block]).function_index() + func_it)* naux_*nocc, nocc);
 					}
-<<<<<<< HEAD
-=======
-timer_off("DDF pQq small K DGEMM");
->>>>>>> 31ee3248ec396155c527e098a0bbeb6e6c09ac99
 				}
 				for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++ ){
 					prune_d( shell_iter, pruned_d, d + nbf_ * (func_it + primary_->shell(shell_iter).function_index()) );
@@ -2281,13 +2277,7 @@ timer_off("DDF pQq small K DGEMM");
 
 			C_DGETRS( 'N', naux_, 1, metp, naux_, pert, coulomb_vector, naux_);
 			for (size_t shell_iter = Shell_starts_[block]; shell_iter <= Shell_stops_[block]; shell_iter++) {
-<<<<<<< HEAD
             	compute_sparse_AO_block_p_pQq(shell_iter, ao_block, eri);
-=======
-timer_on("DDF AO_SPARSE");
-            	compute_sparse_AO_block_p_pQq(shell_iter, ao_block, eri);
-timer_off("DDF AO_SPARSE");
->>>>>>> 31ee3248ec396155c527e098a0bbeb6e6c09ac99
 				for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++){
 					C_DGEMV( 'T', (int) naux_, (int) schwarz_dense_funcs_[shell_iter], 1.0, ao_block + func_it * naux_ * schwarz_dense_funcs_[shell_iter], schwarz_dense_funcs_[shell_iter], coulomb_vector, 1, 0.0, pruned_j, 1 );
 					unprune_J( shell_iter, j + nbf_ * (primary_->shell(shell_iter).function_index() + func_it), pruned_j);
