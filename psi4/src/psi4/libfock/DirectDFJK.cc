@@ -428,20 +428,12 @@ void DirectDFJK::print_header() const {
 void DirectDFJK::preiterations() {
 	printf("Entered preiterations()\n");
 
-<<<<<<< HEAD
-	mP_func_map_pQq_.resize( Q_shells_ );
-	mP_shel_map_pQq_.resize( Q_shells_ );
-
-=======
->>>>>>> 31ee3248ec396155c527e098a0bbeb6e6c09ac99
 	// set_df_ints_num_threads(omp_nthread_);
 	sparsity_prep_pQq();
 
 	//prepare blocks tells us at which indices we start and stop each block.
 	// I'm making it a separate function because I've seen evidence that 
 	// DFHelper does some resizing, and I want to be able to match that.
-
-<<<<<<< HEAD
 //dirty
 	biggest_shell_ = 0;
 	for (int i = 0; i < primary_->nshell(); i++){
@@ -451,8 +443,6 @@ void DirectDFJK::preiterations() {
 	}
 //end dirty
 
-=======
->>>>>>> 31ee3248ec396155c527e098a0bbeb6e6c09ac99
 	// prepares the coulomb metric. Of course, our calculations depend on the
 	//  inverse of the coulomb metric and the (-0.5) power of the metric, so
 	//  we will prepare those immediately afterwards
