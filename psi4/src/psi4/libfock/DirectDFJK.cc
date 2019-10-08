@@ -1768,7 +1768,6 @@ void DirectDFJK::pQp_sparse(){
 #endif
 	eri[rank] = std::shared_ptr<TwoBodyAOInt>(rifactory->eri());
 	}
-<<<<<<< HEAD
 
 	int nocc = C_left_ao_[0]->ncol();
 
@@ -1777,35 +1776,9 @@ void DirectDFJK::pQp_sparse(){
 	
 	std::unique_ptr<double[]> A(new double[ biggest_shell_ * naux_ * nbf_ ]);
 	std::unique_ptr<double[]> U(new double[biggest_shell_ * naux_*nocc]);
-=======
-	//dirty
-	size_t biggest_shell = 0;
-
-	for (int i = 0; i < primary_->nshell(); i++){
-		if (primary_->shell(i).nfunction() > biggest_shell) {
-			biggest_shell = primary_->shell(i).nfunction();
-		}
-	}
-	biggest_shell_ = biggest_shell;
-//end dirty
-	int nocc = C_left_ao_[0]->ncol();
-
-
-	double* j = J_ao_[0]->pointer(0)[0];
-	double* k = K_ao_[0]->pointer(0)[0];
-	
-	std::unique_ptr<double[]> A(new double[biggest_shell*naux_*nbf_]);
-	std::unique_ptr<double[]> U(new double[1U]);
-	if (BB_) {
-		U.reset(new double[biggest_shell*naux_*nbf_]);
-	} else {
-		U.reset(new double[biggest_shell*naux_*nocc]);
-	}
->>>>>>> 31ee3248ec396155c527e098a0bbeb6e6c09ac99
 	std::unique_ptr<double[]> XN(new double[biggest_block_/nbf_*nocc]);
 	std::unique_ptr<double[]> XO(new double[biggest_block_/nbf_*nocc]);
 	std::unique_ptr<double[]> V(new double[naux_]);
-
 
 	double* a = A.get();
 	double* u = U.get();
