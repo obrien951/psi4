@@ -2223,13 +2223,7 @@ void DirectDFJK::X_Block_sparse( char coul_work, bool compute_k, size_t block, d
 		case 'V':
 			for (size_t shell_iter = Shell_starts_[block]; shell_iter <= Shell_stops_[block]; shell_iter++){
 				//compute ao blocks
-<<<<<<< HEAD
 	compute_sparse_AO_block_p_pQq(shell_iter, ao_block , eri);
-=======
-timer_on("DDF AO_SPARSE");
-	compute_sparse_AO_block_p_pQq(shell_iter, ao_block , eri);
-timer_off("DDF AO_SPARSE");
->>>>>>> 31ee3248ec396155c527e098a0bbeb6e6c09ac99
 				for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++) {
 					prune_d( shell_iter, pruned_d, d + nbf_ * (func_it + primary_->shell(shell_iter).function_index()) );
 // Form V for Coulomb Matrix construction
