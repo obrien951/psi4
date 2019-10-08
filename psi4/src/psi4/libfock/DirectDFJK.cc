@@ -2126,42 +2126,6 @@ timer_on("DDF pQq small K DGEMM");
 			C_DGEMM( 'N', 'N', naux_, nocc, naux_, 1.0, met_m_0_5, naux_, u + func_it * naux_*nocc, nocc,  0.0, x + (primary_->shell(shell_iter).function_index() - primary_->shell(Shell_starts_[block]).function_index() + func_it)* naux_*nocc, nocc);
 		}
 timer_off("DDF pQq small K DGEMM");
-=======
-
-
-
-
-// Function that produces tensors for the final contraction
-//    of the exchange matrix build. The issue is that it may or may not
-//    have to construct one of various terms for the coulomb matrix.
-//    We handle this with a switch.
-// coul_work \in { 'V', 'P', 'B', 'N' }
-// 'V' means we compute a vector to be contracted against the coulomb Metric.
-void DirectDFJK::X_Block( char coul_work, bool compute_k, size_t block, double* ao_block, double* x, double* u, double* coulomb_vector, std::vector<std::shared_ptr<TwoBodyAOInt>> eri){
-
-	size_t nocc = C_left_ao_[0]->ncol();
-	double* c = C_left_ao_[0]->pointer()[0];
-	double* met_m_0_5 = get_metric_power(-0.5);
-	double* j = J_ao_[0]->pointer()[0];
-	double* d = D_ao_[0]->pointer()[0];
-
-	std::unique_ptr<int[]> IPIV(new int[naux_]);
-	int* ipiv = IPIV.get();
-		
-	switch (coul_work) {
-		case 'N':
-for (size_t shell_iter = Shell_starts_[block]; shell_iter <= Shell_stops_[block]; shell_iter++) {
-timer_on("DDF AO_CONST");
-	compute_dense_AO_block_p_pQq(shell_iter, ao_block, eri);
-timer_off("DDF AO_CONST");
-	if (compute_k) {
-timer_on("DDF pQq small K DGEMM");
-		C_DGEMM('N', 'N', primary_->shell(shell_iter).nfunction()*naux_, nocc, nbf_, 1.0, ao_block, nbf_, c, nocc, 0.0, u, nocc);
-		for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++){
-			C_DGEMM( 'N', 'N', naux_, nocc, naux_, 1.0, met_m_0_5, naux_, u + func_it * naux_*nocc, nocc,  0.0, x + (primary_->shell(shell_iter).function_index() - primary_->shell(Shell_starts_[block]).function_index() + func_it)* naux_*nocc, nocc);
-		}
-timer_off("DDF pQq small K DGEMM");
->>>>>>> 31ee3248ec396155c527e098a0bbeb6e6c09ac99
 	}
 }
 			break;
