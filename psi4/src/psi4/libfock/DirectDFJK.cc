@@ -568,7 +568,6 @@ void DirectDFJK::sparsity_prep_pQq(){
 //   where they need to go. I don't think it makes sense to have seperate J and
 //   K function calls as J and K are never fully built in a single function.
 void DirectDFJK::compute_JK() {
-<<<<<<< HEAD
 	printf("starting compute_JK \n");
 	BB_ = false;
 //printf("num blocks is %zu\n", num_blocks_);
@@ -580,29 +579,18 @@ void DirectDFJK::compute_JK() {
 //    	pQp();
 			//pQp_sparse();
 
-	if (nocc_last_ == C_left_ao_[0]->ncol() ) {
-		printf("about to start pQp_mn_mP_sparse()\n");
-		outfile->Printf("we're going to use mP sparsity as set\n");
-		pQp_mn_mP_sparse();
-		printf("just finished pQp_mn_mP_sparse()\n");
-	} else {
-		printf("about to start pQp_mn_sparse_set_mP()\n");
-		outfile->Printf("we're going to set mP sparsity\n");
-		pQp_mn_sparse_set_mP();
-		printf("just finished pQp_mn_sparse_set_mP()\n");
-	}
+		if (nocc_last_ == C_left_ao_[0]->ncol() ) {
+			printf("about to start pQp_mn_mP_sparse()\n");
+			outfile->Printf("we're going to use mP sparsity as set\n");
+			pQp_mn_mP_sparse();
+			printf("just finished pQp_mn_mP_sparse()\n");
+		} else {
+			printf("about to start pQp_mn_sparse_set_mP()\n");
+			outfile->Printf("we're going to set mP sparsity\n");
+			pQp_mn_sparse_set_mP();
+			printf("just finished pQp_mn_sparse_set_mP()\n");
+		}
 
-
-
-=======
-	BB_ = false;
-printf("num blocks is %zu\n", num_blocks_);
-	if ( pQq_ ) {
-//    	pQp();
-//      pQp_sparse();
-	  pQp_sparse_DGEMM_split();
-	//build_jk_CC_pQq_blocks();
->>>>>>> 31ee3248ec396155c527e098a0bbeb6e6c09ac99
 	}  else {
 
 		if (num_blocks_ == 1) {
