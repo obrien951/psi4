@@ -160,6 +160,25 @@ void DirectDFJK::pytemplate(){
 	}
 	fprintf(eri_ints,"\n");
 	fclose(eri_ints);
+
+
+
+	for ( int shell_P_it = 0; shell_P_it < auxiliary_->nshell(); shell_P_it++ ) {
+		for ( int shell_M_it = 0; shell_M_it < primary_->nshell(); shell_M_it++ ) {
+			for ( int shell_N_it = 0; shell_N_it < primary_->nshell(); shell_N_it++ ) {
+				
+			}
+		}
+	}
+
+
+
+	FILE * tic = fopen("/theoryfs2/ds/obrien/Debug/Psi4/eri_ints.txt","w");
+
+
+
+	fclose(tic);
+
 	
 //	int* five = (int*) malloc(sizeof(int));
 //	int* twenty_four = (int*) malloc(sizeof(int));
@@ -412,12 +431,24 @@ void DirectDFJK::print_header() const {
 void DirectDFJK::preiterations() {
 	printf("Entered preiterations()\n");
 
+	mP_func_map_pQq_.resize( Q_shells_ );
+	mP_shel_map_pQq_.resize( Q_shells_ );
+
 	// set_df_ints_num_threads(omp_nthread_);
 	sparsity_prep_pQq();
 
 	//prepare blocks tells us at which indices we start and stop each block.
 	// I'm making it a separate function because I've seen evidence that 
 	// DFHelper does some resizing, and I want to be able to match that.
+
+//dirty
+	biggest_shell_ = 0;
+	for (int i = 0; i < primary_->nshell(); i++){
+		if (primary_->shell(i).nfunction() > biggest_shell_) {
+			biggest_shell_ = primary_->shell(i).nfunction();
+		}
+	}
+//end dirty
 
 	// prepares the coulomb metric. Of course, our calculations depend on the
 	//  inverse of the coulomb metric and the (-0.5) power of the metric, so
@@ -436,6 +467,7 @@ void sparsity_prep_Qpq() { }
 
 void DirectDFJK::sparsity_prep_pQq(){
 	printf("started sparsity prep\n");
+
 	int procs = 1;
 #ifdef _OPENMP
 	procs = omp_nthread_;
@@ -520,18 +552,16 @@ void DirectDFJK::sparsity_prep_pQq(){
 		}
 	}
 
-
-	double tolerance = cutoff_ * cutoff_ / global_max_int;
+	tolerance_ = cutoff_ * cutoff_ / global_max_int;
 	schwarz_shell_mask_pQq_.resize(p_shells_);
 	schwarz_func_starts_pQq_.resize(p_shells_);
 	schwarz_dense_funcs_.resize(p_shells_);
 	size_t count;
 
-
 	for ( size_t shell_it_out = 0U; shell_it_out < p_shells_; shell_it_out++ ) {
 		count = 0U;
 		for (size_t shell_it_in = 0U; shell_it_in < p_shells_; shell_it_in++ ) {
-			if(shel_maxes[shell_it_out*p_shells_ + shell_it_in] >  tolerance) {
+			if(shel_maxes[shell_it_out*p_shells_ + shell_it_in] >  tolerance_) {
 				schwarz_shell_mask_pQq_[shell_it_out].push_back(shell_it_in);
 				schwarz_func_starts_pQq_[shell_it_out].push_back(count);
 				count += primary_->shell(shell_it_in).nfunction();
@@ -546,13 +576,31 @@ void DirectDFJK::sparsity_prep_pQq(){
 //   where they need to go. I don't think it makes sense to have seperate J and
 //   K function calls as J and K are never fully built in a single function.
 void DirectDFJK::compute_JK() {
+	printf("starting compute_JK \n");
 	BB_ = false;
-printf("num blocks is %zu\n", num_blocks_);
+//printf("num blocks is %zu\n", num_blocks_);
+//I'm leaving this commented out so that nobody tries to write this code back
+//  in. the number of blocks is caluclated with each hartree fock iteration.
+//  it's a short code that does it, so it doesn't need to be eliminated. However
+//  , it is necessary to have the correct block size for the SAD guess.
 	if ( pQq_ ) {
 //    	pQp();
-//      pQp_sparse();
-	  pQp_sparse_DGEMM_split();
-	//build_jk_CC_pQq_blocks();
+			//pQp_sparse();
+
+	if (nocc_last_ == C_left_ao_[0]->ncol() ) {
+		printf("about to start pQp_mn_mP_sparse()\n");
+		outfile->Printf("we're going to use mP sparsity as set\n");
+		pQp_mn_mP_sparse();
+		printf("just finished pQp_mn_mP_sparse()\n");
+	} else {
+		printf("about to start pQp_mn_sparse_set_mP()\n");
+		outfile->Printf("we're going to set mP sparsity\n");
+		pQp_mn_sparse_set_mP();
+		printf("just finished pQp_mn_sparse_set_mP()\n");
+	}
+
+
+
 	}  else {
 
 		if (num_blocks_ == 1) {
@@ -562,7 +610,7 @@ printf("num blocks is %zu\n", num_blocks_);
 		}
 
 	}
-
+	printf("finishing compute_JK\n");
 }
 
 void DirectDFJK::postiterations() {
@@ -1002,7 +1050,7 @@ void DirectDFJK::compute_sparse_AO_block_p_pQq( size_t shell, double* ao_block, 
 //   around. The memory in &ao_block will live in a unique pointer in the 
 //   module that wraps this function, and in this function, we'll just worry 
 //   about filling it with what belongs inside.
-void DirectDFJK::compute_AO_block_Qpq(size_t start_Q, size_t stop_Q, double* ao_block, std::vector<std::shared_ptr<TwoBodyAOInt>> eri){
+void DirectDFJK::compute_AO_block_Qpq( size_t start_Q, size_t stop_Q, double* ao_block, std::vector<std::shared_ptr<TwoBodyAOInt>> eri ){
 	int procs = 1;
 #ifdef _OPENMP
 	procs = omp_nthread_;
@@ -1083,6 +1131,198 @@ void DirectDFJK::compute_AO_block_Qpq(size_t start_Q, size_t stop_Q, double* ao_
 	}// Loop over aux shells 
 	timer_off("DDF AO_CONST");
 }
+
+void DirectDFJK::compute_AO_block_p_pQq_mn_sparse_set_mP( size_t shell, double* ao_block, std::vector<std::shared_ptr<TwoBodyAOInt>> eri ) {
+	int procs = 1;
+#ifdef _OPENMP
+	procs = omp_nthread_;
+#endif
+
+	std::unique_ptr<double[]> T_AO(new double[biggest_shell_* nbf_ * naux_]);
+	double * temp_ao = T_AO.get();
+
+	std::vector<const double*> buffer(procs);
+    std::vector<std::vector<bool>> colc(procs); 
+	std::vector<bool> shell_track(procs);
+
+#pragma omp parallel num_threads(procs)
+	{
+	int rank = 0;
+#ifdef _OPENMP
+	rank = omp_get_thread_num();
+#endif
+	buffer[rank] = eri[rank]->buffer();
+    colc[rank].resize(biggest_shell_);
+	}
+
+ // ERI indexing Variables
+ // Incides are done with romanization of greek letters \Mu -> M \Nu ->N
+  	size_t ShellP_start;
+    size_t ShellP_count;
+ 	size_t ShellM_start = primary_->shell(shell).function_index();
+ 	size_t ShellM_count = primary_->shell(shell).nfunction();
+ 	size_t ShellN_start;
+ 	size_t ShellN_count;
+ 	size_t Shell_ind_0;
+
+	printf("done initiating variables\n");
+	printf("about to calculate aos\n");
+
+	printf("%zu\n", Q_shells_);
+
+	for ( size_t ShellP = 0; ShellP < Q_shells_; ShellP++ ) {
+		printf("ShellP is %zu\n", ShellP);
+
+    	int rank = 0;
+#ifdef _OPENMP
+    	rank = omp_get_thread_num();
+#endif
+		ShellP_start = auxiliary_->shell(ShellP).function_index();
+		ShellP_count = auxiliary_->shell(ShellP).nfunction();
+//initialize terms used for mP sparsity
+//using a for loop as opposed to a parallel block because the outer 
+//        loop is parallelized
+        for (size_t i = 0; i < ShellP_count; i++) { colc[rank][i] = false; }
+
+		for ( size_t ShellN = 0; ShellN < schwarz_shell_mask_pQq_[shell].size(); ShellN++ ) {
+			ShellN_start = primary_->shell(ShellN).function_index();
+			ShellN_count = primary_->shell(ShellN).nfunction();
+            Shell_ind_0 = ShellN_count * ShellM_count;
+			eri[rank]->compute_shell(ShellP, 0, shell, schwarz_shell_mask_pQq_[shell][ShellN]);
+				for ( size_t intm = 0; intm < ShellM_count; intm++ ) {
+			for ( size_t intp = 0; intp < ShellP_count; intp++ ) {
+					for ( size_t intn = 0; intn < ShellN_count; intn++ ) {
+						temp_ao[ intm*naux_*schwarz_shell_mask_pQq_[shell].size() 
+                                + (intp + ShellP_start)*schwarz_shell_mask_pQq_[shell].size()
+                                + intn  ]
+                        =
+                        buffer[rank][ intp * Shell_ind_0
+                                    + intm * ShellN_count
+                                    + intn ];
+
+                        if ( buffer[rank][ intp * Shell_ind_0 + intm * ShellN_count + intn ] > tolerance_ ) { colc[rank][intp] = true; }
+					}
+				}
+			}
+		}
+// will need to sort the sparsity maps for functiosn and shells
+//     for tensor contractions
+        for ( size_t i = 0; i < ShellP_count; i++ ) { 
+            if (colc[rank][i]) { 
+                mP_func_map_pQq_[shell].push_back(ShellP_start + i);
+               	shell_track[rank] = true;
+            }
+        }
+		if ( shell_track[rank] ) {
+			mP_shel_map_pQq_[shell].push_back(ShellP);
+		}
+	}
+
+	printf("done calculating aos\n");
+
+    std::sort(mP_func_map_pQq_[shell].begin(), mP_func_map_pQq_[shell].end(), DirectDFJK::sztcmp );
+    std::sort(mP_shel_map_pQq_[shell].begin(), mP_shel_map_pQq_[shell].end(), DirectDFJK::sztcmp );
+
+	printf("done sorting\n");
+
+	size_t mP_size = mP_func_map_pQq_[shell].size();
+	size_t mn_size = schwarz_dense_funcs_[shell];
+	size_t nu_base;
+
+	printf("done setting pruning variables\n");
+
+for (int i = 0; i < mP_size; i++) {
+		printf("%zu \n",mP_func_map_pQq_[shell][i] );
+	}
+
+
+
+// We really want to get our clock-cycles' worth from
+//    this sparsity. we're going to repack the AOs for a sparse
+//    tensor contraction.
+#pragma omp parallel for num_threads(procs)
+	for (size_t mu_it = 0; mu_it < primary_->shell(shell).nfunction(); mu_it++ ) {
+		for ( size_t Q_it = 0; Q_it < mP_size; Q_it++ ) {
+			for (size_t nu_it = 0; nu_it < mn_size; nu_it++ ) {
+					ao_block[ mu_it * mP_size * mn_size
+							+ Q_it  * mn_size
+							+ nu_it ]
+							=
+					temp_ao [ mu_it * naux_ * mn_size
+							+ Q_it * mn_size 
+							+ nu_it];
+			}
+		}
+	}
+}
+
+void DirectDFJK::compute_AO_block_p_pQq_mn_mP_sparse( size_t shell, double* ao_block, std::vector<std::shared_ptr<TwoBodyAOInt>> eri ) {
+	printf("in compute_AO_block_p_pQq_mn_mP_sparse\n");
+
+	int procs = 1;
+#ifdef _OPENMP
+	procs = omp_nthread_;
+#endif
+
+	std::vector<const double*> buffer(procs);
+
+#pragma omp parallel num_threads(procs)
+	{
+	int rank = 0;
+#ifdef _OPENMP
+	rank = omp_get_thread_num();
+#endif
+	buffer[rank] = eri[rank]->buffer();
+	}
+
+ // ERI indexing Variables
+ // Incides are done with romanization of greek letters \Mu -> M \Nu ->N
+  	size_t ShellP_start;
+    size_t ShellP_count;
+ 	size_t ShellM_start = primary_->shell(shell).function_index();
+ 	size_t ShellM_count = primary_->shell(shell).nfunction();
+ 	size_t ShellN_start;
+ 	size_t ShellN_count;
+ 	size_t Shell_ind_0; 
+
+
+	for ( size_t ShellP = 0; ShellP < mP_shel_map_pQq_[shell].size(); ShellP++ ) {
+    	int rank = 0;
+#ifdef _OPENMP
+    	rank = omp_get_thread_num();
+#endif
+		ShellP_start = auxiliary_->shell(mP_shel_map_pQq_[shell][ShellP]).function_index();
+		ShellP_count = auxiliary_->shell(mP_shel_map_pQq_[shell][ShellP]).nfunction();
+//initialize terms used for mP sparsity
+//using a for loop as opposed to a parallel block because the outer 
+//        loop is parallelized
+
+		for ( size_t ShellN = 0; ShellN < schwarz_shell_mask_pQq_[shell].size(); ShellN++ ) {
+			ShellN_start = primary_->shell(ShellN).function_index();
+			ShellN_count = primary_->shell(ShellN).nfunction();
+            Shell_ind_0 = ShellN_count * ShellM_count;
+eri[rank]->compute_shell( mP_shel_map_pQq_[shell][ShellP], 0, shell, schwarz_shell_mask_pQq_[shell][ShellN]);
+				for ( size_t intm = 0; intm < ShellM_count; intm++ ) {
+			for ( size_t intp = 0; intp < ShellP_count; intp++ ) {
+					for ( size_t intn = 0; intn < ShellN_count; intn++ ) {
+						ao_block[ intm*naux_*schwarz_shell_mask_pQq_[shell].size() 
+                                + (intp + ShellP_start)*schwarz_shell_mask_pQq_[shell].size()
+                                + intn  ]
+                        =
+                        buffer[rank][ intp * Shell_ind_0
+                                    + intm * ShellN_count
+                                    + intn ];
+
+					}
+				}
+			}
+		}
+	}
+	printf("exiting compute_AO_block_p_pQq_mn_mP_sparse\n");
+}
+
+
+
 
 // The parameter ind says at which index of the D_ao_ vector we're going to
 //   store our new D_ao_.
@@ -1439,27 +1679,18 @@ void DirectDFJK::pQp(){
 #endif
 	eri[rank] = std::shared_ptr<TwoBodyAOInt>(rifactory->eri());
 	}
-	//dirty
-	size_t biggest_shell = 0;
 
-	for (int i = 0; i < primary_->nshell(); i++){
-		if (primary_->shell(i).nfunction() > biggest_shell) {
-			biggest_shell = primary_->shell(i).nfunction();
-		}
-	}
-	biggest_shell_ = biggest_shell;
-//end dirty
 	int nocc = C_left_ao_[0]->ncol();
 
 	double* j = J_ao_[0]->pointer(0)[0];
 	double* k = K_ao_[0]->pointer(0)[0];
 	
-	std::unique_ptr<double[]> A(new double[biggest_shell*naux_*nbf_]);
+	std::unique_ptr<double[]> A(new double[biggest_shell_*naux_*nbf_]);
 	std::unique_ptr<double[]> U(new double[1U]);
 	if (BB_) {
-		U.reset(new double[biggest_shell*naux_*nbf_]);
+		U.reset(new double[biggest_shell_*naux_*nbf_]);
 	} else {
-		U.reset(new double[biggest_shell*naux_*nocc]);
+		U.reset(new double[biggest_shell_*naux_*nocc]);
 	}
 	std::unique_ptr<double[]> XN(new double[biggest_block_/nbf_*nocc]);
 	std::unique_ptr<double[]> XO(new double[biggest_block_/nbf_*nocc]);
@@ -1550,29 +1781,14 @@ void DirectDFJK::pQp_sparse(){
 #endif
 	eri[rank] = std::shared_ptr<TwoBodyAOInt>(rifactory->eri());
 	}
-	//dirty
-	size_t biggest_shell = 0;
 
-	for (int i = 0; i < primary_->nshell(); i++){
-		if (primary_->shell(i).nfunction() > biggest_shell) {
-			biggest_shell = primary_->shell(i).nfunction();
-		}
-	}
-	biggest_shell_ = biggest_shell;
-//end dirty
 	int nocc = C_left_ao_[0]->ncol();
-
 
 	double* j = J_ao_[0]->pointer(0)[0];
 	double* k = K_ao_[0]->pointer(0)[0];
 	
-	std::unique_ptr<double[]> A(new double[biggest_shell*naux_*nbf_]);
-	std::unique_ptr<double[]> U(new double[1U]);
-	if (BB_) {
-		U.reset(new double[biggest_shell*naux_*nbf_]);
-	} else {
-		U.reset(new double[biggest_shell*naux_*nocc]);
-	}
+	std::unique_ptr<double[]> A(new double[ biggest_shell_ * naux_ * nbf_ ]);
+	std::unique_ptr<double[]> U(new double[biggest_shell_ * naux_*nocc]);
 	std::unique_ptr<double[]> XN(new double[biggest_block_/nbf_*nocc]);
 	std::unique_ptr<double[]> XO(new double[biggest_block_/nbf_*nocc]);
 	std::unique_ptr<double[]> V(new double[naux_]);
@@ -1661,9 +1877,237 @@ timer_off("DDF pQq big K DGEMM");
 	}
 }
 
+void DirectDFJK::pQp_mn_sparse_set_mP() {
+	mP_func_map_pQq_.clear();
+	mP_shel_map_pQq_.clear();
+
+	mP_func_map_pQq_.resize(p_shells_);
+	mP_shel_map_pQq_.resize(p_shells_);
+	
+	prepare_p_blocks();
+
+	printf("num_blocks_ is %zu\n", num_blocks_);
+
+	int procs = 1;
+#ifdef _OPENMP
+	procs = omp_nthread_;
+#endif
+
+	std::shared_ptr<BasisSet> zero_ = BasisSet::zero_ao_basis_set();
+	auto rifactory = std::make_shared<IntegralFactory>(auxiliary_, zero_, primary_, primary_);
+	std::vector<std::shared_ptr<TwoBodyAOInt>> eri(procs);
+
+#pragma omp parallel num_threads(procs)
+	{
+	int rank = 0;
+#ifdef _OPENMP
+	rank = omp_get_thread_num();
+#endif
+	eri[rank] = std::shared_ptr<TwoBodyAOInt>(rifactory->eri());
+	}
+
+	int nocc = C_left_ao_[0]->ncol();
+
+	double* j = J_ao_[0]->pointer(0)[0];
+	double* k = K_ao_[0]->pointer(0)[0];
+	
+	std::unique_ptr<double[]> A(new double[ biggest_shell_ * naux_ * nbf_ ]);
+	std::unique_ptr<double[]> U(new double[biggest_shell_ * naux_*nocc]);
+	std::unique_ptr<double[]> XN(new double[biggest_block_/nbf_*nocc]);
+	std::unique_ptr<double[]> XO(new double[biggest_block_/nbf_*nocc]);
+	std::unique_ptr<double[]> V(new double[naux_]);
+	std::unique_ptr<double[]> P_V(new double[naux_]);
+	std::unique_ptr<double[]> P_CM(new double[naux_*naux_]);
 
 
+	double* a = A.get();
+	double* u = U.get();
+	double* xn = XN.get();
+	double* xo = XO.get();
+	double* xh;
+	double* v = V.get();
+	double* p_v = P_V.get();
+	double* p_cm = P_CM.get();
 
+
+	std::unique_ptr<double[]> P_C(new double[nbf_*nocc]);
+	std::unique_ptr<double[]> P_D(new double[nbf_]);
+	std::unique_ptr<double[]> P_J(new double[nbf_]);
+
+
+	double* pruned_c = P_C.get();
+	double* pruned_d = P_D.get();
+	double* pruned_j = P_J.get();
+
+
+	double Zero = 0.0;
+	double* zero = &Zero;
+	C_DCOPY( nbf_*nbf_, zero, 0, j, 1);
+    C_DCOPY( nbf_*nbf_, zero, 0, k, 1);
+	C_DCOPY(naux_, zero, 0, v, 1);
+
+	size_t xn_ind;
+	size_t xo_ind = 0;
+
+	printf("finished initializing variables\n");
+
+	printf("do_K_ %s\n", (do_K_ ? "true": "false") );
+
+	X_Block_mn_sparse_set_mP( num_blocks_==1, do_K_, 0, pruned_c, pruned_d, a, xo, u, v, p_v, pruned_j, p_cm, eri);
+	printf("done with x_block 0\n");
+	C_DGEMM('N', 'T', Block_funcs_[0], Block_funcs_[0], naux_*nocc, 1.0, xo, naux_*nocc, xo, naux_*nocc, 1.0, k, nbf_);
+	for ( size_t xo_iter = 0; xo_iter < num_blocks_; xo_iter++ ) {
+		for (size_t xn_iter = 0; xn_iter < num_blocks_ - xo_iter ; xn_iter++ ) {
+			if ( xo_iter == 0 && xn_iter < num_blocks_ - 1 ) {
+				xn_ind = xn_iter;
+				X_Block_mn_sparse_set_mP( false, do_K_, xn_ind, pruned_c, pruned_d, a, xn, u, v, p_v, pruned_j, p_cm, eri);
+				C_DGEMM('N', 'T', Block_funcs_[xo_ind], Block_funcs_[xn_ind], naux_*nocc, 1.0, xo, naux_*nocc, xn, naux_*nocc, 1.0, k, nbf_);
+				C_DGEMM('N', 'T', Block_funcs_[xn_ind], Block_funcs_[xn_ind], naux_*nocc, 1.0, xn, naux_*nocc, xn, naux_*nocc, 1.0, k, nbf_);
+			}
+			if ( xo_iter == 0 && xn_iter == num_blocks_ - 1 ) {
+				xn_ind = xn_iter;
+				X_Block_mn_sparse_set_mP( true, do_K_, xn_ind, pruned_c, pruned_d, a, xn, u, v, p_v, pruned_j, p_cm, eri);
+				C_DGEMM('N', 'T', Block_funcs_[xo_ind], Block_funcs_[xn_ind], naux_*nocc, 1.0, xo, naux_*nocc, xn, naux_*nocc, 1.0, k, nbf_);
+				C_DGEMM('N', 'T', Block_funcs_[xn_ind], Block_funcs_[xn_ind], naux_*nocc, 1.0, xn, naux_*nocc, xn, naux_*nocc, 1.0, k, nbf_);
+			}
+			if ( xo_iter == 1 ) {
+				xn_ind = xn_iter;
+				X_Block_mn_mP_sparse('P', do_K_, xn_ind, pruned_c, pruned_d, a, xn, u, v, p_v, pruned_j, p_cm, eri);
+				C_DGEMM('N', 'T', Block_funcs_[xo_ind], Block_funcs_[xn_ind], naux_*nocc, 1.0, xo, naux_*nocc, xn, naux_*nocc, 1.0, k, nbf_);
+			} else {
+				xn_ind = xn_iter;
+				X_Block_mn_mP_sparse('N', do_K_, xn_ind, pruned_c, pruned_d, a, xn, u, v, p_v, pruned_j, p_cm, eri);
+				C_DGEMM('N', 'T', Block_funcs_[xo_ind], Block_funcs_[xn_ind], naux_*nocc, 1.0, xo, naux_*nocc, xn, naux_*nocc, 1.0, k, nbf_);
+			}
+		}
+		xh = xn;
+		xo = xn;
+		xn = xh;
+		xo_ind = xn_ind;
+	}
+
+	for (size_t kf_i = 0; kf_i < nbf_; kf_i++){
+		for (size_t kf_j = 0; kf_j < kf_i; kf_j++){
+			k[kf_i * nbf_ + kf_j] = k[ kf_j *nbf_ + kf_i];
+		}
+	}
+	
+	if (num_blocks_ != 1) {
+		X_Block_sparse('P', false, 0, pruned_c, pruned_d, a, nullptr, u, v, pruned_j, eri);
+	}
+
+	nocc_last_ = nocc;
+
+}
+
+void DirectDFJK::pQp_mn_mP_sparse() {
+	prepare_p_blocks();
+
+	int procs = 1;
+#ifdef _OPENMP
+	procs = omp_nthread_;
+#endif
+
+	std::shared_ptr<BasisSet> zero_ = BasisSet::zero_ao_basis_set();
+	auto rifactory = std::make_shared<IntegralFactory>(auxiliary_, zero_, primary_, primary_);
+	std::vector<std::shared_ptr<TwoBodyAOInt>> eri(procs);
+
+#pragma omp parallel num_threads(procs)
+	{
+	int rank = 0;
+#ifdef _OPENMP
+	rank = omp_get_thread_num();
+#endif
+	eri[rank] = std::shared_ptr<TwoBodyAOInt>(rifactory->eri());
+	}
+
+	int nocc = C_left_ao_[0]->ncol();
+
+	double* j = J_ao_[0]->pointer(0)[0];
+	double* k = K_ao_[0]->pointer(0)[0];
+	
+	std::unique_ptr<double[]> A(new double[ biggest_shell_ * naux_ * nbf_ ]);
+	std::unique_ptr<double[]> U(new double[biggest_shell_ * naux_*nocc]);
+	std::unique_ptr<double[]> XN(new double[biggest_block_/nbf_*nocc]);
+	std::unique_ptr<double[]> XO(new double[biggest_block_/nbf_*nocc]);
+	std::unique_ptr<double[]> V(new double[naux_]);
+	std::unique_ptr<double[]> P_V(new double[naux_]);
+	std::unique_ptr<double[]> P_CM(new double[naux_*naux_]);
+
+
+	double* a = A.get();
+	double* u = U.get();
+	double* xn = XN.get();
+	double* xo = XO.get();
+	double* xh;
+	double* v = V.get();
+	double* p_v = P_V.get();
+	double* p_cm = P_CM.get();
+
+
+	std::unique_ptr<double[]> P_C(new double[nbf_*nocc]);
+	std::unique_ptr<double[]> P_D(new double[nbf_]);
+	std::unique_ptr<double[]> P_J(new double[nbf_]);
+
+
+	double* pruned_c = P_C.get();
+	double* pruned_d = P_D.get();
+	double* pruned_j = P_J.get();
+
+
+	double Zero = 0.0;
+	double* zero = &Zero;
+	C_DCOPY( nbf_*nbf_, zero, 0, j, 1);
+    C_DCOPY( nbf_*nbf_, zero, 0, k, 1);
+	C_DCOPY(naux_, zero, 0, v, 1);
+
+	char first_char = ( num_blocks_ == 1 ? 'B' : 'V');
+
+	size_t xn_ind;
+	size_t xo_ind = 0;
+
+	X_Block_mn_mP_sparse( first_char, do_K_, 0, pruned_c, pruned_d, a, xo, u, v, p_v, pruned_j, p_cm, eri);
+	C_DGEMM('N', 'T', Block_funcs_[0], Block_funcs_[0], naux_*nocc, 1.0, xo, naux_*nocc, xo, naux_*nocc, 1.0, k, nbf_);
+	for ( size_t xo_iter = 0; xo_iter < num_blocks_; xo_iter++ ) {
+		for (size_t xn_iter = 0; xn_iter < num_blocks_ - xo_iter ; xn_iter++ ) {
+			if ( xo_iter == 0 && xn_iter < num_blocks_ - 1 ) {
+				xn_ind = xn_iter;
+				X_Block_mn_mP_sparse('V' , do_K_, xn_ind, pruned_c, pruned_d, a, xn, u, v, p_v, pruned_j, p_cm, eri);
+				C_DGEMM('N', 'T', Block_funcs_[xo_ind], Block_funcs_[xn_ind], naux_*nocc, 1.0, xo, naux_*nocc, xn, naux_*nocc, 1.0, k, nbf_);
+				C_DGEMM('N', 'T', Block_funcs_[xn_ind], Block_funcs_[xn_ind], naux_*nocc, 1.0, xn, naux_*nocc, xn, naux_*nocc, 1.0, k, nbf_);
+			}
+			if ( xo_iter == 0 && xn_iter == num_blocks_ - 1 ) {
+				xn_ind = xn_iter;
+				X_Block_mn_mP_sparse( 'B', do_K_, xn_ind, pruned_c, pruned_d, a, xn, u, v, p_v, pruned_j, p_cm, eri);
+				C_DGEMM('N', 'T', Block_funcs_[xo_ind], Block_funcs_[xn_ind], naux_*nocc, 1.0, xo, naux_*nocc, xn, naux_*nocc, 1.0, k, nbf_);
+				C_DGEMM('N', 'T', Block_funcs_[xn_ind], Block_funcs_[xn_ind], naux_*nocc, 1.0, xn, naux_*nocc, xn, naux_*nocc, 1.0, k, nbf_);
+			}
+			if ( xo_iter == 1 ) {
+				xn_ind = xn_iter;
+				X_Block_mn_mP_sparse('P', do_K_, xn_ind, pruned_c, pruned_d, a, xn, u, v, p_v, pruned_j, p_cm, eri);
+				C_DGEMM('N', 'T', Block_funcs_[xo_ind], Block_funcs_[xn_ind], naux_*nocc, 1.0, xo, naux_*nocc, xn, naux_*nocc, 1.0, k, nbf_);
+			} else {
+				xn_ind = xn_iter;
+				X_Block_mn_mP_sparse('N', do_K_, xn_ind, pruned_c, pruned_d, a, xn, u, v, p_v, pruned_j, p_cm, eri);
+				C_DGEMM('N', 'T', Block_funcs_[xo_ind], Block_funcs_[xn_ind], naux_*nocc, 1.0, xo, naux_*nocc, xn, naux_*nocc, 1.0, k, nbf_);
+			}
+		}
+		xh = xn;
+		xo = xn;
+		xn = xh;
+		xo_ind = xn_ind;
+	}
+
+	for (size_t kf_i = 0; kf_i < nbf_; kf_i++){
+		for (size_t kf_j = 0; kf_j < kf_i; kf_j++){
+			k[kf_i * nbf_ + kf_j] = k[ kf_j *nbf_ + kf_i];
+		}
+	}
+
+	if (first_char != 'B') {
+		X_Block_sparse('P', false, 0, pruned_c, pruned_d, a, nullptr, u, v, pruned_j, eri);
+	}
+}
 
 // Function that produces tensors for the final contraction
 //    of the exchange matrix build. The issue is that it may or may not
@@ -1776,73 +2220,52 @@ void DirectDFJK::X_Block_sparse( char coul_work, bool compute_k, size_t block, d
 	double* j = J_ao_[0]->pointer()[0];
 	double* d = D_ao_[0]->pointer()[0];
 
-	std::unique_ptr<int[]> IPIV(new int[naux_]);
-	int* ipiv = IPIV.get();
-		
 	switch (coul_work) {
 		case 'N':
 			for (size_t shell_iter = Shell_starts_[block]; shell_iter <= Shell_stops_[block]; shell_iter++) {
-timer_on("DDF AO_SPARSE");
 	compute_sparse_AO_block_p_pQq(shell_iter, ao_block, eri);
-timer_off("DDF AO_SPARSE");
 				if (compute_k) {
-timer_on("DDF pQq prune_c");
 					prune_c( shell_iter, nocc, pruned_c, c );
-timer_off("DDF pQq prune_c");
-timer_on("DDF pQq small K DGEMM");
 					C_DGEMM('N', 'N', primary_->shell(shell_iter).nfunction()*naux_, nocc, schwarz_dense_funcs_[shell_iter], 1.0, ao_block, schwarz_dense_funcs_[shell_iter], pruned_c, nocc, 0.0, u, nocc);
 					for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++){
 						C_DGEMM( 'N', 'N', naux_, nocc, naux_, 1.0, met_m_0_5, naux_, u + func_it * naux_*nocc, nocc,  0.0, x + (primary_->shell(shell_iter).function_index() - primary_->shell(Shell_starts_[block]).function_index() + func_it)* naux_*nocc, nocc);
 					}
-timer_off("DDF pQq small K DGEMM");
 				}
 			}
 			break;
 		case 'V':
 			for (size_t shell_iter = Shell_starts_[block]; shell_iter <= Shell_stops_[block]; shell_iter++){
 				//compute ao blocks
-timer_on("DDF AO_SPARSE");
 	compute_sparse_AO_block_p_pQq(shell_iter, ao_block , eri);
-timer_off("DDF AO_SPARSE");
 				for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++) {
 					prune_d( shell_iter, pruned_d, d + nbf_ * (func_it + primary_->shell(shell_iter).function_index()) );
 // Form V for Coulomb Matrix construction
 					C_DGEMV( 'N', (int) naux_, (int) schwarz_dense_funcs_[shell_iter], 1.0, ao_block + func_it*naux_*schwarz_dense_funcs_[shell_iter], schwarz_dense_funcs_[shell_iter], pruned_d, 1, 1.0, coulomb_vector, 1 );
 				}
 				if (compute_k) {
-timer_on("DDF pQq prune_c");
 					prune_c( shell_iter, nocc, pruned_c, c );
-timer_off("DDF pQq prune_c");
 // Form U for Exchange Matrix construction
-timer_on("DDF pQq small K DGEMM");
 					C_DGEMM('N', 'N', primary_->shell(shell_iter).nfunction()*naux_, nocc, schwarz_dense_funcs_[shell_iter], 1.0, ao_block, schwarz_dense_funcs_[shell_iter], pruned_c, nocc, 0.0, u, nocc);
 // Contract this u into the corresponding portion of x
 					for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++){
 						C_DGEMM( 'N', 'N', naux_, nocc, naux_, 1.0, met_m_0_5, naux_, u + func_it * naux_*nocc, nocc,  0.0, x + (primary_->shell(shell_iter).function_index() - primary_->shell(Shell_starts_[block]).function_index() + func_it)* naux_*nocc, nocc);
 					}
-timer_off("DDF pQq small K DGEMM");
 				}
 			}
 			break;
 		case 'P':
 			for (size_t shell_iter = Shell_starts_[block]; shell_iter <= Shell_stops_[block]; shell_iter++) {
-timer_on("DDF AO_SPARSE");
 	compute_sparse_AO_block_p_pQq(shell_iter, ao_block, eri);
-timer_off("DDF AO_SPARSE");
 				for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++) {
 					C_DGEMV('T', (int) naux_, (int) schwarz_dense_funcs_[shell_iter], 1.0, ao_block + func_it * naux_ * schwarz_dense_funcs_[shell_iter], schwarz_dense_funcs_[shell_iter], coulomb_vector, 1, 0.0, pruned_j, 1 );
 					unprune_J( shell_iter, j + nbf_ * (primary_->shell(shell_iter).function_index() + func_it), pruned_j);
 				}
 				if (compute_k) {
-timer_on("DDF pQq prune_c");
 					prune_c( shell_iter, nocc, pruned_c, c );
-timer_off("DDF pQq prune_c");
-timer_on("DDF pQq small K DGEMM");
 					C_DGEMM('N', 'N', primary_->shell(shell_iter).nfunction()*naux_, nocc, schwarz_dense_funcs_[shell_iter], 1.0, ao_block, schwarz_dense_funcs_[shell_iter], pruned_c, nocc, 0.0, u, nocc);
 					for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++){
 						C_DGEMM( 'N', 'N', naux_, nocc, naux_, 1.0, met_m_0_5, naux_, u + func_it * naux_*nocc, nocc,  0.0, x + (primary_->shell(shell_iter).function_index() - primary_->shell(Shell_starts_[block]).function_index() + func_it)* naux_*nocc, nocc);
 					}
-timer_off("DDF pQq small K DGEMM");
 				}
 			}
 			break;
@@ -1850,19 +2273,13 @@ timer_off("DDF pQq small K DGEMM");
 			double* metp = &CMPQ_LU_.front();
             int* pert = &PERMUTE_.front();
 			for (size_t shell_iter = Shell_starts_[block]; shell_iter <= Shell_stops_[block]; shell_iter++) {
-timer_on("DDF pQq prune_c");
-				prune_c( shell_iter, nocc, pruned_c, c );
-timer_off("DDF pQq prune_c");
-timer_on("DDF AO_SPARSE");
     compute_sparse_AO_block_p_pQq(shell_iter, ao_block, eri);
-timer_off("DDF AO_SPARSE");
 				if (compute_k) {
-timer_on("DDF pQq small K DGEMM");
+					prune_c( shell_iter, nocc, pruned_c, c );
 					C_DGEMM( 'N', 'N', primary_->shell(shell_iter).nfunction()*naux_, nocc, schwarz_dense_funcs_[shell_iter], 1.0, ao_block, schwarz_dense_funcs_[shell_iter], pruned_c, nocc, 0.0, u, nocc );
 					for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++ ){
 						C_DGEMM( 'N', 'N', naux_, nocc, naux_, 1.0, met_m_0_5, naux_, u + func_it * naux_*nocc, nocc,  0.0, x + (primary_->shell(shell_iter).function_index() - primary_->shell(Shell_starts_[block]).function_index() + func_it)* naux_*nocc, nocc);
 					}
-timer_off("DDF pQq small K DGEMM");
 				}
 				for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++ ){
 					prune_d( shell_iter, pruned_d, d + nbf_ * (func_it + primary_->shell(shell_iter).function_index()) );
@@ -1873,9 +2290,7 @@ timer_off("DDF pQq small K DGEMM");
 
 			C_DGETRS( 'N', naux_, 1, metp, naux_, pert, coulomb_vector, naux_);
 			for (size_t shell_iter = Shell_starts_[block]; shell_iter <= Shell_stops_[block]; shell_iter++) {
-timer_on("DDF AO_SPARSE");
             	compute_sparse_AO_block_p_pQq(shell_iter, ao_block, eri);
-timer_off("DDF AO_SPARSE");
 				for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++){
 					C_DGEMV( 'T', (int) naux_, (int) schwarz_dense_funcs_[shell_iter], 1.0, ao_block + func_it * naux_ * schwarz_dense_funcs_[shell_iter], schwarz_dense_funcs_[shell_iter], coulomb_vector, 1, 0.0, pruned_j, 1 );
 					unprune_J( shell_iter, j + nbf_ * (primary_->shell(shell_iter).function_index() + func_it), pruned_j);
@@ -1885,6 +2300,173 @@ timer_off("DDF AO_SPARSE");
     }
 }
 
+void DirectDFJK::X_Block_mn_sparse_set_mP(bool with_contraction, bool compute_k, size_t block, double* pruned_c, double* pruned_d, double* ao_block, double* x, double* u, double* coulomb_vector, double* pruned_coulomb_vector, double* pruned_j, double* pruned_cm, std::vector<std::shared_ptr<TwoBodyAOInt>> eri ){
+
+    size_t nocc = C_left_ao_[0]->ncol();
+    double* c = C_left_ao_[0]->pointer()[0];
+    double* met_m_0_5 = get_metric_power(-0.5);
+    double* j = J_ao_[0]->pointer()[0];
+    double* d = D_ao_[0]->pointer()[0];
+
+//!NOT!NOT!NOT!NOT!NOT!NOT!NOT! with_contraction
+    if (!with_contraction){
+		printf("in X_Block set_mP without contraction\n");
+        for (size_t shell_iter = Shell_starts_[block]; shell_iter <= Shell_stops_[block]; shell_iter++) {
+            compute_AO_block_p_pQq_mn_sparse_set_mP( shell_iter, ao_block, eri );
+            if (compute_k) {
+                prune_c( shell_iter, nocc, pruned_c, c );
+     			prune_cmpq( shell_iter, met_m_0_5, pruned_cm);
+				C_DGEMM('N', 'N', primary_->shell(shell_iter).nfunction() * mP_func_map_pQq_[shell_iter].size(), nocc, schwarz_dense_funcs_[shell_iter], 1.0, ao_block, schwarz_dense_funcs_[shell_iter], pruned_c, nocc, 0.0, u, nocc );
+				for ( size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++ ){
+					C_DGEMM('N', 'N', naux_, nocc, mP_func_map_pQq_[shell_iter].size(), 1.0, pruned_cm, mP_func_map_pQq_[shell_iter].size(), u + func_it * nocc * mP_func_map_pQq_[shell_iter].size(), nocc, 0.0, x + (primary_->shell(shell_iter).function_index() - primary_->shell(shell_iter).function_index() + func_it)*nocc*naux_, nocc );
+				}
+            }
+			for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++ ){
+				prune_d( shell_iter, pruned_d, d + nbf_ * (func_it + primary_->shell(shell_iter).function_index()) );
+				C_DGEMV( 'N', mP_func_map_pQq_[shell_iter].size(), schwarz_dense_funcs_[shell_iter], 1.0, ao_block + func_it * mP_func_map_pQq_[shell_iter].size() * schwarz_dense_funcs_[shell_iter], schwarz_dense_funcs_[shell_iter], pruned_d, 1, 1.0, pruned_coulomb_vector, 1); 
+				unprune_V( shell_iter, coulomb_vector , pruned_coulomb_vector);
+			}
+		}
+	} else {
+		printf("in X_Block set_mP with contraction\n");
+        double* metp = &CMPQ_LU_.front();
+        int* pert = &PERMUTE_.front();
+		printf("got arrays\n");
+        for (size_t shell_iter = Shell_starts_[block]; shell_iter <= Shell_stops_[block]; shell_iter++) {
+			printf("about to get aos\n");
+            compute_AO_block_p_pQq_mn_mP_sparse( shell_iter, ao_block, eri );
+			printf("got aos\n");
+			if (compute_k) {
+				printf("compute_k true\n");
+            	prune_c( shell_iter, nocc, pruned_c, c );
+				prune_cmpq( shell_iter, met_m_0_5, pruned_cm);
+				C_DGEMM('N', 'N', primary_->shell(shell_iter).nfunction() * mP_func_map_pQq_[shell_iter].size(), nocc, schwarz_dense_funcs_[shell_iter], 1.0, ao_block, schwarz_dense_funcs_[shell_iter], pruned_c, nocc, 0.0, u, nocc );
+				for ( size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++ ){
+					C_DGEMM('N', 'N', naux_, nocc, mP_func_map_pQq_[shell_iter].size(), 1.0, pruned_cm, mP_func_map_pQq_[shell_iter].size(), u + func_it * nocc * mP_func_map_pQq_[shell_iter].size(), nocc, 0.0, x + (primary_->shell(shell_iter).function_index() - primary_->shell(shell_iter).function_index() + func_it)*nocc*naux_, nocc );
+				}
+			}
+			for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++ ){
+				prune_d( shell_iter, pruned_d, d + nbf_ * (func_it + primary_->shell(shell_iter).function_index()) );
+				C_DGEMV( 'N', mP_func_map_pQq_[shell_iter].size(), schwarz_dense_funcs_[shell_iter], 1.0, ao_block + func_it * mP_func_map_pQq_[shell_iter].size() * schwarz_dense_funcs_[shell_iter], schwarz_dense_funcs_[shell_iter], pruned_d, 1, 1.0, pruned_coulomb_vector, 1); 
+				unprune_V( shell_iter, coulomb_vector , pruned_coulomb_vector);
+			}
+        }
+		printf("about to solve JPHI=V\n");
+        C_DGETRS( 'N', naux_, 1, metp, naux_, pert, coulomb_vector, naux_);
+		printf("solved JPHI=V\n");
+        for (size_t shell_iter = Shell_starts_[block]; shell_iter <= Shell_stops_[block]; shell_iter++) {
+            compute_AO_block_p_pQq_mn_mP_sparse( shell_iter, ao_block, eri );
+			printf("about to prune phi\n");
+			prune_phi( shell_iter, coulomb_vector, pruned_coulomb_vector  );
+			printf("pruned phi\n");
+			for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++){
+				printf("about to contract into J\n");
+				C_DGEMV( 'T', (int) mP_shel_map_pQq_[shell_iter].size(), (int) schwarz_dense_funcs_[shell_iter], 1.0, ao_block + func_it * mP_shel_map_pQq_[shell_iter].size() * schwarz_dense_funcs_[shell_iter], schwarz_dense_funcs_[shell_iter], coulomb_vector, 1, 0.0, pruned_j, 1 );
+				printf("contracted into pruned_j\n");
+				printf("unpruning j\n");
+				unprune_J( shell_iter, j + nbf_ * (primary_->shell(shell_iter).function_index() + func_it), pruned_j);
+				printf("j unpruned\n");
+			}
+        }
+    }
+
+}
+
+
+void DirectDFJK::X_Block_mn_mP_sparse(char coul_work, bool compute_k, size_t block, double* pruned_c, double* pruned_d, double* ao_block, double* x, double* u, double* coulomb_vector, double* pruned_coulomb_vector, double* pruned_j, double* pruned_cm, std::vector<std::shared_ptr<TwoBodyAOInt>> eri ){
+
+    size_t nocc = C_left_ao_[0]->ncol();
+    double* c = C_left_ao_[0]->pointer()[0];
+    double* met_m_0_5 = get_metric_power(-0.5);
+    double* j = J_ao_[0]->pointer()[0];
+    double* d = D_ao_[0]->pointer()[0];
+
+
+    switch (coul_work) {
+        case 'N':
+        	for (size_t shell_iter = Shell_starts_[block]; shell_iter <= Shell_stops_[block]; shell_iter++) {
+            	compute_AO_block_p_pQq_mn_mP_sparse( shell_iter, ao_block, eri );
+        	    if (compute_k) {
+            	    prune_c( shell_iter, nocc, pruned_c, c );
+     				prune_cmpq( shell_iter, met_m_0_5, pruned_cm);
+					C_DGEMM('N', 'N', primary_->shell(shell_iter).nfunction() * mP_func_map_pQq_[shell_iter].size(), nocc, schwarz_dense_funcs_[shell_iter], 1.0, ao_block, schwarz_dense_funcs_[shell_iter], pruned_c, nocc, 0.0, u, nocc );
+					for ( size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++ ){
+						C_DGEMM('N', 'N', naux_, nocc, mP_func_map_pQq_[shell_iter].size(), 1.0, pruned_cm, mP_func_map_pQq_[shell_iter].size(), u + func_it * nocc * mP_func_map_pQq_[shell_iter].size(), nocc, 0.0, x + (primary_->shell(shell_iter).function_index() - primary_->shell(shell_iter).function_index() + func_it)*nocc*naux_, nocc );
+					}
+            	}
+			}
+            break;
+        case 'V':
+        	for (size_t shell_iter = Shell_starts_[block]; shell_iter <= Shell_stops_[block]; shell_iter++) {
+            	compute_AO_block_p_pQq_mn_mP_sparse( shell_iter, ao_block, eri );
+            	if (compute_k) {
+                	prune_c( shell_iter, nocc, pruned_c, c );
+     				prune_cmpq( shell_iter, met_m_0_5, pruned_cm);
+					C_DGEMM('N', 'N', primary_->shell(shell_iter).nfunction() * mP_func_map_pQq_[shell_iter].size(), nocc, schwarz_dense_funcs_[shell_iter], 1.0, ao_block, schwarz_dense_funcs_[shell_iter], pruned_c, nocc, 0.0, u, nocc );
+					for ( size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++ ){
+						C_DGEMM('N', 'N', naux_, nocc, mP_func_map_pQq_[shell_iter].size(), 1.0, pruned_cm, mP_func_map_pQq_[shell_iter].size(), u + func_it * nocc * mP_func_map_pQq_[shell_iter].size(), nocc, 0.0, x + (primary_->shell(shell_iter).function_index() - primary_->shell(shell_iter).function_index() + func_it)*nocc*naux_, nocc );
+					}
+            	}
+				for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++ ){
+					prune_d( shell_iter, pruned_d, d + nbf_ * (func_it + primary_->shell(shell_iter).function_index()) );
+					C_DGEMV( 'N', mP_func_map_pQq_[shell_iter].size(), schwarz_dense_funcs_[shell_iter], 1.0, ao_block + func_it * mP_func_map_pQq_[shell_iter].size() * schwarz_dense_funcs_[shell_iter], schwarz_dense_funcs_[shell_iter], pruned_d, 1, 1.0, pruned_coulomb_vector, 1); 
+					unprune_V( shell_iter, coulomb_vector , pruned_coulomb_vector);
+				}
+			}
+            break;
+        case 'P':
+	        for (size_t shell_iter = Shell_starts_[block]; shell_iter <= Shell_stops_[block]; shell_iter++) {
+  		        compute_AO_block_p_pQq_mn_mP_sparse( shell_iter, ao_block, eri );
+        	    if (compute_k) {
+            	    prune_c( shell_iter, nocc, pruned_c, c );
+     				prune_cmpq( shell_iter, met_m_0_5, pruned_cm);
+					C_DGEMM('N', 'N', primary_->shell(shell_iter).nfunction() * mP_func_map_pQq_[shell_iter].size(), nocc, schwarz_dense_funcs_[shell_iter], 1.0, ao_block, schwarz_dense_funcs_[shell_iter], pruned_c, nocc, 0.0, u, nocc );
+					for ( size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++ ){
+						C_DGEMM('N', 'N', naux_, nocc, mP_func_map_pQq_[shell_iter].size(), 1.0, pruned_cm, mP_func_map_pQq_[shell_iter].size(), u + func_it * nocc * mP_func_map_pQq_[shell_iter].size(), nocc, 0.0, x + (primary_->shell(shell_iter).function_index() - primary_->shell(shell_iter).function_index() + func_it)*nocc*naux_, nocc );
+					}
+            	}
+			}	
+			for (size_t shell_iter = Shell_starts_[block]; shell_iter <= Shell_stops_[block]; shell_iter++) {
+				prune_phi( shell_iter, coulomb_vector, pruned_coulomb_vector  );
+				for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++){
+					C_DGEMV( 'T', (int) mP_shel_map_pQq_[shell_iter][func_it], (int) schwarz_dense_funcs_[shell_iter], 1.0, ao_block + func_it * mP_shel_map_pQq_[shell_iter][func_it] * schwarz_dense_funcs_[shell_iter], schwarz_dense_funcs_[shell_iter], coulomb_vector, 1, 0.0, pruned_j, 1 );
+					unprune_J( shell_iter, j + nbf_ * (primary_->shell(shell_iter).function_index() + func_it), pruned_j);
+				}
+			}
+            break;
+        case 'B':
+        	double* metp = &CMPQ_LU_.front();
+        	int* pert = &PERMUTE_.front();
+        	for (size_t shell_iter = Shell_starts_[block]; shell_iter <= Shell_stops_[block]; shell_iter++) {
+            	compute_AO_block_p_pQq_mn_mP_sparse( shell_iter, ao_block, eri );
+				if (compute_k) {
+            		prune_c( shell_iter, nocc, pruned_c, c );
+					prune_cmpq( shell_iter, met_m_0_5, pruned_cm);
+					C_DGEMM('N', 'N', primary_->shell(shell_iter).nfunction() * mP_func_map_pQq_[shell_iter].size(), nocc, schwarz_dense_funcs_[shell_iter], 1.0, ao_block, schwarz_dense_funcs_[shell_iter], pruned_c, nocc, 0.0, u, nocc );
+					for ( size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++ ){
+						printf("%zu %zu %zu\n", Q_shells_, naux_, mP_func_map_pQq_[shell_iter].size());
+						C_DGEMM('N', 'N', naux_, nocc, mP_func_map_pQq_[shell_iter].size(), 1.0, pruned_cm, mP_func_map_pQq_[shell_iter].size(), u + func_it * nocc * mP_func_map_pQq_[shell_iter].size(), nocc, 0.0, x + (primary_->shell(shell_iter).function_index() - primary_->shell(shell_iter).function_index() + func_it)*nocc*naux_, nocc );
+					}
+				}
+				for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++ ){
+					prune_d( shell_iter, pruned_d, d + nbf_ * (func_it + primary_->shell(shell_iter).function_index()) );
+					C_DGEMV( 'N', mP_func_map_pQq_[shell_iter].size(), schwarz_dense_funcs_[shell_iter], 1.0, ao_block + func_it * mP_func_map_pQq_[shell_iter].size() * schwarz_dense_funcs_[shell_iter], schwarz_dense_funcs_[shell_iter], pruned_d, 1, 1.0, pruned_coulomb_vector, 1); 
+					unprune_V( shell_iter, coulomb_vector , pruned_coulomb_vector);
+				}
+        	}
+        	C_DGETRS( 'N', naux_, 1, metp, naux_, pert, coulomb_vector, naux_);
+        	for (size_t shell_iter = Shell_starts_[block]; shell_iter <= Shell_stops_[block]; shell_iter++) {
+            	compute_AO_block_p_pQq_mn_mP_sparse( shell_iter, ao_block, eri );
+				prune_phi( shell_iter, coulomb_vector, pruned_coulomb_vector  );
+					for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++){
+						C_DGEMV( 'T', (int) mP_shel_map_pQq_[shell_iter][func_it], (int) schwarz_dense_funcs_[shell_iter], 1.0, ao_block + func_it * mP_shel_map_pQq_[shell_iter][func_it] * schwarz_dense_funcs_[shell_iter], schwarz_dense_funcs_[shell_iter], coulomb_vector, 1, 0.0, pruned_j, 1 );
+						unprune_J( shell_iter, j + nbf_ * (primary_->shell(shell_iter).function_index() + func_it), pruned_j);
+					}
+        	}
+            break;
+    }
+
+}
 
 void DirectDFJK::prune_c( size_t &mu, size_t nocc, double* pruned_c, double* raw_c ) {
 	int procs = 1;
@@ -1938,300 +2520,27 @@ void DirectDFJK::unprune_J( size_t &mu, double* raw_j, double* pruned_j ) {
 	}
 }
 
-void DirectDFJK::pQp_sparse_DGEMM_split() {
-// In principle, this function call should be in preiterations or in
-//   memory estimator. However, it depends on knowing the memory_
-//   value from input which precludes its calling in either of those
-//   places.
-	prepare_p_blocks();
+void DirectDFJK::prune_cmpq(size_t big_Mu, double* raw_CMPQ, double* pruned_CMPQ) {
 
-	int procs = 1;
-#ifdef _OPENMP
-	procs = omp_nthread_;
-#endif
-
-	std::shared_ptr<BasisSet> zero_ = BasisSet::zero_ao_basis_set();
-	auto rifactory = std::make_shared<IntegralFactory>(auxiliary_, zero_, primary_, primary_);
-	std::vector<std::shared_ptr<TwoBodyAOInt>> eri(procs);
-
-#pragma omp parallel num_threads(procs)
-	{
-	int rank = 0;
-#ifdef _OPENMP
-	rank = omp_get_thread_num();
-#endif
-	eri[rank] = std::shared_ptr<TwoBodyAOInt>(rifactory->eri());
-	}
-	//dirty
-	size_t biggest_shell = 0;
-
-	for (int i = 0; i < primary_->nshell(); i++){
-		if (primary_->shell(i).nfunction() > biggest_shell) {
-			biggest_shell = primary_->shell(i).nfunction();
-		}
-	}
-	biggest_shell_ = biggest_shell;
-//end dirty
-	int nocc = C_left_ao_[0]->ncol();
-
-
-	double* j = J_ao_[0]->pointer(0)[0];
-	double* k = K_ao_[0]->pointer(0)[0];
-	
-	std::unique_ptr<double[]> A(new double[biggest_shell*naux_*nbf_]);
-	std::unique_ptr<double[]> U(new double[1U]);
-	if (BB_) {
-		U.reset(new double[biggest_shell*naux_*nbf_]);
-	} else {
-		U.reset(new double[biggest_shell*naux_*nocc]);
-	}
-	std::unique_ptr<double[]> XN(new double[biggest_block_/nbf_*nocc]);
-	std::unique_ptr<double[]> XO(new double[biggest_block_/nbf_*nocc]);
-	std::unique_ptr<double[]> V(new double[naux_]);
-
-
-	double* a = A.get();
-	double* u = U.get();
-	double* xn = XN.get();
-	double* xo = XO.get();
-	double* xh;
-	double* v = V.get();
-	double Zero = 0.0;
-	double* zero = &Zero;
-
-
-	std::unique_ptr<double[]> P_C(new double[nbf_*nocc]);
-	std::unique_ptr<double[]> P_D(new double[nbf_]);
-	std::unique_ptr<double[]> P_J(new double[nbf_]);
-
-
-	double* pruned_c = P_C.get();
-	double* pruned_d = P_D.get();
-	double* pruned_j = P_J.get();
-
-
-	C_DCOPY( nbf_*nbf_, zero, 0, j, 1);
-    C_DCOPY( nbf_*nbf_, zero, 0, k, 1);
-	C_DCOPY(naux_, zero, 0, v, 1);
-	//for (size_t i = 0; i < naux_; i++) { v[i] = 0.0;}
-	char first_char = ( num_blocks_ == 1 ? 'B' : 'V');
-
-	size_t xo_ind = 0U;
-	size_t xn_ind;
-	
-	outfile->Printf("num_blocks_ is %zu\n", num_blocks_);
-
-	X_Block_sparse_DGEMM_split(first_char, true, 0, pruned_c, pruned_d, a, xo, u, v, pruned_j, eri);
-timer_on("DDF pQq big K DGEMM");
-	C_DGEMM('N', 'T', Block_funcs_[0], Block_funcs_[0], naux_*nocc, 1.0, xo, naux_*nocc, xo, naux_*nocc, 1.0, k, nbf_);
-timer_off("DDF pQq big K DGEMM");
-	for (size_t xo_iter = 0; xo_iter < num_blocks_ - 1 ; xo_iter++){
-		for (size_t xn_iter = 1; xn_iter < num_blocks_ - xo_iter; xn_iter++){
-			if ( xo_iter == 0 && xn_iter != num_blocks_ - 1) {
-				X_Block_sparse_DGEMM_split('V', true, xn_iter, pruned_c, pruned_d, a, xn, u, v, pruned_j, eri); // X_Block
-				xn_ind = xn_iter;
-timer_on("DDF pQq big K DGEMM");
-				C_DGEMM('N', 'T', Block_funcs_[xn_ind], Block_funcs_[xn_ind], naux_*nocc, 1.0, xn, naux_*nocc, xn, naux_*nocc, 1.0, k + k_disps_[xn_ind][xn_ind], nbf_ );
-				C_DGEMM('N', 'T', Block_funcs_[xo_ind], Block_funcs_[xn_ind], naux_*nocc, 1.0, xo, naux_*nocc, xn, naux_*nocc, 1.0, k + k_disps_[xo_ind][xn_ind], nbf_ );
-timer_off("DDF pQq big K DGEMM");
-			} else if (xo_iter == 0 && xn_iter == num_blocks_ - 1) {
-				X_Block_sparse_DGEMM_split('B', true, xn_iter, pruned_c, pruned_d, a, xn, u, v, pruned_j, eri); // X_Block
-				xn_ind = xn_iter;
-timer_on("DDF pQq big K DGEMM");
-				C_DGEMM('N', 'T', Block_funcs_[xn_ind], Block_funcs_[xn_ind], naux_*nocc, 1.0, xn, naux_*nocc, xn, naux_*nocc, 1.0, k + k_disps_[xn_ind][xn_ind], nbf_);
-				C_DGEMM('N', 'T', Block_funcs_[xo_ind], Block_funcs_[xn_ind], naux_*nocc, 1.0, xo, naux_*nocc, xn, naux_*nocc, 1.0, k + k_disps_[xo_ind][xn_ind], nbf_ );
-timer_off("DDF pQq big K DGEMM");
-			} else if ( xo_iter == 1 ) {
-				X_Block_sparse_DGEMM_split('P', true, xn_iter, pruned_c, pruned_d, a, xn, u, v, pruned_j, eri); // X_Block
-				xn_ind = xn_iter;
-timer_on("DDF pQq big K DGEMM");
-				C_DGEMM('N', 'T', Block_funcs_[xn_ind], Block_funcs_[xo_ind], naux_*nocc, 1.0, xn, naux_*nocc, xo, naux_*nocc, 1.0, k + k_disps_[xn_ind][xo_ind], nbf_);
-timer_off("DDF pQq big K DGEMM");
-			} else {
-				X_Block_sparse_DGEMM_split('N', true, xn_iter, pruned_c, pruned_d, a, xn, u, nullptr, nullptr, eri); // X_Block
-				xn_ind = xn_iter;
-timer_on("DDF pQq big K DGEMM");
-				C_DGEMM('N', 'T', Block_funcs_[xn_ind], Block_funcs_[xo_ind], naux_*nocc, 1.0, xn, naux_*nocc, xo, naux_*nocc, 0.0, k + k_disps_[xn_ind][xo_ind], nbf_);
-timer_off("DDF pQq big K DGEMM");
-			}
-		}
-		xh = xn;
-		xn = xo;//XO.get();
-		xo = xh;//XN.get();
-		xo_ind = xn_ind;
-	}
-
-
-	for (size_t kf_i = 0; kf_i < nbf_; kf_i++){
-		for (size_t kf_j = 0; kf_j < kf_i; kf_j++){
-			k[kf_i * nbf_ + kf_j] = k[ kf_j *nbf_ + kf_i];
-		}
-	}
-	
-	if (first_char != 'B') {
-		X_Block_sparse_DGEMM_split('P', false, 0, pruned_c, pruned_d, a, nullptr, u, v, pruned_j, eri); // X_Block
-	}
-} // pQp_sparse_DGEMM_split()
-
-void DirectDFJK::X_Block_sparse_DGEMM_split( char coul_work, bool compute_k, size_t block, double* pruned_c, double* pruned_d, double* ao_block, double* x, double* u, double* coulomb_vector, double* pruned_j, std::vector<std::shared_ptr<TwoBodyAOInt>> eri){
-
-	int procs = 1;
-#ifdef _OPENMP
-	procs = omp_nthread_;
-#endif
-
-
-	size_t nocc = C_left_ao_[0]->ncol();
-	double* c = C_left_ao_[0]->pointer()[0];
-	double* met_m_0_5 = get_metric_power(-0.5);
-	double* j = J_ao_[0]->pointer()[0];
-	double* d = D_ao_[0]->pointer()[0];
-
-	std::unique_ptr<int[]> IPIV(new int[naux_]);
-	int* ipiv = IPIV.get();
-		
-	switch (coul_work) {
-		case 'N':
-			for (size_t shell_iter = Shell_starts_[block]; shell_iter <= Shell_stops_[block]; shell_iter++) {
-	compute_sparse_AO_block_p_pQq(shell_iter, ao_block, eri);
-				if (compute_k) {
-					prune_c( shell_iter, nocc, pruned_c, c );
-#pragma omp parallel num_threads(procs) 
-{
-	int rank = 0;
-#ifdef _OPENMP
-	rank = omp_get_thread_num();
-#endif
-
-					C_DGEMM('N', 'N', ( rank > primary_->shell(shell_iter).nfunction()*naux_ % procs ? primary_->shell(shell_iter).nfunction()*naux_/procs : primary_->shell(shell_iter).nfunction()*naux_/procs + 1 ), nocc, schwarz_dense_funcs_[shell_iter], 1.0, ao_block + ( rank > primary_->shell(shell_iter).nfunction()*naux_/procs ? ( primary_->shell(shell_iter).nfunction()*naux_/procs + 1 ) * ( primary_->shell(shell_iter).nfunction()*naux_ % procs ) * schwarz_dense_funcs_[shell_iter] + (primary_->shell(shell_iter).nfunction()*naux_/procs)*(rank - primary_->shell(shell_iter).nfunction()*naux_%procs) * schwarz_dense_funcs_[shell_iter] : ( primary_->shell(shell_iter).nfunction()*naux_/procs + 1 )*rank*schwarz_dense_funcs_[shell_iter] ), schwarz_dense_funcs_[shell_iter], pruned_c, nocc, 0.0, u + ( rank > primary_->shell(shell_iter).nfunction()*naux_ % procs ? (primary_->shell(shell_iter).nfunction()*naux_/procs + 1 )*(primary_->shell(shell_iter).nfunction()*naux_%procs )*nocc + ( primary_->shell(shell_iter).nfunction()*naux_ / procs )*(rank - primary_->shell(shell_iter).nfunction()*naux_/procs )*nocc : ( primary_->shell(shell_iter).nfunction()*naux_/procs +1)*rank*nocc ), nocc  );
-}
-
-					for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++){
-#pragma omp parallel num_threads(procs)
-{
-	int rank = 0;
-#ifdef _OPENMP
-	rank = omp_get_thread_num();
-#endif
-						C_DGEMM( 'N', 'N', ( rank > naux_ % procs ? naux_ / procs : naux_ /procs + 1  ), nocc, naux_, 1.0, met_m_0_5 + ( rank > naux_ % procs ? (naux_/procs + 1 )*(naux_%procs)*naux_ + (naux_ / procs)*(rank - naux_%procs)*naux_ : (naux_/procs + 1)*rank*naux_ ) , naux_, u + func_it * naux_*nocc, nocc,  0.0, x + (primary_->shell(shell_iter).function_index() - primary_->shell(Shell_starts_[block]).function_index() + func_it)* naux_*nocc + ( rank > naux_ / procs ? (naux_/procs + 1) * ( naux_ % procs ) * naux_ + (naux_/procs)* (rank - naux_ % procs)*naux_ : (naux_/procs + 1)*rank*nocc ), nocc);
-}
-					}
-				} //if (compute_k)
-			}
-			break;
-		case 'V':
-			for (size_t shell_iter = Shell_starts_[block]; shell_iter <= Shell_stops_[block]; shell_iter++){
-				//compute ao blocks
-	compute_sparse_AO_block_p_pQq(shell_iter, ao_block , eri);
-				for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++) {
-					prune_d( shell_iter, pruned_d, d + nbf_ * (func_it + primary_->shell(shell_iter).function_index()) );
-// Form V for Coulomb Matrix construction
-					C_DGEMV( 'N', (int) naux_, (int) schwarz_dense_funcs_[shell_iter], 1.0, ao_block + func_it*naux_*schwarz_dense_funcs_[shell_iter], schwarz_dense_funcs_[shell_iter], pruned_d, 1, 1.0, coulomb_vector, 1 );
-				}
-				if (compute_k) {
-					prune_c( shell_iter, nocc, pruned_c, c );
-#pragma omp parallel num_threads(procs) 
-{
-	int rank = 0;
-#ifdef _OPENMP
-	rank = omp_get_thread_num();
-#endif
-
-					C_DGEMM('N', 'N', ( rank > primary_->shell(shell_iter).nfunction()*naux_ % procs ? primary_->shell(shell_iter).nfunction()*naux_/procs : primary_->shell(shell_iter).nfunction()*naux_/procs + 1 ), nocc, schwarz_dense_funcs_[shell_iter], 1.0, ao_block + ( rank > primary_->shell(shell_iter).nfunction()*naux_/procs ? ( primary_->shell(shell_iter).nfunction()*naux_/procs + 1 ) * ( primary_->shell(shell_iter).nfunction()*naux_ % procs ) * schwarz_dense_funcs_[shell_iter] + (primary_->shell(shell_iter).nfunction()*naux_/procs)*(rank - primary_->shell(shell_iter).nfunction()*naux_%procs) * schwarz_dense_funcs_[shell_iter] : ( primary_->shell(shell_iter).nfunction()*naux_/procs + 1 )*rank*schwarz_dense_funcs_[shell_iter] ), schwarz_dense_funcs_[shell_iter], pruned_c, nocc, 0.0, u + ( rank > primary_->shell(shell_iter).nfunction()*naux_ % procs ? (primary_->shell(shell_iter).nfunction()*naux_/procs + 1 )*(primary_->shell(shell_iter).nfunction()*naux_%procs )*nocc + ( primary_->shell(shell_iter).nfunction()*naux_ / procs )*(rank - primary_->shell(shell_iter).nfunction()*naux_/procs )*nocc : ( primary_->shell(shell_iter).nfunction()*naux_/procs +1)*rank*nocc ), nocc  );
-}
-
-					for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++){
-#pragma omp parallel num_threads(procs)
-{
-	int rank = 0;
-#ifdef _OPENMP
-	rank = omp_get_thread_num();
-#endif
-						C_DGEMM( 'N', 'N', ( rank > naux_ % procs ? naux_ / procs : naux_ /procs + 1  ), nocc, naux_, 1.0, met_m_0_5 + ( rank > naux_ % procs ? (naux_/procs + 1 )*(naux_%procs)*naux_ + (naux_ / procs)*(rank - naux_%procs)*naux_ : (naux_/procs + 1)*rank*naux_ ) , naux_, u + func_it * naux_*nocc, nocc,  0.0, x + (primary_->shell(shell_iter).function_index() - primary_->shell(Shell_starts_[block]).function_index() + func_it)* naux_*nocc + ( rank > naux_ / procs ? (naux_/procs + 1) * ( naux_ % procs ) * naux_ + (naux_/procs)* (rank - naux_ % procs)*naux_ : (naux_/procs + 1)*rank*nocc ), nocc);
-}
-					}
-
-				} // if (compute_k)
-			}
-			break;
-		case 'P':
-			for (size_t shell_iter = Shell_starts_[block]; shell_iter <= Shell_stops_[block]; shell_iter++) {
-	compute_sparse_AO_block_p_pQq(shell_iter, ao_block, eri);
-				for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++) {
-					C_DGEMV('T', (int) naux_, (int) schwarz_dense_funcs_[shell_iter], 1.0, ao_block + func_it * naux_ * schwarz_dense_funcs_[shell_iter], schwarz_dense_funcs_[shell_iter], coulomb_vector, 1, 0.0, pruned_j, 1 );
-					unprune_J( shell_iter, j + nbf_ * (primary_->shell(shell_iter).function_index() + func_it), pruned_j);
-				}
-				if (compute_k) {
-					prune_c( shell_iter, nocc, pruned_c, c );
-#pragma omp parallel num_threads(procs) 
-{
-	int rank = 0;
-#ifdef _OPENMP
-	rank = omp_get_thread_num();
-#endif
-
-					C_DGEMM('N', 'N', ( rank > primary_->shell(shell_iter).nfunction()*naux_ % procs ? primary_->shell(shell_iter).nfunction()*naux_/procs : primary_->shell(shell_iter).nfunction()*naux_/procs + 1 ), nocc, schwarz_dense_funcs_[shell_iter], 1.0, ao_block + ( rank > primary_->shell(shell_iter).nfunction()*naux_/procs ? ( primary_->shell(shell_iter).nfunction()*naux_/procs + 1 ) * ( primary_->shell(shell_iter).nfunction()*naux_ % procs ) * schwarz_dense_funcs_[shell_iter] + (primary_->shell(shell_iter).nfunction()*naux_/procs)*(rank - primary_->shell(shell_iter).nfunction()*naux_%procs) * schwarz_dense_funcs_[shell_iter] : ( primary_->shell(shell_iter).nfunction()*naux_/procs + 1 )*rank*schwarz_dense_funcs_[shell_iter] ), schwarz_dense_funcs_[shell_iter], pruned_c, nocc, 0.0, u + ( rank > primary_->shell(shell_iter).nfunction()*naux_ % procs ? (primary_->shell(shell_iter).nfunction()*naux_/procs + 1 )*(primary_->shell(shell_iter).nfunction()*naux_%procs )*nocc + ( primary_->shell(shell_iter).nfunction()*naux_ / procs )*(rank - primary_->shell(shell_iter).nfunction()*naux_/procs )*nocc : ( primary_->shell(shell_iter).nfunction()*naux_/procs +1)*rank*nocc ), nocc  );
-}
-
-					for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++){
-#pragma omp parallel num_threads(procs)
-{
-	int rank = 0;
-#ifdef _OPENMP
-	rank = omp_get_thread_num();
-#endif
-						C_DGEMM( 'N', 'N', ( rank > naux_ % procs ? naux_ / procs : naux_ /procs + 1  ), nocc, naux_, 1.0, met_m_0_5 + ( rank > naux_ % procs ? (naux_/procs + 1 )*(naux_%procs)*naux_ + (naux_ / procs)*(rank - naux_%procs)*naux_ : (naux_/procs + 1)*rank*naux_ ) , naux_, u + func_it * naux_*nocc, nocc,  0.0, x + (primary_->shell(shell_iter).function_index() - primary_->shell(Shell_starts_[block]).function_index() + func_it)* naux_*nocc + ( rank > naux_ / procs ? (naux_/procs + 1) * ( naux_ % procs ) * naux_ + (naux_/procs)* (rank - naux_ % procs)*naux_ : (naux_/procs + 1)*rank*nocc ), nocc);
-}
-					}
-				} // if (compute_k )
-			}
-			break;
-		case 'B':
-			double* metp = &CMPQ_LU_.front();
-            int* pert = &PERMUTE_.front();
-			for (size_t shell_iter = Shell_starts_[block]; shell_iter <= Shell_stops_[block]; shell_iter++) {
-				prune_c( shell_iter, nocc, pruned_c, c );
-    compute_sparse_AO_block_p_pQq(shell_iter, ao_block, eri);
-				if (compute_k) {
-					prune_c( shell_iter, nocc, pruned_c, c );
-#pragma omp parallel num_threads(procs) 
-{
-	int rank = 0;
-#ifdef _OPENMP
-	rank = omp_get_thread_num();
-#endif
-
-					C_DGEMM('N', 'N', ( rank > primary_->shell(shell_iter).nfunction()*naux_ % procs ? primary_->shell(shell_iter).nfunction()*naux_/procs : primary_->shell(shell_iter).nfunction()*naux_/procs + 1 ), nocc, schwarz_dense_funcs_[shell_iter], 1.0, ao_block + ( rank > primary_->shell(shell_iter).nfunction()*naux_/procs ? ( primary_->shell(shell_iter).nfunction()*naux_/procs + 1 ) * ( primary_->shell(shell_iter).nfunction()*naux_ % procs ) * schwarz_dense_funcs_[shell_iter] + (primary_->shell(shell_iter).nfunction()*naux_/procs)*(rank - primary_->shell(shell_iter).nfunction()*naux_%procs) * schwarz_dense_funcs_[shell_iter] : ( primary_->shell(shell_iter).nfunction()*naux_/procs + 1 )*rank*schwarz_dense_funcs_[shell_iter] ), schwarz_dense_funcs_[shell_iter], pruned_c, nocc, 0.0, u + ( rank > primary_->shell(shell_iter).nfunction()*naux_ % procs ? (primary_->shell(shell_iter).nfunction()*naux_/procs + 1 )*(primary_->shell(shell_iter).nfunction()*naux_%procs )*nocc + ( primary_->shell(shell_iter).nfunction()*naux_ / procs )*(rank - primary_->shell(shell_iter).nfunction()*naux_/procs )*nocc : ( primary_->shell(shell_iter).nfunction()*naux_/procs +1)*rank*nocc ), nocc  );
-}
-
-					for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++){
-#pragma omp parallel num_threads(procs)
-{
-	int rank = 0;
-#ifdef _OPENMP
-	rank = omp_get_thread_num();
-#endif
-						C_DGEMM( 'N', 'N', ( rank > naux_ % procs ? naux_ / procs : naux_ /procs + 1  ), nocc, naux_, 1.0, met_m_0_5 + ( rank > naux_ % procs ? (naux_/procs + 1 )*(naux_%procs)*naux_ + (naux_ / procs)*(rank - naux_%procs)*naux_ : (naux_/procs + 1)*rank*naux_ ) , naux_, u + func_it * naux_*nocc, nocc,  0.0, x + (primary_->shell(shell_iter).function_index() - primary_->shell(Shell_starts_[block]).function_index() + func_it)* naux_*nocc + ( rank > naux_ / procs ? (naux_/procs + 1) * ( naux_ % procs ) * naux_ + (naux_/procs)* (rank - naux_ % procs)*naux_ : (naux_/procs + 1)*rank*nocc ), nocc);
-}
-					}
-				} // if (compute_k)
-				for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++ ){
-					prune_d( shell_iter, pruned_d, d + nbf_ * (func_it + primary_->shell(shell_iter).function_index()) );
-					C_DGEMV( 'N', naux_, schwarz_dense_funcs_[shell_iter], 1.0, ao_block +func_it*naux_*schwarz_dense_funcs_[shell_iter], schwarz_dense_funcs_[shell_iter], pruned_d, 1, 1.0, coulomb_vector, 1);
-				}
-			}
-
-
-			C_DGETRS( 'N', naux_, 1, metp, naux_, pert, coulomb_vector, naux_);
-			for (size_t shell_iter = Shell_starts_[block]; shell_iter <= Shell_stops_[block]; shell_iter++) {
-            	compute_sparse_AO_block_p_pQq(shell_iter, ao_block, eri);
-				for (size_t func_it = 0; func_it < primary_->shell(shell_iter).nfunction(); func_it++){
-					C_DGEMV( 'T', (int) naux_, (int) schwarz_dense_funcs_[shell_iter], 1.0, ao_block + func_it * naux_ * schwarz_dense_funcs_[shell_iter], schwarz_dense_funcs_[shell_iter], coulomb_vector, 1, 0.0, pruned_j, 1 );
-					unprune_J( shell_iter, j + nbf_ * (primary_->shell(shell_iter).function_index() + func_it), pruned_j);
-				}
-			}
-        break;
+#pragma omp parallel for
+    for ( size_t row_iter = 0; row_iter < naux_; row_iter++ ) {
+        for ( size_t col_iter = 0; col_iter < mP_func_map_pQq_[big_Mu].size(); col_iter++ ) {
+            pruned_CMPQ[ row_iter * mP_func_map_pQq_[big_Mu].size() + col_iter] = 
+			raw_CMPQ[ row_iter * naux_ + mP_func_map_pQq_[big_Mu][col_iter]] ;
+        }
     }
-} // X_Block_sparse_DGEMM_split
+}
+
+void DirectDFJK::unprune_V( size_t big_Mu, double* raw_v, double* pruned_v){
+	for (size_t i = 0; i < mP_func_map_pQq_[big_Mu].size(); i++ ) {
+		raw_v[mP_func_map_pQq_[big_Mu][i]] += pruned_v[i];
+	}
+}
+
+void DirectDFJK::prune_phi( size_t big_Mu, double* raw_phi, double* pruned_phi) {
+	for ( size_t i = 0; i < mP_func_map_pQq_[big_Mu].size(); i++ ) {
+		pruned_phi[i] = raw_phi[ mP_func_map_pQq_[big_Mu][i] ];
+	}
+}
 
 } //namespace psi

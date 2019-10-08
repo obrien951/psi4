@@ -1074,6 +1074,12 @@ class PSI_API DirectDFJK : public JK {
 	bool BB_;
     /// Condition cutoff in fitting metric, defaults to 1.0E-12
     double condition_ = 1e-12;
+	double tolerance_;
+
+	// used to determine which jk algorithm is used.
+	int nocc_last_;
+
+	int erilast_;
 
 	/// threads for openmp
     int df_ints_num_threads_ = 1;
@@ -1135,13 +1141,24 @@ class PSI_API DirectDFJK : public JK {
 
     void common_init();
 
-	// sparsity mask for AO_construction
+	// schwarz sparsity mask for AO_construction
 	std::vector<std::vector<size_t>> schwarz_shell_mask_pQq_;
 	//We're going to use a 
 
+	// The each unscreened shell's start function as indexed
+	// in the basis function
 	std::vector<std::vector<size_t>> schwarz_func_starts_pQq_;
 
 	std::vector<size_t> schwarz_dense_funcs_;
+
+	// sparsity mask by mP for AO construction
+	std::vector<std::vector<size_t>> mP_func_map_pQq_;
+	std::vector<std::vector<size_t>> mP_shel_map_pQq_;
+
+    // We need mP functions to be called in the right order.
+    //     an input to std::sort
+    //     abbreviation of "size_t compare"
+    static bool sztcmp(size_t i, size_t j) {return (i < j);}
 
 	// Functions to prepare sparsity. These will work differently
 	//   for different memory layouts
@@ -1181,7 +1198,9 @@ class PSI_API DirectDFJK : public JK {
 
     void compute_dense_AO_block_p_pQq(size_t shell, double* ao_block, std::vector<std::shared_ptr<TwoBodyAOInt>> eri);
     
+    void compute_AO_block_p_pQq_mn_sparse_set_mP( size_t shell, double* ao_block, std::vector<std::shared_ptr<TwoBodyAOInt>> eri );
 
+    void compute_AO_block_p_pQq_mn_mP_sparse( size_t shell, double* ao_block, std::vector<std::shared_ptr<TwoBodyAOInt>> eri ); 
 
 	std::string name() override { return "DirectDFJK"; }
 
@@ -1220,7 +1239,10 @@ class PSI_API DirectDFJK : public JK {
 
 	void prune_c( size_t &mu, size_t nocc, double* pruned_c, double* raw_c );
 	void prune_d( size_t &mu, double* pruned_d, double* raw_d);
+	void prune_cmpq(size_t big_Mu, double* raw_CMPQ, double* pruned_CMPQ);
+	void unprune_V( size_t big_Mu, double* raw_v, double* pruned_v);
 	void unprune_J( size_t &mu, double* raw_j, double* pruned_j );
+	void prune_phi( size_t big_Mu, double* raw_phi, double* pruned_phi );
 
 	//computes D_ao_[ind] to correspond to C_right_ao_[ind] and C_left_ao_[ind]
 	void compute_D_ao(size_t ind);
@@ -1254,13 +1276,17 @@ class PSI_API DirectDFJK : public JK {
 
 	void X_Block_sparse(char coul_work, bool compute_k, size_t block, double* pruned_c, double* pruned_d, double* ao_block, double* x, double* u, double* coulomb_vector, double* pruned_j, std::vector<std::shared_ptr<TwoBodyAOInt>> eri);
 
-	void X_Block_sparse_DGEMM_split(char coul_work, bool compute_k, size_t block, double* pruned_c, double* pruned_d, double* ao_block, double* x, double* u, double* coulomb_vector, double* pruned_j, std::vector<std::shared_ptr<TwoBodyAOInt>> eri);
-    
+	void X_Block_mn_sparse_set_mP( bool with_contraction, bool compute_k, size_t block, double* pruned_c, double* pruned_d, double* ao_block, double* x, double* u, double* coulomb_vector, double* pruned_coulomb_vector, double* pruned_j, double* pruned_cm, std::vector<std::shared_ptr<TwoBodyAOInt>> eri );
+
+	void X_Block_mn_mP_sparse(char coul_work, bool compute_k, size_t block, double* pruned_c, double* pruned_d, double* ao_block, double* x, double* u, double* coulomb_vector, double* pruned_coulomb_vector, double* pruned_j, double* pruned_cm, std::vector<std::shared_ptr<TwoBodyAOInt>> eri);
+
     void pQp();
 
 	void pQp_sparse();
 
-	void pQp_sparse_DGEMM_split();
+	void pQp_mn_sparse_set_mP();
+
+	void pQp_mn_mP_sparse();
 
 	void set_uhf(std::string uhf) { if (uhf == "UHF") uhf_ = true; }
 	//prepares the Density matrix if C* == C
