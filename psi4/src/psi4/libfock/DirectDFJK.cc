@@ -1666,20 +1666,7 @@ void DirectDFJK::pQp(){
 #endif
 	eri[rank] = std::shared_ptr<TwoBodyAOInt>(rifactory->eri());
 	}
-<<<<<<< HEAD
 
-=======
-	//dirty
-	size_t biggest_shell = 0;
-
-	for (int i = 0; i < primary_->nshell(); i++){
-		if (primary_->shell(i).nfunction() > biggest_shell) {
-			biggest_shell = primary_->shell(i).nfunction();
-		}
-	}
-	biggest_shell_ = biggest_shell;
-//end dirty
->>>>>>> 31ee3248ec396155c527e098a0bbeb6e6c09ac99
 	int nocc = C_left_ao_[0]->ncol();
 
 	double* j = J_ao_[0]->pointer(0)[0];
