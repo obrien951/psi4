@@ -1863,7 +1863,6 @@ timer_off("DDF pQq big K DGEMM");
 	}
 }
 
-<<<<<<< HEAD
 void DirectDFJK::pQp_mn_sparse_set_mP() {
 	mP_func_map_pQq_.clear();
 	mP_shel_map_pQq_.clear();
