@@ -1040,11 +1040,7 @@ void DirectDFJK::compute_sparse_AO_block_p_pQq( size_t shell, double* ao_block, 
 //   around. The memory in &ao_block will live in a unique pointer in the 
 //   module that wraps this function, and in this function, we'll just worry 
 //   about filling it with what belongs inside.
-<<<<<<< HEAD
 void DirectDFJK::compute_AO_block_Qpq( size_t start_Q, size_t stop_Q, double* ao_block, std::vector<std::shared_ptr<TwoBodyAOInt>> eri ){
-=======
-void DirectDFJK::compute_AO_block_Qpq(size_t start_Q, size_t stop_Q, double* ao_block, std::vector<std::shared_ptr<TwoBodyAOInt>> eri){
->>>>>>> 31ee3248ec396155c527e098a0bbeb6e6c09ac99
 	int procs = 1;
 #ifdef _OPENMP
 	procs = omp_nthread_;
