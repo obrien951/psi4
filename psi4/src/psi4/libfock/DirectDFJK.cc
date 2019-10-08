@@ -460,10 +460,6 @@ void sparsity_prep_Qpq() { }
 
 void DirectDFJK::sparsity_prep_pQq(){
 	printf("started sparsity prep\n");
-<<<<<<< HEAD
-
-=======
->>>>>>> 31ee3248ec396155c527e098a0bbeb6e6c09ac99
 	int procs = 1;
 #ifdef _OPENMP
 	procs = omp_nthread_;
