@@ -1672,21 +1672,12 @@ void DirectDFJK::pQp(){
 	double* j = J_ao_[0]->pointer(0)[0];
 	double* k = K_ao_[0]->pointer(0)[0];
 	
-<<<<<<< HEAD
 	std::unique_ptr<double[]> A(new double[biggest_shell_*naux_*nbf_]);
 	std::unique_ptr<double[]> U(new double[1U]);
 	if (BB_) {
 		U.reset(new double[biggest_shell_*naux_*nbf_]);
 	} else {
 		U.reset(new double[biggest_shell_*naux_*nocc]);
-=======
-	std::unique_ptr<double[]> A(new double[biggest_shell*naux_*nbf_]);
-	std::unique_ptr<double[]> U(new double[1U]);
-	if (BB_) {
-		U.reset(new double[biggest_shell*naux_*nbf_]);
-	} else {
-		U.reset(new double[biggest_shell*naux_*nocc]);
->>>>>>> 31ee3248ec396155c527e098a0bbeb6e6c09ac99
 	}
 	std::unique_ptr<double[]> XN(new double[biggest_block_/nbf_*nocc]);
 	std::unique_ptr<double[]> XO(new double[biggest_block_/nbf_*nocc]);
