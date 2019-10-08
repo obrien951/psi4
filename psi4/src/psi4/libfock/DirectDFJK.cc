@@ -160,9 +160,6 @@ void DirectDFJK::pytemplate(){
 	}
 	fprintf(eri_ints,"\n");
 	fclose(eri_ints);
-<<<<<<< HEAD
-
-
 
 	for ( int shell_P_it = 0; shell_P_it < auxiliary_->nshell(); shell_P_it++ ) {
 		for ( int shell_M_it = 0; shell_M_it < primary_->nshell(); shell_M_it++ ) {
@@ -180,9 +177,6 @@ void DirectDFJK::pytemplate(){
 
 	fclose(tic);
 
-=======
->>>>>>> 31ee3248ec396155c527e098a0bbeb6e6c09ac99
-	
 //	int* five = (int*) malloc(sizeof(int));
 //	int* twenty_four = (int*) malloc(sizeof(int));
 //                                          
