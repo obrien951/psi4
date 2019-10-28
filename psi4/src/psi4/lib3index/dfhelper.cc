@@ -181,17 +181,11 @@ void DFHelper::initialize() {
         outfile->Printf("%s in-core AOs.\n\n", AO_core_ ? "Using" : "Turning off");
     }
 
-	outfile->Printf("About to enter ao build\n");
-
     // prepare AOs for STORE method
     if (AO_core_) {
-		outfile->Printf("About to prepare_ao_core\n");
 		prepare_AO_core();
-		outfile->Printf("just left prepare_ao_core\n");
         if (do_wK_) {
-			outfile->Printf("About to enter prepare_AO_wK_core\n");
             prepare_AO_wK_core();
-			outfile->Printf("just left prepare_AO_wK_core\n");
         } else {
 //			prepare_AO_core();
 		}	
@@ -555,14 +549,10 @@ void DFHelper::prepare_AO_core() {
             compute_sparse_pQq_blocking_p_symm(start, stop, Mp, eri);
             timer_off("DFH: AO Construction");
 
-			outfile->Printf("about to enter contract metric_ao_core_symm\n");
-
             // contract metric
             timer_on("DFH: AO-Met. Contraction");
             contract_metric_AO_core_symm(Mp, ppq, metp, begin, end);
             timer_off("DFH: AO-Met. Contraction");
-
-			outfile->Printf("just left contract metric_ao_core_symm\n");
         }
         // no more need for metrics
         if (hold_met_) metrics_.clear();
