@@ -168,7 +168,7 @@ void DFHelper::initialize() {
     if (!(std::fabs(mpower_ - 0.0) < 1e-13)) (hold_met_ ? prepare_metric_core() : prepare_metric());
 
 	// if metric power for omega integrals, prepare its metric
-	if (do_wK_) { if (!(std::fabs(mpower_ - 0.0) < 1e-13)) (hold_met_ ? prepare_metric_core() : prepare_metric()); }
+	if (do_wK_) { if (!(std::fabs(wmpower_ - 0.0) < 1e-13)) (hold_met_ ? prepare_metric_core() : prepare_metric()); }
 
     // prepare sparsity masks
     prepare_sparsity();
@@ -461,7 +461,37 @@ void DFHelper::prepare_AO() {
         count += size;
     }
 }
-void DFHelper::prepare_AO_wK() {}
+void DFHelper::prepare_AO_wK() {
+    // prepare eris
+    std::shared_ptr<BasisSet> zero = BasisSet::zero_ao_basis_set();
+    auto rifactory = std::make_shared<IntegralFactory>(aux_, zero, primary_, primary_);
+    std::vector<std::shared_ptr<TwoBodyAOInt>> eri(nthreads_);
+#pragma omp parallel num_threads(nthreads_)
+    {
+        int rank = 0;
+#ifdef _OPENMP
+        rank = omp_get_thread_num();
+#endif
+        eri[rank] = std::shared_ptr<TwoBodyAOInt>(rifactory->eri());
+    }
+
+    // gather blocking info
+    std::vector<std::pair<size_t, size_t>> psteps;
+    std::pair<size_t, size_t> plargest = pshell_blocks_for_AO_build(memory_, 0, psteps);
+
+
+
+
+
+
+
+
+
+
+
+
+
+}
 void DFHelper::prepare_AO_core() {
     // get each thread an eri object
     std::shared_ptr<BasisSet> zero = BasisSet::zero_ao_basis_set();
@@ -511,10 +541,8 @@ void DFHelper::prepare_AO_core() {
             metp = metric.get();
             std::string filename = return_metfile(mpower_);
             get_tensor_(std::get<0>(files_[filename]), metp, 0, naux_ - 1, 0, naux_ - 1);
-			printf("not hold met\n");
         } else 
             metp = metric_prep_core(mpower_);
-			printf("hold met true\n");
 
         for (size_t i = 0; i < psteps.size(); i++) {
             size_t start = std::get<0>(psteps[i]);
@@ -542,7 +570,6 @@ void DFHelper::prepare_AO_core() {
     // outfile->Printf("\n    ==> End AO Blocked Construction <==");
 }
 void DFHelper::prepare_AO_wK_core() {
-	printf("wk ao ping\n");
     // get each thread an eri object
     std::shared_ptr<BasisSet> zero = BasisSet::zero_ao_basis_set();
     auto rifactory = std::make_shared<IntegralFactory>(aux_, zero, primary_, primary_);
@@ -559,8 +586,6 @@ void DFHelper::prepare_AO_wK_core() {
         eri[rank] = std::shared_ptr<TwoBodyAOInt>(rifactory->eri());
 		weri[rank] = std::shared_ptr<TwoBodyAOInt>(rifactory->erf_eri(omega_));
     }
-
-printf("%f\n", omega_ );
 
     // use blocking as for prepare_AO_core
     std::vector<std::pair<size_t, size_t>> psteps;
@@ -583,7 +608,7 @@ printf("%f\n", omega_ );
         std::string filename = return_metfile(wmpower_);
         get_tensor_(std::get<0>(files_[filename]), met1p, 0, naux_ - 1, 0, naux_ - 1);
     } else {
-        met1p = metric_prep_core(-1.0);
+        met1p = metric_prep_core(wmpower_);
 		//met1p = metric_prep_core(1.0);
 /*		auto Jinv = std::make_shared<FittingMetric>(aux_, true);
 		Jinv->form_full_eig_inverse(condition_);
@@ -611,30 +636,32 @@ printf("%f\n", omega_ );
         compute_sparse_pQq_blocking_p_symm(start, stop, M1p, weri);
         timer_off("DFH: wAO Construction");
 
+		timer_on("DFH: wAO Copy");
 		copy_upper_lower_wAO_core_symm(M1p, wppq, begin, end);
+		timer_off("DFH: wAO Copy");
     }
 
 
-    FILE * eri_ints = fopen("/theoryfs2/ds/obrien/Debug/Psi4/dfh_wk/dfheri_ints.txt", "w");
-    FILE * eriwints = fopen("/theoryfs2/ds/obrien/Debug/Psi4/dfh_wk/dfheriwints.txt", "w");
-
-	for (int i = 0; i < nbf_; i++) {
-		fprintf(eri_ints, "%d\n", i); fprintf(eriwints,"%d\n", i);
-		for (int j = 0; j < naux_; j++) {
-			for (int k = 0; k < small_skips_[i]; k++){
-				fprintf(eriwints," %f",  wppq[ big_skips_[i] + j * small_skips_[i] + k] );
-				fprintf(eri_ints," %f", m1ppq[ big_skips_[i] + j * small_skips_[i] + k] );
-			}
-			fprintf(eriwints,"\n"); 
-			fprintf(eri_ints,"\n");
-		}
-		fprintf(eri_ints, "\n"); fprintf(eriwints, "\n");
-		fprintf(eri_ints, "\n"); fprintf(eriwints, "\n");
-		fprintf(eri_ints, "\n"); fprintf(eriwints, "\n");
-	}
-
-    fclose(eri_ints); 
-    fclose(eriwints); 
+//    FILE * eri_ints = fopen("/theoryfs2/ds/obrien/Debug/Psi4/dfh_wk/dfheri_ints.txt", "w");
+//    FILE * eriwints = fopen("/theoryfs2/ds/obrien/Debug/Psi4/dfh_wk/dfheriwints.txt", "w");
+//
+//	for (int i = 0; i < nbf_; i++) {
+//		fprintf(eri_ints, "%d\n", i); fprintf(eriwints,"%d\n", i);
+//		for (int j = 0; j < naux_; j++) {
+//			for (int k = 0; k < small_skips_[i]; k++){
+//				fprintf(eriwints," %f",  wppq[ big_skips_[i] + j * small_skips_[i] + k] );
+//				fprintf(eri_ints," %f", m1ppq[ big_skips_[i] + j * small_skips_[i] + k] );
+//			}
+//			fprintf(eriwints,"\n"); 
+//			fprintf(eri_ints,"\n");
+//		}
+//		fprintf(eri_ints, "\n"); fprintf(eriwints, "\n");
+//		fprintf(eri_ints, "\n"); fprintf(eriwints, "\n");
+//		fprintf(eri_ints, "\n"); fprintf(eriwints, "\n");
+//	}
+//
+//    fclose(eri_ints); 
+//    fclose(eriwints); 
 
     // no more need for metrics
     if (hold_met_) metrics_.clear();
@@ -1311,18 +1338,18 @@ double* DFHelper::metric_prep_core(double pow) {
             break;
         }
     }
+    timer_on("DFH: metric power");
     if (!on) {
         power = pow;
-        timer_on("DFH: metric power");
         SharedMatrix J = metrics_[1.0];
         if ( fabs( pow + 1.0) < 1e-13 ) {
 		    J->invert();
 		} else {
-			J->power(power, condition_);
+    		J->power(power, condition_);
 		}
         metrics_[power] = J;
-        timer_off("DFH: metric power");
     }
+    timer_off("DFH: metric power");
 
     return metrics_[power]->pointer()[0];
 }
@@ -1390,7 +1417,6 @@ double* DFHelper::metric_inverse_prep_core() {
 	double power;
     for (auto& kv : metrics_) {
         if (!(std::fabs(-1.0 - kv.first) > 1e-13)) {
-			printf("ping from found a metric in metric_inverse prep core\n");
             on = true;
             power = kv.first;
             break;
@@ -1558,7 +1584,6 @@ void DFHelper::contract_metric_AO_core_symm(double* Qpq, double* Ppq, double* me
     }
 }
 void DFHelper::copy_upper_lower_wAO_core_symm(double* Qpq, double* Ppq, size_t begin, size_t end){
-	printf("ping copy upper lower.\n");
 	// copy out of symm
 	size_t startind = symm_big_skips_[begin];
 	for (size_t j = begin; j <= end; j++) {
