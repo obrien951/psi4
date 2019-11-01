@@ -167,8 +167,10 @@ void DFHelper::initialize() {
     // if metric power is not zero, prepare it
     if (!(std::fabs(mpower_ - 0.0) < 1e-13)) (hold_met_ ? prepare_metric_core() : prepare_metric());
 
-	// if metric power for omega integrals, prepare its metric
-	if (do_wK_) { if (!(std::fabs(wmpower_ - 0.0) < 1e-13)) (hold_met_ ? prepare_metric_core() : prepare_metric()); }
+    // if metric power for omega integrals, prepare its metric
+    if (do_wK_) {
+        if (!(std::fabs(wmpower_ - 0.0) < 1e-13)) (hold_met_ ? prepare_metric_core() : prepare_metric());
+    }
 
     // prepare sparsity masks
     prepare_sparsity();
@@ -183,22 +185,22 @@ void DFHelper::initialize() {
 
     // prepare AOs for STORE method
     if (AO_core_) {
-		prepare_AO_core();
+        prepare_AO_core();
         if (do_wK_) {
             prepare_AO_wK_core();
         } else {
-//			prepare_AO_core();
-		}	
+            //			prepare_AO_core();
+        }
     } else if (!direct_ && !direct_iaQ_) {
-		prepare_AO();
+        prepare_AO();
         if (do_wK_) {
             std::stringstream error;
             error << "DFHelper: not equipped to do wK";
             throw PSIEXCEPTION(error.str().c_str());
             prepare_AO_wK();
         } else {
-//        	prepare_AO();
-		}
+            //        	prepare_AO();
+        }
     }
 
     built_ = true;
@@ -218,7 +220,7 @@ void DFHelper::AO_core() {
     } else {
         // total size of sparse AOs. beautiful
         required_core_size_ = (do_wK_ ? 3 * big_skips_[nbf_] : big_skips_[nbf_]);
-   }
+    }
 
     // Auxiliary metric
     required_core_size_ += naux_ * naux_;
@@ -472,19 +474,6 @@ void DFHelper::prepare_AO_wK() {
     // gather blocking info
     std::vector<std::pair<size_t, size_t>> psteps;
     std::pair<size_t, size_t> plargest = pshell_blocks_for_AO_build(memory_, 0, psteps);
-
-
-
-
-
-
-
-
-
-
-
-
-
 }
 void DFHelper::prepare_AO_core() {
     // get each thread an eri object
@@ -511,7 +500,7 @@ void DFHelper::prepare_AO_core() {
         Ppq_ = std::unique_ptr<double[]>(new double[big_skips_[nbf_]]);
     }
 
-	double* ppq = Ppq_.get();
+    double* ppq = Ppq_.get();
 
     // outfile->Printf("\n    ==> Begin AO Blocked Construction <==\n\n");
     if (direct_iaQ_ || direct_) {
@@ -535,7 +524,7 @@ void DFHelper::prepare_AO_core() {
             metp = metric.get();
             std::string filename = return_metfile(mpower_);
             get_tensor_(std::get<0>(files_[filename]), metp, 0, naux_ - 1, 0, naux_ - 1);
-        } else 
+        } else
             metp = metric_prep_core(mpower_);
 
         for (size_t i = 0; i < psteps.size(); i++) {
@@ -564,8 +553,7 @@ void DFHelper::prepare_AO_wK_core() {
     std::shared_ptr<BasisSet> zero = BasisSet::zero_ao_basis_set();
     auto rifactory = std::make_shared<IntegralFactory>(aux_, zero, primary_, primary_);
     std::vector<std::shared_ptr<TwoBodyAOInt>> eri(nthreads_);
-	std::vector<std::shared_ptr<TwoBodyAOInt>> weri(nthreads_);
-
+    std::vector<std::shared_ptr<TwoBodyAOInt>> weri(nthreads_);
 
 #pragma omp parallel num_threads(nthreads_)
     {
@@ -574,7 +562,7 @@ void DFHelper::prepare_AO_wK_core() {
         rank = omp_get_thread_num();
 #endif
         eri[rank] = std::shared_ptr<TwoBodyAOInt>(rifactory->eri());
-		weri[rank] = std::shared_ptr<TwoBodyAOInt>(rifactory->erf_eri(omega_));
+        weri[rank] = std::shared_ptr<TwoBodyAOInt>(rifactory->erf_eri(omega_));
     }
 
     // use blocking as for prepare_AO_core
@@ -584,8 +572,8 @@ void DFHelper::prepare_AO_wK_core() {
     wPpq_ = std::unique_ptr<double[]>(new double[big_skips_[nbf_]]);
     m1Ppq_ = std::unique_ptr<double[]>(new double[big_skips_[nbf_]]);
 
-	double* wppq = wPpq_.get();
-	double* m1ppq = m1Ppq_.get();
+    double* wppq = wPpq_.get();
+    double* m1ppq = m1Ppq_.get();
 
     std::unique_ptr<double[]> Qpq(new double[std::get<0>(plargest)]);
     double* M1p = Qpq.get();
@@ -599,11 +587,11 @@ void DFHelper::prepare_AO_wK_core() {
         get_tensor_(std::get<0>(files_[filename]), met1p, 0, naux_ - 1, 0, naux_ - 1);
     } else {
         met1p = metric_prep_core(wmpower_);
-		//met1p = metric_prep_core(1.0);
-/*		auto Jinv = std::make_shared<FittingMetric>(aux_, true);
-		Jinv->form_full_eig_inverse(condition_);
-		met1p = Jinv->get_metric()->pointer()[0]; */
-	}
+        // met1p = metric_prep_core(1.0);
+        /*		auto Jinv = std::make_shared<FittingMetric>(aux_, true);
+                        Jinv->form_full_eig_inverse(condition_);
+                        met1p = Jinv->get_metric()->pointer()[0]; */
+    }
 
     for (size_t i = 0; i < psteps.size(); i++) {
         size_t start = std::get<0>(psteps[i]);
@@ -621,41 +609,39 @@ void DFHelper::prepare_AO_wK_core() {
         contract_metric_AO_core_symm(M1p, m1ppq, met1p, begin, end);
         timer_off("DFH: AO-Met. Contraction");
 
-		// compute (A|w|mn)
+        // compute (A|w|mn)
         timer_on("DFH: wAO Construction");
         compute_sparse_pQq_blocking_p_symm(start, stop, M1p, weri);
         timer_off("DFH: wAO Construction");
 
-		timer_on("DFH: wAO Copy");
-		copy_upper_lower_wAO_core_symm(M1p, wppq, begin, end);
-		timer_off("DFH: wAO Copy");
+        timer_on("DFH: wAO Copy");
+        copy_upper_lower_wAO_core_symm(M1p, wppq, begin, end);
+        timer_off("DFH: wAO Copy");
     }
 
-
-//    FILE * eri_ints = fopen("/theoryfs2/ds/obrien/Debug/Psi4/dfh_wk/dfheri_ints.txt", "w");
-//    FILE * eriwints = fopen("/theoryfs2/ds/obrien/Debug/Psi4/dfh_wk/dfheriwints.txt", "w");
-//
-//	for (int i = 0; i < nbf_; i++) {
-//		fprintf(eri_ints, "%d\n", i); fprintf(eriwints,"%d\n", i);
-//		for (int j = 0; j < naux_; j++) {
-//			for (int k = 0; k < small_skips_[i]; k++){
-//				fprintf(eriwints," %f",  wppq[ big_skips_[i] + j * small_skips_[i] + k] );
-//				fprintf(eri_ints," %f", m1ppq[ big_skips_[i] + j * small_skips_[i] + k] );
-//			}
-//			fprintf(eriwints,"\n"); 
-//			fprintf(eri_ints,"\n");
-//		}
-//		fprintf(eri_ints, "\n"); fprintf(eriwints, "\n");
-//		fprintf(eri_ints, "\n"); fprintf(eriwints, "\n");
-//		fprintf(eri_ints, "\n"); fprintf(eriwints, "\n");
-//	}
-//
-//    fclose(eri_ints); 
-//    fclose(eriwints); 
+    //    FILE * eri_ints = fopen("/theoryfs2/ds/obrien/Debug/Psi4/dfh_wk/dfheri_ints.txt", "w");
+    //    FILE * eriwints = fopen("/theoryfs2/ds/obrien/Debug/Psi4/dfh_wk/dfheriwints.txt", "w");
+    //
+    //	for (int i = 0; i < nbf_; i++) {
+    //		fprintf(eri_ints, "%d\n", i); fprintf(eriwints,"%d\n", i);
+    //		for (int j = 0; j < naux_; j++) {
+    //			for (int k = 0; k < small_skips_[i]; k++){
+    //				fprintf(eriwints," %f",  wppq[ big_skips_[i] + j * small_skips_[i] + k] );
+    //				fprintf(eri_ints," %f", m1ppq[ big_skips_[i] + j * small_skips_[i] + k] );
+    //			}
+    //			fprintf(eriwints,"\n");
+    //			fprintf(eri_ints,"\n");
+    //		}
+    //		fprintf(eri_ints, "\n"); fprintf(eriwints, "\n");
+    //		fprintf(eri_ints, "\n"); fprintf(eriwints, "\n");
+    //		fprintf(eri_ints, "\n"); fprintf(eriwints, "\n");
+    //	}
+    //
+    //    fclose(eri_ints);
+    //    fclose(eriwints);
 
     // no more need for metrics
     if (hold_met_) metrics_.clear();
-
 }
 std::pair<size_t, size_t> DFHelper::pshell_blocks_for_AO_build(const size_t mem, size_t symm,
                                                                std::vector<std::pair<size_t, size_t>>& b) {
@@ -673,18 +659,18 @@ std::pair<size_t, size_t> DFHelper::pshell_blocks_for_AO_build(const size_t mem,
             // get current cost of this block of AOs and add it to the total
             // the second buffer is accounted for with full AO_core
             current = symm_big_skips_[end + 1] - symm_big_skips_[begin];
-			if (do_wK_) {
-				current *=3;
-			}
+            if (do_wK_) {
+                current *= 3;
+            }
             total += current;
         } else {
             // on-disk
             // get current cost of this block of AOs and add it to the total
             // count current twice, for both pre and post contracted buffers
             current = big_skips_[end + 1] - big_skips_[begin];
-			if (do_wK_) {
-				current *=3;
-			}
+            if (do_wK_) {
+                current *= 3;
+            }
             total += 2 * current;
         }
 
@@ -1332,11 +1318,11 @@ double* DFHelper::metric_prep_core(double pow) {
     if (!on) {
         power = pow;
         SharedMatrix J = metrics_[1.0];
-        if ( fabs( pow + 1.0) < 1e-13 ) {
-		    J->invert();
-		} else {
-    		J->power(power, condition_);
-		}
+        if (fabs(pow + 1.0) < 1e-13) {
+            J->invert();
+        } else {
+            J->power(power, condition_);
+        }
         metrics_[power] = J;
     }
     timer_off("DFH: metric power");
@@ -1404,7 +1390,7 @@ std::string DFHelper::compute_metric(double pow) {
 }
 double* DFHelper::metric_inverse_prep_core() {
     bool on = false;
-	double power;
+    double power;
     for (auto& kv : metrics_) {
         if (!(std::fabs(-1.0 - kv.first) > 1e-13)) {
             on = true;
@@ -1416,16 +1402,16 @@ double* DFHelper::metric_inverse_prep_core() {
         power = -1.0;
         timer_on("DFH: metric power");
         SharedMatrix J = metrics_[1.0];
-		J->invert();
-/*		printf("ping\n");
-		double* j = metrics_[power]->pointer()[0];
-		printf("ping\n");
-		std::unique_ptr<int[]> IPIV(new int[naux_]);
-		std::unique_ptr<double[]> WORK(new double[naux_]);
-		int * ipiv = IPIV.get();
-		double * work = WORK.get();
-		C_DGETRF( (int) naux_, (int) naux_, j, (int) naux_, ipiv);
-		C_DGETRI( (int) naux_, j, (int) naux_, ipiv, work, (int) naux_); */
+        J->invert();
+        /*		printf("ping\n");
+                        double* j = metrics_[power]->pointer()[0];
+                        printf("ping\n");
+                        std::unique_ptr<int[]> IPIV(new int[naux_]);
+                        std::unique_ptr<double[]> WORK(new double[naux_]);
+                        int * ipiv = IPIV.get();
+                        double * work = WORK.get();
+                        C_DGETRF( (int) naux_, (int) naux_, j, (int) naux_, ipiv);
+                        C_DGETRI( (int) naux_, j, (int) naux_, ipiv, work, (int) naux_); */
         metrics_[power] = J;
         timer_off("DFH: metric power");
     }
@@ -1559,7 +1545,7 @@ void DFHelper::contract_metric_AO_core_symm(double* Qpq, double* Ppq, double* me
         size_t skip2 = symm_big_skips_[j] - startind;
         C_DGEMM('N', 'N', naux_, mi, naux_, 1.0, metp, naux_, &Qpq[skip2], mi, 0.0, &Ppq[skip1 + jump], si);
     }
-    // copy upper-to-lower
+// copy upper-to-lower
 #pragma omp parallel for num_threads(nthreads_) schedule(static)
     for (size_t omu = begin; omu <= end; omu++) {
         for (size_t Q = 0; Q < naux_; Q++) {
@@ -1573,20 +1559,20 @@ void DFHelper::contract_metric_AO_core_symm(double* Qpq, double* Ppq, double* me
         }
     }
 }
-void DFHelper::copy_upper_lower_wAO_core_symm(double* Qpq, double* Ppq, size_t begin, size_t end){
-	// copy out of symm
-	size_t startind = symm_big_skips_[begin];
-	for (size_t j = begin; j <= end; j++) {
-		size_t mi = symm_small_skips_[j];
+void DFHelper::copy_upper_lower_wAO_core_symm(double* Qpq, double* Ppq, size_t begin, size_t end) {
+    // copy out of symm
+    size_t startind = symm_big_skips_[begin];
+    for (size_t j = begin; j <= end; j++) {
+        size_t mi = symm_small_skips_[j];
         size_t si = small_skips_[j];
-		size_t jump = symm_ignored_columns_[j];
+        size_t jump = symm_ignored_columns_[j];
         size_t skip1 = big_skips_[j];
-		size_t skip2 = symm_big_skips_[j] - startind;
-		for (size_t j2 = 0; j2 < naux_; j2++) {
-			C_DCOPY(mi, &Qpq[skip2 + mi*j2 ], 1, &Ppq[skip1 + jump + si*j2 ], 1);
-		}
-	} 
-    // copy upper-to-lower
+        size_t skip2 = symm_big_skips_[j] - startind;
+        for (size_t j2 = 0; j2 < naux_; j2++) {
+            C_DCOPY(mi, &Qpq[skip2 + mi * j2], 1, &Ppq[skip1 + jump + si * j2], 1);
+        }
+    }
+// copy upper-to-lower
 #pragma omp parallel for num_threads(nthreads_) schedule(static)
     for (size_t omu = begin; omu <= end; omu++) {
         for (size_t Q = 0; Q < naux_; Q++) {
@@ -2897,16 +2883,16 @@ void DFHelper::build_JK(std::vector<SharedMatrix> Cleft, std::vector<SharedMatri
         outfile->Printf("Entering DFHelper::build_JK\n");
     }
 
-// This was an if-else statement. Presumably, we could manage J construction
-//   to more effectively manage memory, so I think that was what was going on.
+    // This was an if-else statement. Presumably, we could manage J construction
+    //   to more effectively manage memory, so I think that was what was going on.
 
     if (do_J || do_K) {
         timer_on("DFH: compute_JK()");
         compute_JK(Cleft, Cright, D, J, K, max_nocc, do_J, do_K, do_wK, lr_symmetric);
         timer_off("DFH: compute_JK()");
-    } 
+    }
 
-	if (do_wK_) {
+    if (do_wK_) {
         timer_on("DFH: compute_wK()");
         compute_wK(Cleft, Cright, wK, max_nocc, do_J, do_K, do_wK);
         timer_off("DFH: compute_wK()");
@@ -3172,14 +3158,15 @@ void DFHelper::compute_K(std::vector<SharedMatrix> Cleft, std::vector<SharedMatr
                 nbf_);
     }
 }
-void DFHelper::compute_wK(std::vector<SharedMatrix> Cleft, std::vector<SharedMatrix> Cright, std::vector<SharedMatrix> wK, size_t max_nocc, bool do_J, bool do_K, bool do_wK) {
+void DFHelper::compute_wK(std::vector<SharedMatrix> Cleft, std::vector<SharedMatrix> Cright,
+                          std::vector<SharedMatrix> wK, size_t max_nocc, bool do_J, bool do_K, bool do_wK) {
     std::vector<std::pair<size_t, size_t>> Qsteps;
     std::tuple<size_t, size_t> info = Qshell_blocks_for_JK_build(Qsteps, max_nocc, false);
     size_t tots = std::get<0>(info);
     size_t totsb = std::get<1>(info);
 
-	double* wMp = wPpq_.get();
-	double* M1p = m1Ppq_.get();
+    double* wMp = wPpq_.get();
+    double* M1p = m1Ppq_.get();
     std::vector<std::vector<double>> C_buffers(nthreads_);
 // prepare C buffers
 #pragma omp parallel num_threads(nthreads_)
@@ -3194,7 +3181,7 @@ void DFHelper::compute_wK(std::vector<SharedMatrix> Cleft, std::vector<SharedMat
     // declare bufs
     std::unique_ptr<double[]> T1;  // Ktmp1
     std::unique_ptr<double[]> T2;  // Ktmp2
-                                                                                      
+
     // allocate first Ktmp
     size_t Ktmp_size = (!max_nocc ? totsb * 1 : totsb * max_nocc);
     Ktmp_size = std::max(Ktmp_size * nbf_, nthreads_ * naux_);  // max necessary
@@ -3205,7 +3192,7 @@ void DFHelper::compute_wK(std::vector<SharedMatrix> Cleft, std::vector<SharedMat
 
     /* The rest of the file would usually be in compute_K */
     /* */
-    for ( size_t bind = 0, bcount = 0; bind < Qsteps.size(); bind++ ) {
+    for (size_t bind = 0, bcount = 0; bind < Qsteps.size(); bind++) {
         size_t start = std::get<0>(Qsteps[bind]);
         size_t stop = std::get<1>(Qsteps[bind]);
         size_t begin = Qshell_aggs_[start];
@@ -3213,21 +3200,23 @@ void DFHelper::compute_wK(std::vector<SharedMatrix> Cleft, std::vector<SharedMat
         size_t block_size = end - begin + 1;
         for (size_t i = 0; i < wK.size(); i++) {
             size_t nocc = Cleft[i]->colspi()[0];
-            if (!nocc) { continue; }
+            if (!nocc) {
+                continue;
+            }
             double* Clp = Cleft[i]->pointer()[0];
             double* Crp = Cright[i]->pointer()[0];
             double* wKp = wK[i]->pointer()[0];
-    
+
             // compute first tmp
             first_transform_pQq(nocc, bcount, block_size, M1p, T1p, Clp, C_buffers);
             // compute second tmp
             first_transform_pQq(nocc, bcount, block_size, wMp, T2p, Crp, C_buffers);
-    
+
             // compute wK
-            C_DGEMM('N', 'T', nbf_, nbf_, nocc * block_size, 1.0, T2p, nocc * block_size, T1p, nocc * block_size, 1.0, wKp,
-                    nbf_);
+            C_DGEMM('N', 'T', nbf_, nbf_, nocc * block_size, 1.0, T2p, nocc * block_size, T1p, nocc * block_size, 1.0,
+                    wKp, nbf_);
         }
-		bcount += block_size;
+        bcount += block_size;
     }
 }
 
