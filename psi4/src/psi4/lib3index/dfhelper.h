@@ -154,6 +154,20 @@ class PSI_API DFHelper {
     size_t get_omega() { return omega_; }
 
     ///
+    /// sets the weight for normal exchange
+    /// @param exch_alpha double: weight for normal exchange
+    ///
+    void set_exch_alpha(double exch_alpha) { exch_alpha_ = exch_alpha; }
+    double get_exch_alpha() { return exch_alpha_; }
+
+    ///
+    /// sets the weight for omega exchange
+    /// @param exch_beta double: weight for omega exchange
+    ///
+    void set_exch_beta( double exch_beta) { exch_beta_ = exch_beta; }
+    double get_exch_beta() { return exch_beta_; }
+
+    ///
     /// set the printing verbosity parameter
     /// @param print_lvl indicating verbosity
     ///
@@ -313,6 +327,8 @@ class PSI_API DFHelper {
     bool ordered_ = false;
     bool do_wK_ = false;
     double omega_;
+    double exch_alpha_;
+    double exch_beta_;
     bool debug_ = false;
     bool sparsity_prepared_ = false;
     int print_lvl_ = 1;

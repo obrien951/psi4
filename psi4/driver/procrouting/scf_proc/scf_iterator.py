@@ -121,6 +121,8 @@ def initialize_jk(self, memory, jk=None):
     jk.set_do_K(functional.is_x_hybrid())
     jk.set_do_wK(functional.is_x_lrc())
     jk.set_omega(functional.x_omega())
+#    if functional.is_x_hybrid() and functional.is_x_lrc():
+#        jk.
 
     jk.initialize()
     jk.print_header()

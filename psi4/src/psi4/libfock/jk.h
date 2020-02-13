@@ -257,6 +257,12 @@ class PSI_API JK {
     /// Omega, defaults to 0.0
     double omega_;
 
+    /// alpha for functionals with explicit exchange, defaults to 1.0
+    double exch_alpha_;
+
+    /// beta for functionals with range-separated exchange, defaults to 0.0
+    double exch_beta_;
+
     /// Left-right symmetric? Determined in each call of compute()
     bool lr_symmetric_;
 
@@ -435,6 +441,18 @@ class PSI_API JK {
     * @param omega range-separation parameter
     */
     void set_omega(double omega) { omega_ = omega; }
+
+    /**
+    * Set the \alpha value for non-attenuated eris in exchange functionals
+    * @param \alpha exchange eri weight parameter
+    */
+    void set_exch_alpha(double exch_alpha) { exch_alpha_ = exch_alpha; }
+
+    /**
+    * Set the \beta value for attenuated eris in range-separated DFT
+    * @param \beta exchange eri withgt parameter
+    */
+    void set_exch_beta(double exch_beta) { exch_beta_ = exch_beta; }
 
     // => Computers <= //
 

@@ -80,6 +80,8 @@ void MemDFJK::preiterations() {
     dfh_->set_memory(memory_ - memory_overhead());
     dfh_->set_do_wK(do_wK_);
     dfh_->set_omega(omega_);
+    dfh_->set_exch_alpha(exch_alpha_);
+    dfh_->set_exch_beta(exch_beta_);
 
     // we need to prepare the AOs here, and that's it.
     // DFHelper takes care of all the housekeeping
