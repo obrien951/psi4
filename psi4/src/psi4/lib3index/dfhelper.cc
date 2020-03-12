@@ -414,9 +414,12 @@ void DFHelper::prepare_AO() {
         metp = metric.get();
         std::string filename = return_metfile(mpower_);
         get_tensor_(std::get<0>(files_[filename]), metp, 0, naux_ - 1, 0, naux_ - 1);
+        outfile->Printf("went to disk for metric\n");
 
-    } else
+    } else {
         metp = metric_prep_core(mpower_);
+        outfile->Printf("used a metric that was in core\n");
+    }
 
     // prepare files
     AO_filename_maker(1);
@@ -524,8 +527,12 @@ void DFHelper::prepare_AO_core() {
             metp = metric.get();
             std::string filename = return_metfile(mpower_);
             get_tensor_(std::get<0>(files_[filename]), metp, 0, naux_ - 1, 0, naux_ - 1);
-        } else
+
+            outfile->Printf("went to disk for metric\n");
+        } else {
             metp = metric_prep_core(mpower_);
+            outfile->Printf("used a metric that was in core\n");
+        }
 
         for (size_t i = 0; i < psteps.size(); i++) {
             size_t start = std::get<0>(psteps[i]);

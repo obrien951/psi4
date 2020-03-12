@@ -306,7 +306,7 @@ class PSI_API DFHelper {
     double condition_ = 1e-12;
     double mpower_ = -0.5;
     double wmpower_ = -1.0;
-    bool hold_met_ = false;
+    bool hold_met_ = true;
     bool built_ = false;
     bool transformed_ = false;
     std::pair<size_t, size_t> info_;
