@@ -1070,6 +1070,100 @@ class PSI_API MemDFJK : public JK {
     std::shared_ptr<DFHelper> dfh() { return dfh_; }
 };
 
+class PSI_API MemDF_2B_JK: public JK{
+    protected:
+    /* Information for Density Fitting */
+
+    std::string name() override {return "MemDF_2B_JK";}
+    size_t memory_estimate() override;
+
+    /* This class wraps a DFHelper object
+     * dfh_ handles tensor construction, contraction
+     *    metric construction, basis set naming, sparsity,
+     *    and fills J and K Matrices.
+     *
+     * The user is responsible for stitching the resulting
+     * matrices together. */
+    std::shared_ptr<DFHelper> dfh_;
+
+    std::shared_ptr<BasisSet> auxiliary_;
+    std::shared_ptr<BasisSet> row_bas_;
+    std::shared_ptr<BasisSet> col_bas_;
+
+    /* number of threads for DF integrals */
+    int df_ints_num_threads_;
+    /* Condition cutoff in fitting metric (deals with convergence) */
+    double condition_ = 1.0E-12;
+
+
+    /* general JK related methods and information
+     * wrappers to functions in the DFHelper object */
+
+    int max_nocc() const;
+    bool C1() const override { return true; }
+    /* Function to call generation of integral tensors, metrics, files, etc
+     * calls dfh_->initialize() and blocking functions */
+    void preiterations() override;
+    /* Compute needed J/K type objects */
+    void compute_JK() override;
+    /* Delete integrals, files, other pointers */
+    void postiterations() override;
+
+    void common_init();
+
+    void common_init(bool k);
+
+    public:
+    /* Constructor 
+     * @param primary This system's row (column) basis set
+     * @param secondary This system's columb (row) basis set
+     * @param auxiliary This system's auxiliary basis set 
+     */ 
+    MemDF_2B_JK(std::shared_ptr<BasisSet> primary, 
+                std::shared_ptr<BasisSet> auxiliary);
+
+    MemDF_2B_JK(std::shared_ptr<BasisSet> primary, 
+                std::shared_ptr<BasisSet> row_bas,
+                std::shared_ptr<BasisSet> col_bas,
+                std::shared_ptr<BasisSet> auxiliary);
+    /* Destructor */
+    ~MemDF_2B_JK() override;
+
+    /* Knobs */
+
+    /*
+     * Minimum relative eigenvalue to retain in fitting inverse
+          * All eigenvectors with \epsilon_i < condition * \epsilon_max
+          * will be discarded
+          * @param condition minimum relative eigenvalue allowed,
+          *        defaults to 1.0E-12
+     */
+    void set_condition(double condition) { condition_ = condition; }
+
+    /*
+     * Number of threads for computing integrals
+     * @param t_readies a positive integer
+     */
+    void set_df_ints_num_threads(int t_readies) { df_ints_num_threads_ = t_readies; }
+
+    /* TODO */
+    /* void set_do_wK(bool do_wK) override; */
+
+    /* Accessors */
+
+    /*
+     * Prints the header information regarding JK type to the output file
+     */
+     void print_header() const override;
+
+    /*
+     * Returns the DFHelper object
+     */
+    std::shared_ptr<DFHelper> dfh() { return dfh_; }
+
+    void set_do_wK(bool tf);// { do_wK_ = tf; dfh_->set_do_wK(tf); }
+};
+
 }
 
 #endif

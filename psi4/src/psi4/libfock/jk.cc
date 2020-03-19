@@ -106,6 +106,11 @@ std::shared_ptr<JK> JK::build_JK(std::shared_ptr<BasisSet> primary, std::shared_
         _set_dfjk_options<MemDFJK>(jk, options);
 
         return std::shared_ptr<JK>(jk);
+    } else if (jk_type == "MEMDF_2B_") {
+        MemDF_2B_JK* jk = new MemDF_2B_JK(primary, auxiliary);
+        _set_dfjk_options<MemDF_2B_JK>(jk, options);
+
+        return std::shared_ptr<JK>(jk);
     } else if (jk_type == "PK") {
         PKJK* jk = new PKJK(primary, options);
 
