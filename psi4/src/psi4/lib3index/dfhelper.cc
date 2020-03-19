@@ -70,7 +70,26 @@ DFHelper::DFHelper(std::shared_ptr<BasisSet> primary, std::shared_ptr<BasisSet> 
     prepare_blocking();
 }
 
-DFHelper::~DFHelper() { clear_all(); }
+DFHelper::DFHelper(std::shared_ptr<BasisSet> primary, std::shared_ptr<BasisSet> row_bas, std::shared_ptr<BasisSet> col_bas, std::shared_ptr<BasisSet> aux) {
+    primary_ = primary;
+    row_bas_ = row_bas;
+    col_bas_ = col_bas;
+    aux_ = aux;
+
+    nbf_ = primary_->nbf();
+    row_bf_ = row_bas_->nbf();
+    col_bf_ = col_bas_->nbf();
+    naux_ = aux_->nbf();
+    prepare_blocking();
+}
+
+
+
+DFHelper::~DFHelper() { 
+printf("before clear_all()\n");
+clear_all(); 
+printf("after clear_all()\n");
+}
 
 void DFHelper::prepare_blocking() {
     Qshells_ = aux_->nshell();
@@ -772,6 +791,8 @@ std::tuple<size_t, size_t> DFHelper::Qshell_blocks_for_JK_build(std::vector<std:
         // compute total memory used by aggregate block
         size_t constraint = total_AO_buffer + T1 * tmpbs + T3;
         constraint += (lr_symmetric ? T2 : T2 * tmpbs);
+
+printf("memory inside dfhelper is %zu\n", memory_);
 
         if (constraint > memory_ || i == Qshells_ - 1) {
             if (count == 1 && i != Qshells_ - 1) {
@@ -2896,7 +2917,13 @@ void DFHelper::compute_JK(std::vector<SharedMatrix> Cleft, std::vector<SharedMat
     // the strided disk reads for the AOs will result in a definite loss to DiskDFJK in the disk-bound realm
     // 2. we could allocate the buffers only once, instead of every time compute_JK() is called
     std::vector<std::pair<size_t, size_t>> Qsteps;
+//joejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoe
+printf("about to get Qsteps \n");
+//joejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoe
     std::tuple<size_t, size_t> info = Qshell_blocks_for_JK_build(Qsteps, max_nocc, lr_symmetric);
+//joejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoe
+printf("just got Qsteps \n");
+//joejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoe
     size_t tots = std::get<0>(info);
     size_t totsb = std::get<1>(info);
 
@@ -2982,6 +3009,7 @@ void DFHelper::compute_JK(std::vector<SharedMatrix> Cleft, std::vector<SharedMat
 
         bcount += block_size;
     }
+    printf("done with build_jk\n");
     // outfile->Printf("\n     ==> DFHelper:--End J/K Builds (disk)<==\n\n");
 }
 void DFHelper::compute_J_symm(std::vector<SharedMatrix> D, std::vector<SharedMatrix> J, double* Mp, double* T1p,

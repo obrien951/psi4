@@ -5,6 +5,7 @@ list(APPEND sources
   DiskJK.cc
   GTFockJK.cc
   MemDFJK.cc
+  MemDF_2B_JK.cc
   PKJK.cc
   PK_workers.cc
   PKmanagers.cc

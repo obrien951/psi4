@@ -48,7 +48,11 @@ class TwoBodyAOInt;
 
 class PSI_API DFHelper {
    public:
+    /// Constructor for conventional use of DFHelper
     DFHelper(std::shared_ptr<BasisSet> primary, std::shared_ptr<BasisSet> aux);
+    /// Constructor for DFHelper for Assymmetric JK
+    DFHelper(std::shared_ptr<BasisSet> primary, std::shared_ptr<BasisSet> row_bas_, std::shared_ptr<BasisSet> col_bas_, std::shared_ptr<BasisSet> aux);
+
     ~DFHelper();
 
     ///
@@ -286,8 +290,12 @@ class PSI_API DFHelper {
    protected:
     // => basis sets <=
     std::shared_ptr<BasisSet> primary_;
+    std::shared_ptr<BasisSet> col_bas_;
+    std::shared_ptr<BasisSet> row_bas_;
     std::shared_ptr<BasisSet> aux_;
     size_t nbf_;
+    size_t col_bf_;
+    size_t row_bf_;
     size_t naux_;
 
     // => memory in doubles <=
@@ -360,10 +368,19 @@ class PSI_API DFHelper {
     // => shell info and blocking <=
     size_t pshells_;
     size_t Qshells_;
+    //     => shell info and blockin for f12 bases
+    size_t row_shells_;
+    size_t col_shells_;
+
     // greatest number of functions in an aux_ shell
     double Qshell_max_;
     std::vector<size_t> pshell_aggs_;
     std::vector<size_t> Qshell_aggs_;
+
+    // similar data for f12 terms
+    std::vector<size_t> row_shell_aggs_;
+    std::vector<size_t> col_shell_aggs_;
+
     void prepare_blocking();
 
     // => generalized blocking <=
