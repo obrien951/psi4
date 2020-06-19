@@ -321,7 +321,7 @@ core.Wavefunction.to_file = _core_wavefunction_to_file
 
 
 @staticmethod
-def _core_jk_build(orbital_basis, aux=None, jk_type=None, do_wK=None, memory=None):
+def _core_jk_build(orbital_basis, aux=None, jk_type=None, do_wK=None, memory=None, one_basis=None, two_basis=None):
     """
     Constructs a Psi4 JK object from an input basis.
 
@@ -361,6 +361,10 @@ def _core_jk_build(orbital_basis, aux=None, jk_type=None, do_wK=None, memory=Non
 
     optstash = optproc.OptionsState(["SCF_TYPE"])
 
+#    if one_basis is not None:
+#        if two_basis is not None:
+#        else:
+
     if jk_type is not None:
         core.set_global_option("SCF_TYPE", jk_type)
 
@@ -371,10 +375,14 @@ def _core_jk_build(orbital_basis, aux=None, jk_type=None, do_wK=None, memory=Non
         else:
             aux = core.BasisSet.zero_ao_basis_set()
 
-    if (do_wK is None) or (memory is None):
-        jk = core.JK.build_JK(orbital_basis, aux)
+    if one_basis is not None:
+        print(one_basis)
+        jk = core.JK.build_JK(orbital_basis, aux, one_basis, two_basis)
     else:
-        jk = core.JK.build_JK(orbital_basis, aux, bool(do_wK), int(memory))
+        if (do_wK is None) or (memory is None):
+            jk = core.JK.build_JK(orbital_basis, aux)
+        else:
+            jk = core.JK.build_JK(orbital_basis, aux, bool(do_wK), int(memory))
 
     optstash.restore()
     return jk

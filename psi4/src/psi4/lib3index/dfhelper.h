@@ -165,10 +165,10 @@ class PSI_API DFHelper {
     int get_print_lvl() { return print_lvl_; }
 
     /// Initialize the object
-    void initialize();
+    virtual void initialize();
 
     /// Prepare the sparsity matrix
-    void prepare_sparsity();
+    virtual void prepare_sparsity();
 
     /// print tons of useful info
     void print_header();
@@ -287,11 +287,35 @@ class PSI_API DFHelper {
                   std::vector<SharedMatrix> J, std::vector<SharedMatrix> K, std::vector<SharedMatrix> wK,
                   size_t max_nocc, bool do_J, bool do_K, bool do_wK, bool lr_symmetric);
 
+    virtual void build_2B_JK(std::vector<SharedMatrix> Cleft,
+                             std::vector<SharedMatrix> Cright,
+                             std::vector<SharedMatrix> D,
+                             std::vector<SharedMatrix> J_pq,
+                             std::vector<SharedMatrix> J_fq,
+                             std::vector<SharedMatrix> J_fg,
+                             std::vector<SharedMatrix> K_pq,
+                             std::vector<SharedMatrix> K_fq,
+                             std::vector<SharedMatrix> K_fg,
+                             size_t max_nocc, bool do_J, bool do_K,
+                             bool lr_summetric ) {};
+
+    virtual void build_2B_JK_naive(std::vector<SharedMatrix> Cleft,
+                             std::vector<SharedMatrix> Cright,
+                             std::vector<SharedMatrix> D,
+                             std::vector<SharedMatrix> J_pq,
+                             std::vector<SharedMatrix> J_fq,
+                             std::vector<SharedMatrix> J_fg,
+                             std::vector<SharedMatrix> K_pq,
+                             std::vector<SharedMatrix> K_fq,
+                             std::vector<SharedMatrix> K_fg,
+                             size_t max_nocc, bool do_J, bool do_K,
+                             bool lr_summetric ) {};
+
    protected:
     // => basis sets <=
     std::shared_ptr<BasisSet> primary_;
-    std::shared_ptr<BasisSet> col_bas_;
-    std::shared_ptr<BasisSet> row_bas_;
+/*  std::shared_ptr<BasisSet> col_bas_;
+    std::shared_ptr<BasisSet> row_bas_;  */
     std::shared_ptr<BasisSet> aux_;
     size_t nbf_;
     size_t col_bf_;
@@ -326,9 +350,15 @@ class PSI_API DFHelper {
     int print_lvl_ = 1;
 
     // => in-core machinery <=
-    void AO_core();
+    virtual void AO_core();
+      /* function that returns a memory burden based on how 
+         AO integral Calculation Scheme*/
+    virtual size_t calcfull_3index(bool symm) {return (symm ? big_skips_[nbf_]:0);};
     std::unique_ptr<double[]> Ppq_;
     std::map<double, SharedMatrix> metrics_;
+
+    std::unique_ptr<double[]> Metric_LU_;
+    std::unique_ptr<int[]> MET_LU_PERT_;
 
     // => in-core wK machinery <=
     std::unique_ptr<double[]> wPpq_;  // if do_wK_ holds (A|w|mn)
@@ -336,7 +366,7 @@ class PSI_API DFHelper {
 
     // => AO building machinery <=
     void prepare_AO();
-    void prepare_AO_core();
+    virtual void prepare_AO_core();
     void compute_dense_Qpq_blocking_Q(const size_t start, const size_t stop, double* Mp,
                                       std::vector<std::shared_ptr<TwoBodyAOInt>> eri);
     void compute_sparse_pQq_blocking_Q(const size_t start, const size_t stop, double* Mp,
@@ -355,7 +385,7 @@ class PSI_API DFHelper {
     void copy_upper_lower_wAO_core_symm(double* Qpq, double* Ppq, size_t begin, size_t end);
 
     // first integral transforms
-    void first_transform_pQq(size_t bsize, size_t bcount, size_t block_size, double* Mp, double* Tp, double* Bp,
+    virtual void first_transform_pQq(size_t bsize, size_t bcount, size_t block_size, double* Mp, double* Tp, double* Bp,
                              std::vector<std::vector<double>>& C_buffers);
 
     // => index vectors for screened AOs <=
@@ -369,19 +399,15 @@ class PSI_API DFHelper {
     size_t pshells_;
     size_t Qshells_;
     //     => shell info and blockin for f12 bases
-    size_t row_shells_;
-    size_t col_shells_;
+/*  size_t row_shells_;
+    size_t col_shells_;  */
 
     // greatest number of functions in an aux_ shell
     double Qshell_max_;
     std::vector<size_t> pshell_aggs_;
     std::vector<size_t> Qshell_aggs_;
 
-    // similar data for f12 terms
-    std::vector<size_t> row_shell_aggs_;
-    std::vector<size_t> col_shell_aggs_;
-
-    void prepare_blocking();
+    virtual void prepare_blocking();
 
     // => generalized blocking <=
     std::pair<size_t, size_t> pshell_blocks_for_AO_build(const size_t mem, size_t symm,
@@ -405,6 +431,8 @@ class PSI_API DFHelper {
     std::string compute_metric(double m_pow);
 
     double* metric_inverse_prep_core();
+    /* returns the LU factorization of the coulomb metric from DGETRF */
+    void prepare_metric_lu_core();
 
     // => metric operations <=
     void contract_metric_Qpq(std::string file, double* metp, double* Mp, double* Fp, const size_t tots);
@@ -503,5 +531,163 @@ class PSI_API DFHelper {
     void fill(double* b, size_t count, double value);
 
 };  // End DF Helper class
+
+class PSI_API DFHelper_2B : public DFHelper {
+   public:
+    DFHelper_2B( std::shared_ptr<BasisSet> one_basis, std::shared_ptr<BasisSet> two_basis, std::shared_ptr<BasisSet> primary, std::shared_ptr<BasisSet> aux);
+    void prepare_sparsity() override;
+    void initialize() override;
+    //~DFHelper_2B();
+    void build_2B_JK_naive(std::vector<SharedMatrix> Cleft,
+                     std::vector<SharedMatrix> Cright,
+                     std::vector<SharedMatrix> D,
+                     std::vector<SharedMatrix> J_pq,
+                     std::vector<SharedMatrix> J_fq,
+                     std::vector<SharedMatrix> J_fg,
+                     std::vector<SharedMatrix> K_pq,
+                     std::vector<SharedMatrix> K_fq,
+                     std::vector<SharedMatrix> K_fg,
+                     size_t max_nocc, bool do_J, bool do_K,
+                     bool lr_summetric ) override;
+
+    void build_2B_JK(std::vector<SharedMatrix> Cleft,
+                     std::vector<SharedMatrix> Cright,
+                     std::vector<SharedMatrix> D,
+                     std::vector<SharedMatrix> J_pq,
+                     std::vector<SharedMatrix> J_fq,
+                     std::vector<SharedMatrix> J_fg,
+                     std::vector<SharedMatrix> K_pq,
+                     std::vector<SharedMatrix> K_fq,
+                     std::vector<SharedMatrix> K_fg,
+                     size_t max_nocc, bool do_J, bool do_K,
+                     bool lr_summetric ) override;
+
+    /* Testing Only */
+    void say_hello() {printf("DFHelper_2B::say_hello\n");}
+   protected:
+    std::shared_ptr<BasisSet> one_basis_;
+    std::shared_ptr<BasisSet> two_basis_;
+    
+    size_t nob_;
+    size_t ntb_;
+
+    size_t oshells_;
+    size_t tshells_;
+
+    std::vector<size_t> oshell_aggs_;
+    std::vector<size_t> tshell_aggs_;
+
+//    void prepare_AO();
+    void prepare_AO_core() override;
+
+    /* */
+    std::vector<size_t> ob_ao_small_skips_;
+    std::vector<size_t> ob_ao_big_skips_;
+
+    /* should be fun by fun... why just a 1d vector? 1d type with 2d size*/
+    std::vector<size_t> ob_ob_small_skips_;
+    std::vector<size_t> ob_ob_big_skips_;
+
+    /* */
+    std::vector<size_t> ob_ao_schwarz_fun_mask_;
+    std::vector<size_t> ob_ao_schwarz_shell_mask_;
+
+    /* */
+    std::vector<size_t> ob_ob_schwarz_fun_mask_;
+    std::vector<size_t> ob_ob_schwarz_shell_mask_;
+
+
+
+    std::pair<size_t, size_t> fshell_blocks_for_ob_ao_AO_build(const size_t mem, size_t symm, std::vector<std::pair<size_t, size_t>> &b);
+    std::pair<size_t, size_t> fshell_blocks_for_ob_ob_AO_build(const size_t mem, size_t symm, std::vector<std::pair<size_t, size_t>> &b);
+
+    /* We got rid of the override declaration because this one gets more args */
+    std::tuple<size_t, size_t> Qshell_blocks_for_JK_build(std::vector<std::pair<size_t, size_t>>& b, size_t max_nocc, bool lr_symmetric); /* override;*/
+// labels <=> aux 2b ao
+    std::unique_ptr<double[]> Pfq_;
+// labels <=> aux 2b 2b
+    std::unique_ptr<double[]> Pfg_;
+
+//used for coulomb matrix construction.
+std::unique_ptr<double[]> Ppq_reg_;
+
+    /* Do AO's fit in core? sets the value of member data */ 
+    void AO_core() override;
+    size_t calcfull_3index(bool symm) override;
+    void prepare_blocking() override;
+
+    /* AO 2E ERI computation wrappers  */
+    /*void compute_dense_Pfq_blocking_p( size_t start, size_t stop, double* Mp, std::vector<std::shared_ptr<TwoBodyAOInt>> eri );
+    void compute_dense_Pfg_blocking_p( size_t start, size_t stop, double* Mp, std::vector<std::shared_ptr<TwoBodyAOInt>> eri ); */
+
+    void compute_sparse_fPq_blocking_p( size_t start, size_t stop, double* Mp, std::vector<std::shared_ptr<TwoBodyAOInt>> eri );
+
+    void compute_sparse_fPg_blocking_p( size_t start, size_t stop, double* Mp, std::vector<std::shared_ptr<TwoBodyAOInt>> eri );
+
+    void contract_metric_pPq_core(size_t func1, size_t func2, double* Qpq, double* metp);
+    void contract_metric_fPq_core(size_t func1, size_t func2, double* Qfq, double* metp);
+    void contract_metric_fPg_core(size_t func1, size_t func2, double* Qfg, double* metp);
+
+    void first_transform_pQq(size_t bsize, size_t bcount, size_t block_size, double* Mp, double* Tp, double* Bp, size_t nbf, std::vector<size_t> sm_skips, std::vector<size_t> bg_skips, std::vector<std::vector<double>>& C_buffers, std::vector<size_t> fun_mask);
+
+    void compute_J_2B_core(std::vector<SharedMatrix> D, 
+                           std::vector<SharedMatrix> J_pq, 
+                           std::vector<SharedMatrix> J_fq, 
+                           std::vector<SharedMatrix> J_fg, 
+                           std::vector<std::vector<double>>& dbuffers,
+                           double* Qpq,
+                           double* Qfq, 
+                           double* Pfg, 
+                           double* T1p,
+                           double* qvec, 
+                           double* qvec2, 
+                           double* metp,
+                           size_t bcount,
+                           size_t block_size);
+
+    void compute_K_2B(std::vector<SharedMatrix> Cleft,
+                      std::vector<SharedMatrix> Cright,
+                      std::vector<SharedMatrix> K_pq,
+                      std::vector<SharedMatrix> K_fq,
+                      std::vector<SharedMatrix> K_fg,
+                      double* T1t_p,
+                      double* T2t_p,
+                      double* T1o_p,
+                      double* T2o_p,
+                      double* Mtp,
+                      double* Mop,
+                      size_t bcount,
+                      size_t block_size,
+                      bool lr_summetric,
+                      std::vector<std::vector<double>>& C_buffers);
+
+    void first_transform_pQq(size_t bsize, 
+                             size_t bcount,
+                             size_t block_size,
+                             double* Mp,
+                             double* Tp,
+                             double* Bp,
+// The arguments below are not in DFHelper::first_transform
+                             size_t rnbf,
+                             size_t cnbf,
+                             std::vector<size_t> big_skips,
+                             std::vector<size_t> small_skips,
+                             std::vector<size_t> schwarz_fun_mask,
+                             std::vector<std::vector<double>>& C_buffers);
+    /*void build_2B_JK(std::vector<SharedMatrix> Cleft,
+                     std::vector<SharedMatrix> Cright,
+                     std::vector<SharedMatrix> D,
+                     std::vector<SharedMatrix> J_pq,
+                     std::vector<SharedMatrix> J_fq,
+                     std::vector<SharedMatrix> J_fg,
+                     std::vector<SharedMatrix> K_pq,
+                     std::vector<SharedMatrix> K_fq,
+                     std::vector<SharedMatrix> K_fg,
+                     size_t max_nocc, bool do_J, bool do_K,
+                     bool lr_summetric ) override; */
+
+
+};  // class PSI_API DFHelper_2B
+
 }  // psi4 namespace
 #endif

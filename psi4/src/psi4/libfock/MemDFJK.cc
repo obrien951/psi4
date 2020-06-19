@@ -101,7 +101,7 @@ void MemDFJK::postiterations() {}
 void MemDFJK::print_header() const {
     // dfh_->print_header();
     if (print_) {
-        outfile->Printf("  ==> MemDFJK: Density-Fitted J/K Matrices <==\n\n");
+        outfile->Printf("beep  ==> MemDFJK: Density-Fitted J/K Matrices <==\n\n");
 
         outfile->Printf("    J tasked:           %11s\n", (do_J_ ? "Yes" : "No"));
         outfile->Printf("    K tasked:           %11s\n", (do_K_ ? "Yes" : "No"));
@@ -126,4 +126,4 @@ int MemDFJK::max_nocc() const {
     return max_nocc;
 }
 void MemDFJK::set_do_wK(bool tf) { do_wK_ = tf; dfh_->set_do_wK(tf); }
-}
+} // namespace psi

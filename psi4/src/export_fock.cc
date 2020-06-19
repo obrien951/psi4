@@ -55,6 +55,10 @@ void export_fock(py::module &m) {
                     [](std::shared_ptr<BasisSet> basis, std::shared_ptr<BasisSet> aux, bool do_wK, size_t doubles) {
                         return JK::build_JK(basis, aux, Process::environment.options, do_wK, doubles);
                     })
+        .def_static("build_JK",
+                    [](std::shared_ptr<BasisSet> basis, std::shared_ptr<BasisSet> aux, std::shared_ptr<BasisSet> one_basis, std::shared_ptr<BasisSet> two_basis) {
+                        return JK::build_JK(basis, aux, one_basis, two_basis, Process::environment.options);
+                    })
         .def("name", &JK::name)
         .def("memory_estimate", &JK::memory_estimate)
         .def("initialize", &JK::initialize)
@@ -90,8 +94,11 @@ void export_fock(py::module &m) {
     py::class_<MemDFJK, std::shared_ptr<MemDFJK>, JK>(m, "MemDFJK", "docstring")
         .def("dfh", &MemDFJK::dfh, "Return the DFHelper object.");
 
-    py::class_<MemDF_2B_JK, std::shared_ptr<MemDF_2B_JK>, JK>(m, "MemDF_2B_JK", "docstring")
-        .def("dfh", &MemDF_2B_JK::dfh, "Return the DFHelper object.");
+    py::class_<Mem_2B_DFJK, std::shared_ptr<Mem_2B_DFJK>, JK>(m, "Mem_2B_DFJK", "docstring")
+        .def("J_oo_ao", &Mem_2B_DFJK::J_oo_ao, py::return_value_policy::reference_internal)
+        .def("K_oo_ao", &Mem_2B_DFJK::K_oo_ao, py::return_value_policy::reference_internal)
+        .def("compute_2B_JK", &Mem_2B_DFJK::compute_2B_JK)
+        .def("dfh", &Mem_2B_DFJK::dfh, "Return the DFHelper object.");
 
     py::class_<LaplaceDenominator, std::shared_ptr<LaplaceDenominator>>(m, "LaplaceDenominator", "docstring")
         .def(py::init<std::shared_ptr<Vector>, std::shared_ptr<Vector>, double>())
@@ -180,6 +187,9 @@ void export_fock(py::module &m) {
         .def("get_tensor_shape", &DFHelper::get_tensor_shape)
         .def("get_tensor", take_string(&DFHelper::get_tensor))
         .def("get_tensor", tensor_access3(&DFHelper::get_tensor));
+
+    py::class_<DFHelper_2B, std::shared_ptr<DFHelper_2B>, DFHelper>(m, "DFHelper_2B", "docstring")
+        .def("say_hello", &DFHelper_2B::say_hello);
 
     py::class_<scf::SADGuess, std::shared_ptr<scf::SADGuess>>(m, "SADGuess", "docstring")
         .def_static("build_SAD",

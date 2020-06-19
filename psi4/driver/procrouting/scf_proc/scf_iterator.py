@@ -123,6 +123,7 @@ def initialize_jk(self, memory, jk=None):
     jk.set_omega(functional.x_omega())
 
     jk.initialize()
+    print("finished jk.initialized")
     jk.print_header()
 
 

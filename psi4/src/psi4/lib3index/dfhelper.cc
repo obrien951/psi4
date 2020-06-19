@@ -70,6 +70,8 @@ DFHelper::DFHelper(std::shared_ptr<BasisSet> primary, std::shared_ptr<BasisSet> 
     prepare_blocking();
 }
 
+
+/*
 DFHelper::DFHelper(std::shared_ptr<BasisSet> primary, std::shared_ptr<BasisSet> row_bas, std::shared_ptr<BasisSet> col_bas, std::shared_ptr<BasisSet> aux) {
     primary_ = primary;
     row_bas_ = row_bas;
@@ -82,14 +84,10 @@ DFHelper::DFHelper(std::shared_ptr<BasisSet> primary, std::shared_ptr<BasisSet> 
     naux_ = aux_->nbf();
     prepare_blocking();
 }
+*/
 
 
-
-DFHelper::~DFHelper() { 
-printf("before clear_all()\n");
-clear_all(); 
-printf("after clear_all()\n");
-}
+DFHelper::~DFHelper() { clear_all(); }
 
 void DFHelper::prepare_blocking() {
     Qshells_ = aux_->nshell();
@@ -477,6 +475,12 @@ void DFHelper::prepare_AO() {
     }
 }
 void DFHelper::prepare_AO_wK() {
+    std::stringstream error;
+    error << "DFHelper::prepare_AO_wK: Out of core machinery not written!\nPlease set scf_type disk_df in your input file";
+    throw PSIEXCEPTION(error.str().c_str());
+
+
+
     // prepare eris
     std::shared_ptr<BasisSet> zero = BasisSet::zero_ao_basis_set();
     auto rifactory = std::make_shared<IntegralFactory>(aux_, zero, primary_, primary_);
@@ -653,8 +657,8 @@ void DFHelper::prepare_AO_wK_core() {
 }
 std::pair<size_t, size_t> DFHelper::pshell_blocks_for_AO_build(const size_t mem, size_t symm,
                                                                std::vector<std::pair<size_t, size_t>>& b) {
-    size_t full_3index = (symm ? big_skips_[nbf_] : 0);
-    size_t constraint, end, begin, current, block_size, tmpbs, total, count, largest;
+    size_t full_3index = calcfull_3index(symm);
+    size_t demand, end, begin, current, block_size, tmpbs, total, count, largest;
     block_size = tmpbs = total = count = largest = 0;
     for (size_t i = 0; i < pshells_; i++) {
         count++;
@@ -682,17 +686,17 @@ std::pair<size_t, size_t> DFHelper::pshell_blocks_for_AO_build(const size_t mem,
             total += 2 * current;
         }
 
-        constraint = total;
-        constraint += full_3index;
-        constraint += (hold_met_ ? naux_ * naux_ : total);
-        if (constraint > mem || i == pshells_ - 1) {
+        demand = total;
+        demand += full_3index;
+        demand += (hold_met_ ? naux_ * naux_ : total);
+        if (demand > mem || i == pshells_ - 1) {
             if (count == 1 && i != pshells_ - 1) {
                 std::stringstream error;
                 error << "DFHelper: not enough memory for (p shell) AO blocking!"
-                      << " required memory: " << constraint * 8 / (1024 * 1024 * 1024.0) << " [GiB].";
+                      << " required memory: " << demand * 8 / (1024 * 1024 * 1024.0) << " [GiB].";
                 throw PSIEXCEPTION(error.str().c_str());
             }
-            if (constraint > mem) {
+            if (demand > mem) {
                 total -= current;
                 tmpbs -= end - begin + 1;
                 b.push_back(std::make_pair(i - count + 1, i - 1));
@@ -791,8 +795,6 @@ std::tuple<size_t, size_t> DFHelper::Qshell_blocks_for_JK_build(std::vector<std:
         // compute total memory used by aggregate block
         size_t constraint = total_AO_buffer + T1 * tmpbs + T3;
         constraint += (lr_symmetric ? T2 : T2 * tmpbs);
-
-printf("memory inside dfhelper is %zu\n", memory_);
 
         if (constraint > memory_ || i == Qshells_ - 1) {
             if (count == 1 && i != Qshells_ - 1) {
@@ -1212,9 +1214,11 @@ void DFHelper::compute_sparse_pQq_blocking_p(const size_t start, const size_t st
                 size_t numP = aux_->shell(Pshell).nfunction();
                 eri[rank]->compute_shell(Pshell, 0, MU, NU);
                 for (size_t mu = 0; mu < nummu; mu++) {
-                    size_t omu = primary_->shell(MU).function_index() + mu;
+                    //size_t omu = primary_->shell(MU).function_index() + mu;
+                    size_t omu = pshell_aggs_[MU] + mu ;
                     for (size_t nu = 0; nu < numnu; nu++) {
-                        size_t onu = primary_->shell(NU).function_index() + nu;
+                        //size_t onu = primary_->shell(NU).function_index() + nu;
+                        size_t onu = pshell_aggs_[NU] + nu ;
                         if (!schwarz_fun_mask_[omu * nbf_ + onu]) {
                             continue;
                         }
@@ -1336,6 +1340,27 @@ double* DFHelper::metric_prep_core(double m_pow) {
     }
 
     return metrics_[power]->pointer()[0];
+}
+void DFHelper::prepare_metric_lu_core() {
+    MET_LU_PERT_ = std::unique_ptr<int[]>(new int[naux_]);
+    int * pert = MET_LU_PERT_.get(); //(int*) malloc(naux_*sizeof(int));
+
+    double * my_met = (double*) malloc(naux_*naux_*  sizeof(double));
+
+    Metric_LU_ = std::unique_ptr<double[]>(new double[naux_* naux_]);
+    double* met_lu_p = Metric_LU_.get();
+
+    SharedMatrix J = metrics_[1.0];
+    double* jp = J->pointer()[0];
+    
+    C_DCOPY(naux_ * naux_, jp, 1, my_met, 1);
+
+    C_DGETRF(naux_, naux_, my_met, naux_, pert);
+
+    C_DCOPY(naux_ * naux_, my_met, 1, met_lu_p, 1);
+
+    if (my_met) {free(my_met);}
+    //if (pert) {free(pert);}
 }
 void DFHelper::prepare_metric() {
     // construct metric
@@ -2020,7 +2045,11 @@ void DFHelper::transform() {
         outfile->Printf("Exiting DFHelper::transform\n");
     }
 }
-
+/* There are a couple oddities in this function that need to be addressed
+   The pointer Bp is actually the address of the orbital coefficients. 
+   The pointer Mp is the address of the (-0.5 contracted) Atomic orbitals. 
+   bcount is actually counting b's... layers of B, the AO tensor
+   */
 void DFHelper::first_transform_pQq(size_t bsize, size_t bcount, size_t block_size, double* Mp, double* Tp, double* Bp,
                                    std::vector<std::vector<double>>& C_buffers) {
 // perform first contraction on pQq, thread over p.
@@ -2917,13 +2946,7 @@ void DFHelper::compute_JK(std::vector<SharedMatrix> Cleft, std::vector<SharedMat
     // the strided disk reads for the AOs will result in a definite loss to DiskDFJK in the disk-bound realm
     // 2. we could allocate the buffers only once, instead of every time compute_JK() is called
     std::vector<std::pair<size_t, size_t>> Qsteps;
-//joejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoe
-printf("about to get Qsteps \n");
-//joejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoe
     std::tuple<size_t, size_t> info = Qshell_blocks_for_JK_build(Qsteps, max_nocc, lr_symmetric);
-//joejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoe
-printf("just got Qsteps \n");
-//joejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoe
     size_t tots = std::get<0>(info);
     size_t totsb = std::get<1>(info);
 
@@ -3009,7 +3032,6 @@ printf("just got Qsteps \n");
 
         bcount += block_size;
     }
-    printf("done with build_jk\n");
     // outfile->Printf("\n     ==> DFHelper:--End J/K Builds (disk)<==\n\n");
 }
 void DFHelper::compute_J_symm(std::vector<SharedMatrix> D, std::vector<SharedMatrix> J, double* Mp, double* T1p,

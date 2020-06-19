@@ -277,8 +277,9 @@ class PSI_API JK {
 
     // => Microarchitecture-Level State Variables (No Spatial Symmetry) <= //
 
-    /// Primary basis set
-    std::shared_ptr<BasisSet> primary_;
+    /// Primary basis set 
+    std::shared_ptr<BasisSet> primary_; 
+
     /// AO2USO transformation matrix
     SharedMatrix AO2USO_;
     /// Pseudo-occupied C matrices, left side
@@ -365,6 +366,12 @@ class PSI_API JK {
                                         Options& options, std::string jk_type);
     static std::shared_ptr<JK> build_JK(std::shared_ptr<BasisSet> primary, std::shared_ptr<BasisSet> auxiliary,
                                         Options& options, bool do_wK, size_t doubles);
+    /* returns the asymmetric JK object */
+    static std::shared_ptr<JK> build_JK(std::shared_ptr<BasisSet> primary, std::shared_ptr<BasisSet> auxiliary, std::shared_ptr<BasisSet> one_basis, std::shared_ptr<BasisSet> two_basis,
+                                    Options& options);
+
+    static std::shared_ptr<JK> build_JK(std::shared_ptr<BasisSet> primary, std::shared_ptr<BasisSet> auxiliary, std::shared_ptr<BasisSet> one_basis, std::shared_ptr<BasisSet> two_basis,
+                                        Options& options, std::string jk_type);
 
     /// Do we need to backtransform to C1 under the hood?
     virtual bool C1() const = 0;
@@ -524,6 +531,12 @@ class PSI_API JK {
      */
     const std::vector<SharedMatrix>& D() const { return D_; }
 
+/*    virtual const std::vector<SharedMatrix>& J_oo() const { return J_; }
+    virtual const std::vector<SharedMatrix>& K_oo() const { return K_; }
+    virtual const std::vector<SharedMatrix>& J_ot() const { return J_; }
+    virtual const std::vector<SharedMatrix>& K_ot() const { return K_; }
+    virtual const std::vector<SharedMatrix>& J_tt() const { return J_; }
+    virtual const std::vector<SharedMatrix>& K_tt() const { return K_; } */
     /**
     * Print header information regarding JK
     * type on output file
@@ -1070,11 +1083,27 @@ class PSI_API MemDFJK : public JK {
     std::shared_ptr<DFHelper> dfh() { return dfh_; }
 };
 
-class PSI_API MemDF_2B_JK: public JK{
+class PSI_API Mem_2B_DFJK: public JK{
     protected:
-    /* Information for Density Fitting */
+    /* Asymmetric JK machinery */
+    //void allocate_JK();
 
-    std::string name() override {return "MemDF_2B_JK";}
+    /// One basis set
+    std::shared_ptr<BasisSet> auxiliary_;
+    /// One basis set
+    std::shared_ptr<BasisSet> one_basis_;
+    /// Two basis set
+    std::shared_ptr<BasisSet> two_basis_;
+
+    /* I need to know about the sizes of these basis sets! */
+    size_t nbf_;
+    size_t naux_;
+    size_t nob_;
+    size_t ntb_;
+
+
+    /* Information for Density Fitting */
+    std::string name() override {return "Mem_2B_DFJK";}
     size_t memory_estimate() override;
 
     /* This class wraps a DFHelper object
@@ -1085,10 +1114,6 @@ class PSI_API MemDF_2B_JK: public JK{
      * The user is responsible for stitching the resulting
      * matrices together. */
     std::shared_ptr<DFHelper> dfh_;
-
-    std::shared_ptr<BasisSet> auxiliary_;
-    std::shared_ptr<BasisSet> row_bas_;
-    std::shared_ptr<BasisSet> col_bas_;
 
     /* number of threads for DF integrals */
     int df_ints_num_threads_;
@@ -1113,21 +1138,44 @@ class PSI_API MemDF_2B_JK: public JK{
 
     void common_init(bool k);
 
+    bool do_J_oo_;
+    bool do_K_oo_;
+    bool do_J_ot_;
+    bool do_K_ot_;
+    bool do_J_tt_;
+    bool do_K_tt_;
+
+    std::vector<SharedMatrix> J_oo_;
+    std::vector<SharedMatrix> K_oo_;
+    std::vector<SharedMatrix> J_ot_;
+    std::vector<SharedMatrix> K_ot_;
+    std::vector<SharedMatrix> J_tt_;
+    std::vector<SharedMatrix> K_tt_;
+
+    std::vector<SharedMatrix> J_oo_ao_;
+    std::vector<SharedMatrix> K_oo_ao_;
+    std::vector<SharedMatrix> J_ot_ao_;
+    std::vector<SharedMatrix> K_ot_ao_;
+    std::vector<SharedMatrix> J_tt_ao_;
+    std::vector<SharedMatrix> K_tt_ao_;
+
+    void compute_D_2B();
+
     public:
     /* Constructor 
      * @param primary This system's row (column) basis set
      * @param secondary This system's columb (row) basis set
      * @param auxiliary This system's auxiliary basis set 
      */ 
-    MemDF_2B_JK(std::shared_ptr<BasisSet> primary, 
+    Mem_2B_DFJK(std::shared_ptr<BasisSet> primary, 
                 std::shared_ptr<BasisSet> auxiliary);
 
-    MemDF_2B_JK(std::shared_ptr<BasisSet> primary, 
-                std::shared_ptr<BasisSet> row_bas,
-                std::shared_ptr<BasisSet> col_bas,
-                std::shared_ptr<BasisSet> auxiliary);
+    Mem_2B_DFJK(std::shared_ptr<BasisSet> primary, 
+                std::shared_ptr<BasisSet> auxiliary,
+                std::shared_ptr<BasisSet> one_bas,
+                std::shared_ptr<BasisSet> two_bas);
     /* Destructor */
-    ~MemDF_2B_JK() override;
+    ~Mem_2B_DFJK() override;
 
     /* Knobs */
 
@@ -1146,6 +1194,38 @@ class PSI_API MemDF_2B_JK: public JK{
      */
     void set_df_ints_num_threads(int t_readies) { df_ints_num_threads_ = t_readies; }
 
+    void set_do_J_oo_(bool val) {do_J_oo_ = val;} 
+    bool get_do_J_oo_() {return do_J_oo_;}
+
+    void set_do_K_oo_(bool val) {do_K_oo_ = val;} 
+    bool get_do_K_oo_() {return do_K_oo_;}
+
+    void set_do_J_ot_(bool val) {do_J_ot_ = val;} 
+    bool get_do_J_ot_() {return do_J_ot_;}
+
+    void set_do_K_ot_(bool val) {do_K_ot_ = val;} 
+    bool get_do_K_ot_() {return do_K_ot_;}
+
+    void set_do_J_tt_(bool val) {do_J_tt_ = val;} 
+    bool get_do_J_tt_() {return do_J_tt_;}
+
+    void set_do_K_tt_(bool val) {do_K_tt_ = val;} 
+    bool get_do_K_tt_() {return do_K_tt_;}
+
+    const std::vector<SharedMatrix>& J_oo() const { return J_oo_; }
+    const std::vector<SharedMatrix>& K_oo() const { return K_oo_; }
+    const std::vector<SharedMatrix>& J_ot() const { return J_ot_; }
+    const std::vector<SharedMatrix>& K_ot() const { return K_ot_; }
+    const std::vector<SharedMatrix>& J_tt() const { return J_tt_; }
+    const std::vector<SharedMatrix>& K_tt() const { return K_tt_; }
+
+    const std::vector<SharedMatrix>& J_oo_ao() const { return J_oo_ao_; }
+    const std::vector<SharedMatrix>& K_oo_ao() const { return K_oo_ao_; }
+    const std::vector<SharedMatrix>& J_ot_ao() const { return J_ot_ao_; }
+    const std::vector<SharedMatrix>& K_ot_ao() const { return K_ot_ao_; }
+    const std::vector<SharedMatrix>& J_tt_ao() const { return J_tt_ao_; }
+    const std::vector<SharedMatrix>& K_tt_ao() const { return K_tt_ao_; }
+
     /* TODO */
     /* void set_do_wK(bool do_wK) override; */
 
@@ -1162,6 +1242,9 @@ class PSI_API MemDF_2B_JK: public JK{
     std::shared_ptr<DFHelper> dfh() { return dfh_; }
 
     void set_do_wK(bool tf);// { do_wK_ = tf; dfh_->set_do_wK(tf); }
+    
+    void compute_2B_JK();
+
 };
 
 }
