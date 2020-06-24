@@ -87,6 +87,7 @@ void DFHelper_2B::initialize() {
     prepare_metric_lu_core();
 
     prepare_sparsity();
+    printf("finished prepare sparsity\n");
 
     if (two_basis_.get() == primary_.get()) {
         if (AO_core_) {
@@ -151,6 +152,17 @@ void DFHelper_2B::prepare_blocking() {
 
 
 void DFHelper_2B::prepare_sparsity() {
+    double max_integral = 0.0;
+    double ob_ao_max_integral = 0.0;
+    double ob_ob_max_integral = 0.0;
+
+    std::vector<double> shell_max_vals(pshells_ * pshells_ , 0.0);
+    std::vector<double> ob_ao_shell_max_vals(pshells_ * oshells_, 0.0);
+    std::vector<double> ob_ob_shell_max_vals(oshells_ * oshells_, 0.0);
+    std::vector<double> fun_max_vals(nbf_ * nbf_, 0.0);
+    std::vector<double> ob_ao_fun_max_vals(nbf_ * nob_, 0.0);
+    std::vector<double> ob_ob_fun_max_vals(nob_ * nob_, 0.0);
+
     small_skips_.resize(nbf_ + 1);
     big_skips_.resize(nbf_ + 1);
 
@@ -159,11 +171,6 @@ void DFHelper_2B::prepare_sparsity() {
 
     ob_ob_small_skips_.resize(nob_ + 1);
     ob_ob_big_skips_.resize(nob_ + 1);
-
-    //forgotforgotforgotforgotforgotforgotforgotforgotforgotforgotforgotforgotforgot
-    small_skips_[0] = nbf_;
-    big_skips_[0] = 0;
-    //forgotforgotforgotforgotforgotforgotforgotforgotforgotforgotforgotforgotforgot
 
     ob_ao_small_skips_[0] = nbf_;
     ob_ao_big_skips_[0] = 0;
@@ -180,63 +187,257 @@ void DFHelper_2B::prepare_sparsity() {
     ob_ob_schwarz_fun_mask_.resize(nob_ * nob_);
     ob_ob_schwarz_shell_mask_.resize(nob_ * nob_);
 
+    size_t nthreads = (nthreads_ == 1 ? 1 : 2);
+    auto rifactory = std::make_shared<IntegralFactory>(primary_, primary_, primary_, primary_);
+    auto ob_ao_rifactory = std::make_shared<IntegralFactory>(one_basis_, primary_, one_basis_, primary_);
+    auto ob_ob_rifactory = std::make_shared<IntegralFactory>(one_basis_, one_basis_, one_basis_, one_basis_);
 
-    for (size_t iter = 1; iter < nbf_; iter++) {
+    std::vector<std::shared_ptr<TwoBodyAOInt>> eri(nthreads);
+    std::vector<std::shared_ptr<TwoBodyAOInt>> ob_ao_eri(nthreads);
+    std::vector<std::shared_ptr<TwoBodyAOInt>> ob_ob_eri(nthreads);
+    std::vector<const double*> buffer(nthreads);
+    std::vector<const double*> ob_ao_buffer(nthreads);
+    std::vector<const double*> ob_ob_buffer(nthreads);
+
+
+#pragma omp parallel num_threads(nthreads) if (nbf_ > 1000)
+{
+    int rank = 0;
+#ifdef _OPENMP
+    rank = omp_get_thread_num();
+#endif
+    eri[rank] = std::shared_ptr<TwoBodyAOInt>(rifactory->eri());
+    ob_ao_eri[rank] = std::shared_ptr<TwoBodyAOInt>(ob_ao_rifactory->eri());
+    ob_ob_eri[rank] = std::shared_ptr<TwoBodyAOInt>(ob_ob_rifactory->eri());
+
+    buffer[rank] = eri[rank]->buffer();
+    ob_ao_buffer[rank] = ob_ao_eri[rank]->buffer();
+    ob_ob_buffer[rank] = ob_ob_eri[rank]->buffer();
+}
+
+#pragma omp parallel for
+    for (size_t ao_iters = 0; ao_iters < pshells_; ao_iters++) {
+        int rank = 0;
+#ifdef _OPENMP
+        rank = omp_get_thread_num();
+#endif
+        for (size_t ao_jters = 0; ao_jters < pshells_; ao_jters++) {
+            eri[rank]->compute_shell(ao_iters, ao_jters, ao_iters, ao_jters);
+            size_t nummu = primary_->shell(ao_iters).nfunction();
+            size_t numnu = primary_->shell(ao_jters).nfunction();
+            for (size_t ao_iter = 0; ao_iter < nummu; ao_iter++) {
+                size_t omu = primary_->shell(ao_iters).function_index() + ao_iter;
+                for (size_t ao_jter = 0; ao_jter < numnu; ao_jter++) {
+                    size_t onu = primary_->shell(ao_jters).function_index() + ao_jter;
+                    size_t index = ao_iter * (numnu + numnu * nummu * numnu ) + ao_jter * (nummu * numnu + 1);
+                    double val = fabs(buffer[rank][index]);
+                    max_integral = std::max(max_integral, val);
+                    if (shell_max_vals[pshells_ * ao_iters + ao_jters] < val) {
+                        shell_max_vals[pshells_ * ao_iters + ao_jters] = val;
+                    }
+                    if (fun_max_vals[omu * nbf_ + onu ] < val ) {
+                        fun_max_vals[omu * nbf_ + onu] = val;
+                    }
+                }
+            }
+        }
+    }
+
+    double tolerance = cutoff_ * cutoff_ / max_integral;
+
+    for (size_t ao_iters = 0; ao_iters < pshells_ * pshells_; ao_iters++) {
+        schwarz_shell_mask_[ao_iters] = (shell_max_vals[ao_iters] < tolerance ? 0 : 1);
+    }
+
+    for (size_t ao_iter = 0, count = 0; ao_iter < nbf_; ao_iter++) {
+        count = 0;
+        for (size_t ao_jter = 0; ao_jter < nbf_; ao_jter++) {
+            if (fun_max_vals[ao_iter * nbf_ + ao_jter] > tolerance ) {
+                count++;
+                schwarz_fun_mask_[ao_iter * nbf_ + ao_jter] = count;
+            } else {
+                schwarz_fun_mask_[ao_iter * nbf_ + ao_jter] = 0;
+            }
+        }
+        small_skips_[ao_iter] = count;
+    }
+
+    big_skips_[0] = 0;
+    size_t coltots = 0; 
+    for (size_t ao_iter = 1; ao_iter < nbf_ + 1; ao_iter++) {
+        coltots += small_skips_[ao_iter - 1];
+        big_skips_[ao_iter] = big_skips_[ao_iter - 1] + naux_ * small_skips_[ao_iter - 1];
+    }
+    small_skips_[nbf_] = coltots;
+
+    //big_skips_[nbf_] = ;
+
+    printf("before sparsity integrals\n");
+
+//#pragma omp parallel for num_threads(nthreads)
+    for (size_t ob_iters = 0; ob_iters < oshells_; ob_iters++) {
+        int rank = 0;
+//#ifdef _OPENMP
+        rank = omp_get_thread_num();
+//#endif
+        for (size_t ao_iters = 0; ao_iters < pshells_; ao_iters++ ) {
+            ob_ao_eri[rank]->compute_shell(ob_iters, ao_iters, ob_iters, ao_iters);
+            size_t numphi = one_basis_->shell(ob_iters).nfunction();
+            size_t nummu = primary_->shell(ao_iters).nfunction();
+            for (size_t ob_iter = 0; ob_iter < numphi; ob_iter++) {
+                size_t ophi = one_basis_->shell(ob_iters).function_index() + ob_iter;
+                for (size_t ao_iter = 0; ao_iter < nummu; ao_iter++) {
+                    size_t omu = primary_->shell(ao_iters).function_index() + ao_iter;
+                    double val = fabs(ob_ao_buffer[rank][ob_iter * (nummu + nummu * numphi * nummu) + ao_iter * (numphi * nummu + 1) ]);
+                    ob_ao_max_integral = std::max(ob_ao_max_integral, val);
+                    ob_ao_shell_max_vals[pshells_ * ob_iters + ao_iters] = std::max(ob_ao_shell_max_vals[pshells_ * ob_iters + ao_iters], val);
+                    ob_ao_fun_max_vals[ophi * nbf_ + omu] = std::max(ob_ao_fun_max_vals[ophi * nbf_ + omu], val);
+                }
+            }
+        }
+    }
+
+    printf("after sparsity integrals\n");
+
+    tolerance = cutoff_ * cutoff_ / ob_ao_max_integral;
+
+    for (size_t ob_iters = 0; ob_iters < oshells_ * pshells_; ob_iters++ ) {ob_ao_schwarz_shell_mask_[ob_iters] = ( ob_ao_shell_max_vals[ob_iters] > tolerance ? 1 : 0); } 
+
+printf("after ob_ao_shell_mask\n");
+
+    for (size_t ob_iter = 0, count = 0; ob_iter < nob_; ob_iter++) {
+        count = 0;
+        for (size_t ao_iter = 0; ao_iter < nbf_; ao_iter++) {
+            if (ob_ao_fun_max_vals[ob_iter * nbf_ + ao_iter] > tolerance) {
+                count++;
+                ob_ao_schwarz_fun_mask_[ob_iter * nbf_ + ao_iter] = count;
+            } else {
+                ob_ao_schwarz_fun_mask_[ob_iter * nbf_ + ao_iter] = 0;
+            }
+        }
+        ob_ao_small_skips_[ob_iter] = count;
+    } 
+
+printf("after ob_ao_small_skips\n");
+
+    coltots = 0;
+    ob_ao_big_skips_[0] = 0;
+    for (size_t ob_iter = 0; ob_iter < nob_; ob_iter++) {
+        ob_ao_big_skips_[ob_iter + 1] = ob_ao_big_skips_[ob_iter] + ob_ao_small_skips_[ob_iter] * naux_;
+        coltots += ob_ao_small_skips_[ob_iter];
+    }
+    ob_ao_small_skips_[nob_] = coltots;
+
+printf("before new sparsity integrals\n");
+
+#pragma omp parallel for num_threads(nthreads)
+    for (size_t ob_iters = 0; ob_iters < oshells_; ob_iters++) {
+        int rank = 0;
+#ifdef _OPENMP
+        rank = omp_get_thread_num();
+#endif
+        size_t nphi = one_basis_->shell(ob_iters).nfunction();
+        size_t ind_phi = one_basis_->shell(ob_iters).function_index();
+        for (size_t ob_jters = 0; ob_jters < oshells_; ob_jters++) {
+            ob_ob_eri[rank]->compute_shell(ob_iters, ob_jters, ob_iters, ob_jters);
+            size_t ngam = one_basis_->shell(ob_jters).nfunction();
+            size_t ind_gamma = one_basis_->shell(ob_jters).function_index();
+            for (size_t ob_iter = 0; ob_iter < nphi; ob_iter++) {
+                size_t phi = ind_phi + ob_iter;
+                for (size_t ob_jter = 0; ob_jter < ngam; ob_jter++) {
+                    size_t gamma = ind_gamma + ob_jter;
+                    double val = fabs(ob_ob_buffer[rank][ ob_iter * (ngam + ngam * nphi * ngam) + ob_jter * (1 + ngam * nphi ) ]);
+                    ob_ob_max_integral = std::max(ob_ob_max_integral, val);
+                    ob_ob_shell_max_vals[ ob_iters * oshells_ + ob_jters ] = std::max(ob_ob_shell_max_vals[ ob_iters * oshells_ + ob_jters ], val);
+                    ob_ob_fun_max_vals[ phi * nob_ + gamma ] = std::max(ob_ob_fun_max_vals[ phi * nob_ + gamma ], val);
+                }
+            }
+        }
+    }
+
+    tolerance = cutoff_ * cutoff_/ ob_ob_max_integral;
+
+    for (size_t ob_iters = 0; ob_iters < oshells_ * oshells_; ob_iters++) { ob_ob_schwarz_shell_mask_[ob_iters] = ( ob_ob_shell_max_vals[ob_iters] > tolerance ? 1 : 0); }
+
+
+    for (size_t ob_iter = 0, count = 0; ob_iter < nob_; ob_iter++) {
+        count = 0;
+        for (size_t ob_jter = 0; ob_jter < nob_; ob_jter++) {
+            if (ob_ob_fun_max_vals[ob_iter * nob_ + ob_jter] > tolerance) {
+                count++;
+                ob_ob_schwarz_fun_mask_[ ob_iter * nob_ + ob_jter ] = count;
+            } else {
+                ob_ob_schwarz_fun_mask_[ ob_iter * nob_ + ob_jter ] = 0;
+            }
+        }
+        ob_ob_small_skips_[ob_iter] = count;
+    }
+
+    ob_ob_big_skips_[0] = 0;
+    coltots = 0;
+    for (size_t ob_iter = 0; ob_iter < nob_; ob_iter++ ) {
+        ob_ob_big_skips_[ob_iter+ 1] = ob_ob_big_skips_[ob_iter] + ob_ob_small_skips_[ob_iter] * naux_;
+        coltots += ob_ob_small_skips_[ob_iter] ;
+    }
+    ob_ob_small_skips_[nob_] = coltots;
+
+/*    for (size_t iter = 1; iter < nbf_; iter++) {
         small_skips_[iter] = nbf_;
         big_skips_[iter] = big_skips_[iter - 1] + nbf_ * naux_;
     }
 
-    big_skips_[nbf_] = big_skips_[nbf_ - 1] + nbf_ * naux_;
+    big_skips_[nbf_] = big_skips_[nbf_ - 1] + nbf_ * naux_; */
 
     for (size_t iter = 1; iter < nob_; iter++) {
-        ob_ao_small_skips_[iter] = nbf_;
-        ob_ao_big_skips_[iter] = ob_ao_big_skips_[iter - 1] + nbf_*naux_;
-        ob_ob_small_skips_[iter] = nob_;
-        ob_ob_big_skips_[iter] = ob_ob_big_skips_[iter - 1] + nob_*naux_;
+//        ob_ao_small_skips_[iter] = nbf_;
+//        ob_ao_big_skips_[iter] = ob_ao_big_skips_[iter - 1] + nbf_*naux_;
+//        ob_ob_small_skips_[iter] = nob_;
+//        ob_ob_big_skips_[iter] = ob_ob_big_skips_[iter - 1] + nob_*naux_;
     }
 
-    ob_ao_big_skips_[nob_] = ob_ao_big_skips_[nob_ - 1] + nbf_*naux_;
-    ob_ob_big_skips_[nob_] = ob_ob_big_skips_[nob_ - 1] + nob_*naux_;
+//    ob_ao_big_skips_[nob_] = ob_ao_big_skips_[nob_ - 1] + nbf_*naux_;
+//    ob_ob_big_skips_[nob_] = ob_ob_big_skips_[nob_ - 1] + nob_*naux_;
 
 
-    for (size_t iter = 0; iter < pshells_; iter++) {
+/*    for (size_t iter = 0; iter < pshells_; iter++) {
         for (size_t jter = 0; jter < pshells_; jter++) {
             schwarz_shell_mask_[ iter * pshells_ + jter ] = 1;
         }
-    }
+    } */
   
 /*#pragma omp parallel for*/
     for (size_t ob_iter = 0; ob_iter < oshells_; ob_iter++) {
         for (size_t ao_iter = 0; ao_iter < pshells_; ao_iter++) {
-            ob_ao_schwarz_shell_mask_[ob_iter*pshells_ + ao_iter] = 1;
+            //ob_ao_schwarz_shell_mask_[ob_iter*pshells_ + ao_iter] = 1;
         } 
         for (size_t ob_jter = 0; ob_jter < oshells_; ob_jter++) {
-            ob_ob_schwarz_shell_mask_[ob_iter* oshells_ + ob_jter] = 1;
+//            ob_ob_schwarz_shell_mask_[ob_iter* oshells_ + ob_jter] = 1;
         }
     }
 
 
-    for (size_t iter = 0; iter < nbf_; iter++) {
+/*    for (size_t iter = 0; iter < nbf_; iter++) {
         for (size_t jter = 0; jter < nbf_; jter++) {
             schwarz_fun_mask_[ iter * nbf_ + jter] = jter + 1;
         }
-    }
+    } */
 
 /*#pragma omp parallel for*/
     for (size_t ob_iter = 0; ob_iter < nob_; ob_iter++) {
         for (size_t ao_iter = 0; ao_iter < nbf_; ao_iter++) {
-            ob_ao_schwarz_fun_mask_[ob_iter * nbf_ + ao_iter] = 1 + ao_iter;
+  //          ob_ao_schwarz_fun_mask_[ob_iter * nbf_ + ao_iter] = 1 + ao_iter;
         } 
         for (size_t ob_jter = 0; ob_jter < nob_; ob_jter++) {
-            ob_ob_schwarz_fun_mask_[ob_iter * nob_ + ob_jter] = 1 + ob_jter;
+ //           ob_ob_schwarz_fun_mask_[ob_iter * nob_ + ob_jter] = 1 + ob_jter;
         }
     }
 
     // these ones are special
-    small_skips_[nbf_] = nbf_ * nbf_;
-    ob_ao_small_skips_[nob_] = nbf_ * nob_;
-    ob_ob_small_skips_[nob_] = nob_ * nob_;
+    /*small_skips_[nbf_] = nbf_ * nbf_;*/
+ //   ob_ao_small_skips_[nob_] = nbf_ * nob_;
+//    ob_ob_small_skips_[nob_] = nob_ * nob_;
 
+    printf("about to leave prepare_sparsity()\n");
 }
 
 std::pair<size_t, size_t> DFHelper_2B::fshell_blocks_for_ob_ao_AO_build(const size_t mem,
@@ -420,21 +621,17 @@ void DFHelper_2B::prepare_AO_core() {
     auto ob_ao_rifactory = std::make_shared<IntegralFactory>(aux_, zero, one_basis_, primary_);
     auto ob_ob_rifactory = std::make_shared<IntegralFactory>(aux_, zero, one_basis_, one_basis_);
 
-
     std::vector<std::shared_ptr<TwoBodyAOInt>> ao_ao_eri(nthreads_);
     std::vector<std::shared_ptr<TwoBodyAOInt>> ob_ao_eri(nthreads_);
     std::vector<std::shared_ptr<TwoBodyAOInt>> ob_ob_eri(nthreads_);
-
 
     std::vector<std::pair<size_t, size_t>> ao_ao_psteps;
     std::vector<std::pair<size_t, size_t>> ob_ao_fsteps;
     std::vector<std::pair<size_t, size_t>> ob_ob_fsteps;
 
-
     std::pair<size_t, size_t> ao_ao_plargest = pshell_blocks_for_AO_build(memory_, 0, ao_ao_psteps);
     std::pair<size_t, size_t> ob_ao_flargest = fshell_blocks_for_ob_ao_AO_build(memory_, 0, ob_ao_fsteps);
     std::pair<size_t, size_t> ob_ob_flargest = fshell_blocks_for_ob_ob_AO_build(memory_, 0, ob_ob_fsteps);
-
 
 #pragma omp parallel num_threads(nthreads_)
     {
@@ -465,10 +662,8 @@ double* ppqr = Ppq_reg_.get();
 //    metp = metric.get();
     metp = metric_prep_core(mpower_);
 
-
     std::unique_ptr<double[]> Qpq(new double[std::get<0>(ao_ao_plargest)]);
     double* taop = Qpq.get();
-
 
     for (size_t i = 0; i < ao_ao_psteps.size(); i++) { 
         size_t start = std::get<0>(ao_ao_psteps[i]); 
@@ -484,11 +679,9 @@ double* ppqr = Ppq_reg_.get();
         contract_metric_pPq_core(start_func, stop_func, taop, metp);
     }
 
-
     Qpq.reset();
     std::unique_ptr<double[]> Qfq(new double[std::get<0>(ob_ao_flargest)]);
     taop = Qfq.get();
-
 
     for (size_t i = 0; i < ob_ao_fsteps.size(); i++) { 
         size_t start = std::get<0>(ob_ao_fsteps[i]); 
@@ -502,11 +695,9 @@ double* ppqr = Ppq_reg_.get();
         contract_metric_fPq_core(start_func, stop_func, taop, metp);
     }
 
-
     Qfq.reset();
     std::unique_ptr<double[]> Qfg(new double[std::get<0>(ob_ob_flargest)]);
     taop = Qfg.get();
-
 
     for (size_t i = 0; i < ob_ob_fsteps.size(); i++) { 
         size_t start = std::get<0>(ob_ob_fsteps[i]); 
@@ -520,7 +711,6 @@ double* ppqr = Ppq_reg_.get();
         // [J^{1/2}]_{QP}(P|rq)
         //contract_metric_fPg_core( begin, end, taop, metp);
     } 
-
 
     Qfg.reset();
 
@@ -573,15 +763,17 @@ void DFHelper_2B::compute_sparse_fPq_blocking_p( size_t start, size_t stop, doub
                 size_t Pind = aux_->shell(Pshell).function_index();
                 size_t Pfuncs = aux_->shell(Pshell).nfunction();
 // (AUX 0 | one primary)
-                eri[rank]->compute_shell( static_cast<int>(Pshell), 0, static_cast<int>(PHI), static_cast<int>(NU));
+                eri[rank]->compute_shell(Pshell, 0, PHI, NU);
                 for ( size_t phi = 0; phi < numphi; phi++ ) {
                     phiind = indphi + phi;
                     for ( size_t nu = 0;  nu < numnu; nu++ ) {
                         nuind = indnu + nu;
-                        for (size_t pfunc = 0; pfunc < Pfuncs; pfunc++) {
-Mp[ ob_ao_big_skips_[phiind] - start_ind + (Pind + pfunc)*ob_ao_small_skips_[phiind] +  nuind ]
+                        if (ob_ao_schwarz_fun_mask_[phiind * nbf_ + nuind]) {
+                            for (size_t pfunc = 0; pfunc < Pfuncs; pfunc++) {
+Mp[ ob_ao_big_skips_[phiind] - start_ind + (Pind + pfunc)*ob_ao_small_skips_[phiind] +  ob_ao_schwarz_fun_mask_[phiind * nbf_ + nuind] - 1 ]
 =
 buffer[rank][ pfunc*numphi*numnu + phi*numnu + nu ];
+                            }
                         }
                     }
                 }
@@ -630,9 +822,11 @@ void DFHelper_2B::compute_sparse_fPg_blocking_p( size_t start, size_t stop, doub
                     for (size_t gamma = 0; gamma < numgamma; gamma++) {
                         gammaind = indgamma + gamma;
                         for (size_t pfunc = 0; pfunc < numP; pfunc++) {
-Mp[ob_ob_big_skips_[phiind]-startind + (indP+pfunc ) * ob_ob_small_skips_[phiind] + gammaind ]
+                            if (ob_ob_schwarz_fun_mask_[nob_ * phiind + gammaind]) {
+Mp[ob_ob_big_skips_[phiind]-startind + (indP+pfunc ) * ob_ob_small_skips_[phiind] + ob_ob_schwarz_fun_mask_[ phiind * nob_ + gammaind] - 1 ]
 =
 buffer[rank][ pfunc * numphi * numgamma + phi * numgamma + gamma];
+                            }
                         }// size_t pfunc = 0; pfunc < numP; pfunc++
                     }// size_t gamma = 0; gamma < numgamma; gamma++
                 }// size_t phi = 0; phi < numphi; phi++
@@ -1297,7 +1491,7 @@ printf("third K\n");
         C_DGEMM('N', 'T', nob_, nob_, block_size * nocc, 1.0, T1o_p, nocc * block_size, T2o_p, nocc * block_size, 1.0, Kfgp, nob_);
     }
 printf("all K's\n");
-}
+} //DFHelper_2B::compute_K_2B
 // look at the arguments to the dgemm if you need to know what the arguments to
 //   first_transform mean
 void DFHelper_2B::first_transform_pQq(size_t bsize, 
