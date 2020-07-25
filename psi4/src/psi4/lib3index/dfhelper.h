@@ -574,8 +574,16 @@ class PSI_API DFHelper_2B : public DFHelper {
     size_t oshells_;
     size_t tshells_;
 
+    std::string jk_2b_build = "oo";
+
+    bool do_JK_tt_ = true;
+    bool do_JK_ot_ = true;
+    bool do_JK_oo_ = true;
+
     std::vector<size_t> oshell_aggs_;
     std::vector<size_t> tshell_aggs_;
+
+    std::vector<size_t> prim_to_ob_;
 
 //    void prepare_AO();
     void prepare_AO_core() override;
@@ -596,7 +604,7 @@ class PSI_API DFHelper_2B : public DFHelper {
     std::vector<size_t> ob_ob_schwarz_fun_mask_;
     std::vector<size_t> ob_ob_schwarz_shell_mask_;
 
-
+    void form_prim_to_ob();
 
     std::pair<size_t, size_t> fshell_blocks_for_ob_ao_AO_build(const size_t mem, size_t symm, std::vector<std::pair<size_t, size_t>> &b);
     std::pair<size_t, size_t> fshell_blocks_for_ob_ob_AO_build(const size_t mem, size_t symm, std::vector<std::pair<size_t, size_t>> &b);
