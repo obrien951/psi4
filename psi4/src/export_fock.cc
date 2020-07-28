@@ -97,6 +97,11 @@ void export_fock(py::module &m) {
     py::class_<Mem_2B_DFJK, std::shared_ptr<Mem_2B_DFJK>, JK>(m, "Mem_2B_DFJK", "docstring")
         .def("J_oo_ao", &Mem_2B_DFJK::J_oo_ao, py::return_value_policy::reference_internal)
         .def("K_oo_ao", &Mem_2B_DFJK::K_oo_ao, py::return_value_policy::reference_internal)
+        .def("J_ot_ao", &Mem_2B_DFJK::J_ot_ao, py::return_value_policy::reference_internal)
+        .def("K_ot_ao", &Mem_2B_DFJK::K_ot_ao, py::return_value_policy::reference_internal)
+        .def("set_do_JK_oo", &Mem_2B_DFJK::set_do_JK_oo)
+        .def("set_do_JK_ot", &Mem_2B_DFJK::set_do_JK_ot)
+        .def("set_do_JK_tt", &Mem_2B_DFJK::set_do_JK_tt)
         .def("compute_2B_JK", &Mem_2B_DFJK::compute_2B_JK)
         .def("dfh", &Mem_2B_DFJK::dfh, "Return the DFHelper object.");
 
@@ -188,8 +193,7 @@ void export_fock(py::module &m) {
         .def("get_tensor", take_string(&DFHelper::get_tensor))
         .def("get_tensor", tensor_access3(&DFHelper::get_tensor));
 
-    py::class_<DFHelper_2B, std::shared_ptr<DFHelper_2B>, DFHelper>(m, "DFHelper_2B", "docstring")
-        .def("say_hello", &DFHelper_2B::say_hello);
+    py::class_<DFHelper_2B, std::shared_ptr<DFHelper_2B>, DFHelper>(m, "DFHelper_2B", "docstring");
 
     py::class_<scf::SADGuess, std::shared_ptr<scf::SADGuess>>(m, "SADGuess", "docstring")
         .def_static("build_SAD",

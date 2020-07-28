@@ -86,7 +86,7 @@ class PSI_API DFHelper {
     size_t get_AO_size() { return big_skips_[nbf_]; }
 
     /// Returns the size of the in-core version in doubles
-    size_t get_core_size() {
+    virtual size_t get_core_size() {
         AO_core();
         return required_core_size_;
     }
@@ -158,6 +158,29 @@ class PSI_API DFHelper {
     size_t get_omega() { return omega_; }
 
     ///
+    /// build the two-basis x two-basis fock analogue.
+    /// should throw an error in the base class
+    /// @param do_JK_tt bool indicating this component will be constructed
+    ///
+    virtual void set_do_JK_tt(bool do_JK_tt);// {do_JK_tt_ = do_JK_tt;}
+    virtual bool get_do_JK_tt() {return false;}
+
+    ///
+    /// build the one-basis x two-basis fock analogue.
+    /// should throw an error in the base class
+    /// @param do_JK_tt bool indicating this component will be constructed
+    ///
+    virtual void set_do_JK_ot(bool do_JK_ot);// {do_JK_ot_ = do_JK_ot;}
+    virtual bool get_do_JK_ot() {return false;}
+
+    ///
+    /// build the one-basis x two-basis fock analogue.
+    /// should throw an error in the base class
+    /// @param do_JK_tt bool indicating this component will be constructed
+    ///                                                                       
+    virtual void set_do_JK_oo(bool do_JK_ot);// {do_JK_ot_ = do_JK_ot;}
+    virtual bool get_do_JK_oo() {return false;}
+
     /// set the printing verbosity parameter
     /// @param print_lvl indicating verbosity
     ///
@@ -537,6 +560,19 @@ class PSI_API DFHelper_2B : public DFHelper {
     DFHelper_2B( std::shared_ptr<BasisSet> one_basis, std::shared_ptr<BasisSet> two_basis, std::shared_ptr<BasisSet> primary, std::shared_ptr<BasisSet> aux);
     void prepare_sparsity() override;
     void initialize() override;
+
+    size_t get_core_size() override {
+        AO_core();
+        return required_core_size_;
+    }
+    void set_do_JK_tt(bool do_JK_tt) override;// {do_JK_tt_ = do_JK_tt;}
+    bool get_do_JK_tt() override;// {return do_JK_tt_;}
+             
+    void set_do_JK_ot(bool do_JK_ot) override;// {do_JK_ot_ = do_JK_ot;}
+    bool get_do_JK_ot() override; //{return do_JK_ot_;}
+
+    void set_do_JK_oo(bool do_JK_ot) override;// {do_JK_ot_ = do_JK_ot;}
+    bool get_do_JK_oo() override; //{return do_JK_ot_;}
     //~DFHelper_2B();
     void build_2B_JK_naive(std::vector<SharedMatrix> Cleft,
                      std::vector<SharedMatrix> Cright,
@@ -563,7 +599,6 @@ class PSI_API DFHelper_2B : public DFHelper {
                      bool lr_summetric ) override;
 
     /* Testing Only */
-    void say_hello() {printf("DFHelper_2B::say_hello\n");}
    protected:
     std::shared_ptr<BasisSet> one_basis_;
     std::shared_ptr<BasisSet> two_basis_;
@@ -576,7 +611,9 @@ class PSI_API DFHelper_2B : public DFHelper {
 
     std::string jk_2b_build = "oo";
 
-    bool do_JK_tt_ = true;
+    bool JK_tt_done_ = false;
+
+    bool do_JK_tt_ = false;
     bool do_JK_ot_ = true;
     bool do_JK_oo_ = true;
 

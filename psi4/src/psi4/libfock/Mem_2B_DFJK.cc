@@ -62,7 +62,6 @@ Mem_2B_DFJK::Mem_2B_DFJK( std::shared_ptr<BasisSet> primary,
                         : JK(primary), 
                           auxiliary_(auxiliary) {
     common_init();
-    printf("ping\n");
 }
 Mem_2B_DFJK::Mem_2B_DFJK( std::shared_ptr<BasisSet> primary, 
                         std::shared_ptr<BasisSet> auxiliary,
@@ -78,10 +77,6 @@ Mem_2B_DFJK::Mem_2B_DFJK( std::shared_ptr<BasisSet> primary,
     naux_ = auxiliary_->nbf();
     nob_ = one_basis_->nbf();
     ntb_ = two_basis_->nbf();
-    printf("nbf_ is %zu\n" , nbf_);
-    printf("naux_ is %zu\n" , naux_);
-    printf("nob_ is %zu\n" , nob_);
-    printf("ntb is %zu\n" , ntb_);
 }
 Mem_2B_DFJK::~Mem_2B_DFJK() {}
 void Mem_2B_DFJK::common_init() { 
@@ -97,7 +92,6 @@ size_t Mem_2B_DFJK::memory_estimate() {
     return dfh_->get_core_size();
 //joejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoejoe
 }
-
 void Mem_2B_DFJK::preiterations() {
     // Pass our information to DFHelper
     dfh_->set_nthreads(omp_nthread_);
@@ -112,12 +106,6 @@ void Mem_2B_DFJK::preiterations() {
     dfh_->initialize();
 }
 void Mem_2B_DFJK::compute_D_2B(){
-    printf("Beginning Mem_2B_DFJK::compute_D_2B\n");
-    printf("nbf_ is %zu, naux_ is %zu, nob_ is %zu, ntb_ is %zu \n", nbf_, naux_, nob_, ntb_);
-
-    printf("C_right_.size() is %zu C_right_.size() is %s \n", C_right_.size(), 
-                ( C_right_.size() ? "true" : "false" )  );
-
 
     if (C_left_.size() && !C_right_.size() ) {
         lr_symmetric_ = true;
@@ -150,7 +138,6 @@ void Mem_2B_DFJK::compute_D_2B(){
         C_right_ = C_left_;
         C_right_ao_ = C_left_ao_;
     } else { /* it's on the user to provide C_left in this case */
-        printf("not lr_symmetric_ \n");
         C_right_ao_ = C_right_;
     }
     if (C_left_ao_.size() != C_right_ao_.size()) {
@@ -211,7 +198,6 @@ void Mem_2B_DFJK::compute_D_2B(){
         s << "K tt " << i << " (AO)";
         K_tt_ao_.push_back(std::make_shared<Matrix>(s.str(), ntb_, ntb_));
     }
-    printf("Exiting Mem_2B_DFJK::compute_D_2B\n" );
 }
     /* This functions exists because it is necessary for Psi4 to compile
      *     works the same as MemDFJK::compute_JK()
@@ -231,10 +217,7 @@ void Mem_2B_DFJK::compute_2B_JK() {
     /* for now, we're going to boldly assume (require that our user ensure) 
        that our system is C1*/
     compute_D_2B();
-    printf("about to call dfh_->build_2B_JK \n");
     dfh_->build_2B_JK(C_left_ao_, C_right_ao_, D_ao_, J_tt_ao_, J_ot_ao_, J_oo_ao_, K_tt_ao_, K_ot_ao_, K_oo_ao_, static_cast<size_t>(max_nocc()), do_J_, do_K_, lr_symmetric_);
-
-    printf("already called dfh_->build_2B_JK \n");
 }
 void Mem_2B_DFJK::postiterations() {}
 void Mem_2B_DFJK::print_header() const {
@@ -261,9 +244,11 @@ int Mem_2B_DFJK::max_nocc() const {
     for (size_t N = 0; N < C_left_ao_.size(); N++) {
         max_noc = ( C_left_ao_[N]->coldim(0) > max_noc ? C_left_ao_[N]->coldim(0) : max_noc); 
     }
-    printf("max_noc is %zu \n", max_noc);
     return max_noc;
 }
 void Mem_2B_DFJK::set_do_wK(bool tf) { do_wK_ = tf; dfh_->set_do_wK(tf); }
+void Mem_2B_DFJK::set_do_JK_oo(bool v) {do_JK_oo_=v; if (dfh_) {dfh_->set_do_JK_oo(v);}}
+void Mem_2B_DFJK::set_do_JK_ot(bool v) {do_JK_ot_=v; if (dfh_) {dfh_->set_do_JK_ot(v);}}
+void Mem_2B_DFJK::set_do_JK_tt(bool v) {do_JK_tt_=v; if (dfh_) {dfh_->set_do_JK_tt(v);}}
 } // namespace psi
 

@@ -3246,5 +3246,20 @@ void DFHelper::compute_wK(std::vector<SharedMatrix> Cleft, std::vector<SharedMat
         bcount += block_size;
     }
 }
+void DFHelper::set_do_JK_tt(bool do_JK_tt) {
+    std::stringstream error;
+    error << "DFHelper Base class doesn't do assymetric JK's. Use DFHelper_2B.";
+    throw PSIEXCEPTION(error.str().c_str());
+}
+void DFHelper::set_do_JK_ot(bool do_JK_tt) {
+    std::stringstream error;
+    error << "DFHelper Base class doesn't do assymetric JK's. Use DFHelper_2B.";
+    throw PSIEXCEPTION(error.str().c_str());
+}
+void DFHelper::set_do_JK_oo(bool do_JK_tt) {
+    std::stringstream error;
+    error << "DFHelper Base class doesn't do assymetric JK's. Use DFHelper_2B.";
+    throw PSIEXCEPTION(error.str().c_str());
+}
 
 }  // End namespaces

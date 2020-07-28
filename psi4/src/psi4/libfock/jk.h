@@ -1138,12 +1138,9 @@ class PSI_API Mem_2B_DFJK: public JK{
 
     void common_init(bool k);
 
-    bool do_J_oo_;
-    bool do_K_oo_;
-    bool do_J_ot_;
-    bool do_K_ot_;
-    bool do_J_tt_;
-    bool do_K_tt_;
+    bool do_JK_oo_;
+    bool do_JK_ot_;
+    bool do_JK_tt_;
 
     std::vector<SharedMatrix> J_oo_;
     std::vector<SharedMatrix> K_oo_;
@@ -1194,23 +1191,14 @@ class PSI_API Mem_2B_DFJK: public JK{
      */
     void set_df_ints_num_threads(int t_readies) { df_ints_num_threads_ = t_readies; }
 
-    void set_do_J_oo_(bool val) {do_J_oo_ = val;} 
-    bool get_do_J_oo_() {return do_J_oo_;}
+    void set_do_JK_oo(bool v);// {do_JK_oo_=v; if (dfh_) {dfh_->set_do_JK_oo(v);}} 
+    bool get_do_JK_oo() {return do_JK_oo_;}
 
-    void set_do_K_oo_(bool val) {do_K_oo_ = val;} 
-    bool get_do_K_oo_() {return do_K_oo_;}
+    void set_do_JK_ot(bool v);// {do_JK_ot_=v; if (dfh_) {dfh_->set_do_JK_ot(v);}} 
+    bool get_do_JK_ot() {return do_JK_ot_;}
 
-    void set_do_J_ot_(bool val) {do_J_ot_ = val;} 
-    bool get_do_J_ot_() {return do_J_ot_;}
-
-    void set_do_K_ot_(bool val) {do_K_ot_ = val;} 
-    bool get_do_K_ot_() {return do_K_ot_;}
-
-    void set_do_J_tt_(bool val) {do_J_tt_ = val;} 
-    bool get_do_J_tt_() {return do_J_tt_;}
-
-    void set_do_K_tt_(bool val) {do_K_tt_ = val;} 
-    bool get_do_K_tt_() {return do_K_tt_;}
+    void set_do_JK_tt(bool v);// {do_JK_tt_=v; if (dfh_) {dfh_->set_do_JK_tt(v);}}
+    bool get_do_JK_tt() {return do_JK_tt_;}
 
     const std::vector<SharedMatrix>& J_oo() const { return J_oo_; }
     const std::vector<SharedMatrix>& K_oo() const { return K_oo_; }

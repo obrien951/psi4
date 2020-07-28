@@ -72,22 +72,55 @@ DFHelper_2B::DFHelper_2B( std::shared_ptr<BasisSet> one_basis, std::shared_ptr<B
     oshells_ = one_basis_->nshell();
     tshells_ = two_basis_->nshell();
     prepare_blocking();
+    form_prim_to_ob();
 }
 
 //DFHelper_2B::~DFHelper() {}
+
+// useful for f12 sapt. We need to be able to get the same functions from
+//   the primary basis in the cabs basis
+
+void DFHelper_2B::form_prim_to_ob() {
+    prim_to_ob_.resize(nbf_);
+    // number of atoms in the basis set
+    std::vector<size_t> ob_atom_to_shell(primary_->shell(primary_->nshell()-1).ncenter()+1);
+    int lastatom = -1;
+    for (int i = 0; i < one_basis_->nshell(); i++) {
+        if (one_basis_->shell(i).ncenter() != lastatom ) {
+            lastatom = one_basis_->shell(i).ncenter();
+            ob_atom_to_shell[lastatom] = i;
+        }
+    }
+    int shell_on_atom_index = -1;
+    int atom_last = -1;
+    for (int i = 0; i < primary_->nshell(); i++) {
+        if (primary_->shell(i).ncenter() != atom_last) {
+            atom_last = primary_->shell(i).ncenter();
+            shell_on_atom_index = 0;
+        } else {
+            shell_on_atom_index++;
+        }
+        int pr_shell_start = primary_->shell(i).function_index();
+        int ob_shell_start = one_basis_->shell(
+ob_atom_to_shell[atom_last] +shell_on_atom_index
+                                               ).function_index();
+        for (int j = 0; j < primary_->shell(i).nfunction(); j++ ) {
+            prim_to_ob_[pr_shell_start + j] = ob_shell_start + j;
+        }
+    }
+}
 
 void DFHelper_2B::initialize() {
 
     hold_met_ = true;
     /* This is a provisional step */
-    AO_core_ = true;
+    AO_core();
 
 
     if (!(std::fabs(mpower_ - 0.0) < 1e-13)) (hold_met_ ? prepare_metric_core() : prepare_metric());
     prepare_metric_lu_core();
 
     prepare_sparsity();
-    printf("finished prepare sparsity\n");
 
     if (two_basis_.get() == primary_.get()) {
         if (AO_core_) {
@@ -105,7 +138,14 @@ void DFHelper_2B::initialize() {
 }
 
 void DFHelper_2B::AO_core() {
-    AO_core_ = true;
+    prepare_sparsity();
+    required_core_size_ = big_skips_[nbf_];
+    required_core_size_ += ob_ao_big_skips_[nob_];
+    required_core_size_ += ob_ob_big_skips_[nob_];
+    required_core_size_ += 2 * naux_ * naux_;
+    required_core_size_ += nthreads_ * nbf_ * nbf_;
+    required_core_size_ += 3 * nob_ * nob_ * Qshell_max_;
+    AO_core_ = required_core_size_ < memory_;
 }
 
 size_t DFHelper_2B::calcfull_3index(bool symm) {
@@ -152,6 +192,9 @@ void DFHelper_2B::prepare_blocking() {
 
 
 void DFHelper_2B::prepare_sparsity() {
+    if (sparsity_prepared_) {return;}
+
+    timer_on("DFH_2B: sparsity prep");
     double max_integral = 0.0;
     double ob_ao_max_integral = 0.0;
     double ob_ob_max_integral = 0.0;
@@ -270,10 +313,6 @@ void DFHelper_2B::prepare_sparsity() {
     }
     small_skips_[nbf_] = coltots;
 
-    //big_skips_[nbf_] = ;
-
-    printf("before sparsity integrals\n");
-
 //#pragma omp parallel for num_threads(nthreads)
     for (size_t ob_iters = 0; ob_iters < oshells_; ob_iters++) {
         int rank = 0;
@@ -297,13 +336,8 @@ void DFHelper_2B::prepare_sparsity() {
         }
     }
 
-    printf("after sparsity integrals\n");
-
     tolerance = cutoff_ * cutoff_ / ob_ao_max_integral;
-
     for (size_t ob_iters = 0; ob_iters < oshells_ * pshells_; ob_iters++ ) {ob_ao_schwarz_shell_mask_[ob_iters] = ( ob_ao_shell_max_vals[ob_iters] > tolerance ? 1 : 0); } 
-
-printf("after ob_ao_shell_mask\n");
 
     for (size_t ob_iter = 0, count = 0; ob_iter < nob_; ob_iter++) {
         count = 0;
@@ -318,8 +352,6 @@ printf("after ob_ao_shell_mask\n");
         ob_ao_small_skips_[ob_iter] = count;
     } 
 
-printf("after ob_ao_small_skips\n");
-
     coltots = 0;
     ob_ao_big_skips_[0] = 0;
     for (size_t ob_iter = 0; ob_iter < nob_; ob_iter++) {
@@ -327,8 +359,6 @@ printf("after ob_ao_small_skips\n");
         coltots += ob_ao_small_skips_[ob_iter];
     }
     ob_ao_small_skips_[nob_] = coltots;
-
-printf("before new sparsity integrals\n");
 
 #pragma omp parallel for num_threads(nthreads)
     for (size_t ob_iters = 0; ob_iters < oshells_; ob_iters++) {
@@ -437,7 +467,8 @@ printf("before new sparsity integrals\n");
  //   ob_ao_small_skips_[nob_] = nbf_ * nob_;
 //    ob_ob_small_skips_[nob_] = nob_ * nob_;
 
-    printf("about to leave prepare_sparsity()\n");
+    sparsity_prepared_ = true;
+    timer_off("DFH_2B: sparsity prep");
 }
 
 std::pair<size_t, size_t> DFHelper_2B::fshell_blocks_for_ob_ao_AO_build(const size_t mem,
@@ -646,7 +677,7 @@ void DFHelper_2B::prepare_AO_core() {
 
     Ppq_ = std::unique_ptr<double[]>(new double[big_skips_[nbf_]]);
 
-Ppq_reg_ = std::unique_ptr<double[]>(new double[big_skips_[nbf_]]);
+//Ppq_reg_ = std::unique_ptr<double[]>(new double[big_skips_[nbf_]]);
 
     Pfq_ = std::unique_ptr<double[]>(new double[ob_ao_big_skips_[nob_]]);
     Pfg_ = std::unique_ptr<double[]>(new double[ob_ob_big_skips_[nob_]]);
@@ -654,7 +685,7 @@ Ppq_reg_ = std::unique_ptr<double[]>(new double[big_skips_[nbf_]]);
     double* ppq = Ppq_.get();
     double* pfq = Pfq_.get();
     double* pfg = Pfg_.get();
-double* ppqr = Ppq_reg_.get();
+//double* ppqr = Ppq_reg_.get();
 
 //    std::unique_ptr<double[]> metric = std::unique_ptr<double[]>(new double[naux_ * naux_]);
     double* metp;
@@ -674,7 +705,7 @@ double* ppqr = Ppq_reg_.get();
         size_t end = pshell_aggs_[stop + 1] - 1;
         compute_sparse_pQq_blocking_p(start, stop, taop, ao_ao_eri);
         // (P|ls) <- temp
-        C_DCOPY(big_skips_[stop_func + 1] - big_skips_[start_func], taop, 1, &ppqr[big_skips_[start_func]], 1);
+       // C_DCOPY(big_skips_[stop_func + 1] - big_skips_[start_func], taop, 1, &ppqr[big_skips_[start_func]], 1);
         // [J^{1/2}]_{QP}(P|ls)
         contract_metric_pPq_core(start_func, stop_func, taop, metp);
     }
@@ -929,7 +960,7 @@ void DFHelper_2B::build_2B_JK_naive(std::vector<SharedMatrix> Cleft,
     double* pfg = Pfg_.get();
 
 
-double* ppqr = Ppq_reg_.get();
+//double* ppqr = Ppq_reg_.get();
 
 //double* met_inv = metric_inverse_prep_core();
 
@@ -1045,9 +1076,9 @@ double* qvec2 = Q_vec2.get();
         C_DGEMV('N', naux_, naux_, 1.0, metp, naux_, qvec, 1, 0.0, qvec2, 1);
 //        C_DCOPY(naux_, qvec2, 1, qvec, 1);
 
-        for (int bf_iter = 0; bf_iter < nbf_; bf_iter++ ) {
+/*        for (int bf_iter = 0; bf_iter < nbf_; bf_iter++ ) {
             C_DGEMV('T', naux_, nbf_, 1.0, ppqr + naux_ * nbf_ * bf_iter, nbf_, qvec2, 1, 0.0, j_pq + nbf_ * bf_iter , 1);
-        }
+        } */
 
 
         for (int of_iter = 0; of_iter < nob_; of_iter++ ) {
@@ -1112,7 +1143,7 @@ void DFHelper_2B::build_2B_JK(std::vector<SharedMatrix> Cleft,
     double* pfg = Pfg_.get();
 
 
-    double* ppqr = Ppq_reg_.get();
+    //double* ppqr = Ppq_reg_.get();
 
 //double* met_inv = metric_inverse_prep_core();
 
@@ -1195,7 +1226,6 @@ void DFHelper_2B::build_2B_JK(std::vector<SharedMatrix> Cleft,
     }
 
     for (size_t bl_iter = 0, bcount=0; bl_iter < Qsteps.size(); bl_iter++) {
-printf("ping\n");
         size_t start = std::get<0>(Qsteps[bl_iter]);
         size_t stop = std::get<1>(Qsteps[bl_iter]);
         size_t begin = Qshell_aggs_[start];
@@ -1328,7 +1358,6 @@ void DFHelper_2B::compute_J_2B_core(std::vector<SharedMatrix> D,
                                     double* metp,
                                     size_t bcount,
                                     size_t block_size){
-printf("beginning of DFHelper_2B::compute_J_2B()\n");
 //JSOBJSOBJSOBJSOBJSOBJSOBJSOBJSOBJSOBJSOBJSOBJSOBJSOBJSOBJSOBJSOBJSOBJSOBJSOBJSOB
 int n = 0;
     double ZERO[16] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
@@ -1387,8 +1416,6 @@ n = 1;
             C_DGEMV('T', block_size, sp_size, 1.0, Qpq + jump, sp_size, qvec, 1, 0.0, &T1p[ nbf_ * bf_iter ], 1);
         }
 
-
-
         for (int bf_iter = 0; bf_iter < nbf_; bf_iter++) {
             for (int bf2 = 0, count = -1; bf2 < nbf_; bf2++) {
                 if (schwarz_fun_mask_[ bf_iter * nbf_ + bf2]) {
@@ -1398,25 +1425,26 @@ n = 1;
             }
         }
 
-
         C_DCOPY(nob_ * nbf_, zerop, 0, T1p, 1);
-        //C_DCOPY(nob_ * nbf_, zerop, 0, j_fq,1);
+        C_DCOPY(nob_ * nbf_, zerop, 0, j_fq,1);
+        if (do_JK_ot_ && !do_JK_oo_) {
 #pragma omp parallel for schedule(guided) num_threads(nthreads_)
-        for (size_t ob_iter = 0; ob_iter < nob_; ob_iter++) {
-            int rank = 0;
+            for (size_t ob_iter = 0; ob_iter < nob_; ob_iter++) {
+                int rank = 0;
 #ifdef _OPENMP
-            rank = omp_get_thread_num();
+                rank = omp_get_thread_num();
 #endif
-            size_t sp_size = ob_ao_small_skips_[ob_iter];
-            size_t jump = (AO_core_ ? ob_ao_big_skips_[ob_iter] + bcount * sp_size : (ob_ao_big_skips_[ob_iter] * block_size) / naux_ );
-            C_DGEMV('T', block_size, sp_size, 1.0, Qfq + jump, sp_size, qvec, 1, 0.0, &T1p[nbf_ * ob_iter], 1);
-        }
+                size_t sp_size = ob_ao_small_skips_[ob_iter];
+                size_t jump = (AO_core_ ? ob_ao_big_skips_[ob_iter] + bcount * sp_size : (ob_ao_big_skips_[ob_iter] * block_size) / naux_ );
+                C_DGEMV('T', block_size, sp_size, 1.0, Qfq + jump, sp_size, qvec, 1, 0.0, &T1p[nbf_ * ob_iter], 1);
+            }
 
-        for (int ob_iter = 0; ob_iter < nob_; ob_iter++) {
-            for (int bf2 = 0, count = -1; bf2 < nbf_; bf2++) {
-                if (ob_ao_schwarz_fun_mask_[ ob_iter * nbf_ + bf2]) {
-                    count++;
-                    j_fq[ob_iter * nbf_ + bf2] += T1p[ob_iter * nbf_ + count];
+            for (int ob_iter = 0; ob_iter < nob_; ob_iter++) {
+                for (int bf2 = 0, count = -1; bf2 < nbf_; bf2++) {
+                    if (ob_ao_schwarz_fun_mask_[ ob_iter * nbf_ + bf2]) {
+                        count++;
+                        j_fq[ob_iter * nbf_ + bf2] += T1p[ob_iter * nbf_ + count];
+                    }
                 }
             }
         }
@@ -1443,9 +1471,14 @@ n = 1;
             }
         } 
 
-
+        if (do_JK_oo_ && do_JK_ot_) {
+            for (int i = 0; i < nob_; i++ ) {
+                for (int j = 0; j < nbf_; j++) {
+                    j_fq[i * nbf_ + j ] = j_fg[ i * nob_ + prim_to_ob_[j] ];
+                }
+            }
+        }
     }
-printf("end of DFHelper_2B::compute_J_2B()\n");
 } // DFHelper_2B::compute_J_2B()
 
 void DFHelper_2B::compute_K_2B(std::vector<SharedMatrix> Cleft,
@@ -1463,6 +1496,7 @@ void DFHelper_2B::compute_K_2B(std::vector<SharedMatrix> Cleft,
                                size_t block_size,
                                bool lr_symmetric,
                                std::vector<std::vector<double>>& C_buffers) {
+
     for (size_t i = 0; i < Cleft.size(); i++) {
         size_t nocc = Cleft[i]->colspi()[0];
         if (!nocc) {
@@ -1474,23 +1508,48 @@ void DFHelper_2B::compute_K_2B(std::vector<SharedMatrix> Cleft,
         double* Kpqp = K_pq[i]->pointer()[0];
         double* Kfqp = K_fq[i]->pointer()[0];
         double* Kfgp = K_fg[i]->pointer()[0];
-printf("about to start first_transform_pQq\n");
-        first_transform_pQq(nocc, bcount, block_size, Mtp, T1t_p, Clp, ntb_, nbf_, big_skips_, small_skips_, schwarz_fun_mask_, C_buffers);
-printf("about to start first_transform_pQq\n");
-        first_transform_pQq(nocc, bcount, block_size, Mop, T1o_p, Clp, nob_, nbf_, ob_ao_big_skips_, ob_ao_small_skips_, ob_ao_schwarz_fun_mask_, C_buffers);
-printf("lr_symmetric is %s \n", ( lr_symmetric ? "True" : "False" ) );
-        if (!lr_symmetric) {
-            first_transform_pQq(nocc, bcount, block_size, Mtp, T2t_p, Crp, ntb_, nbf_, big_skips_, small_skips_, schwarz_fun_mask_, C_buffers);
-            first_transform_pQq(nocc, bcount, block_size, Mop, T2o_p, Crp, nob_, nbf_, ob_ao_big_skips_, ob_ao_small_skips_, ob_ao_schwarz_fun_mask_, C_buffers);
+
+        if (!do_JK_oo_ && (do_JK_tt_ || do_JK_ot_) ) {    
+            first_transform_pQq(nocc, bcount, block_size, Mtp, T1t_p, Clp, ntb_, nbf_, big_skips_, small_skips_, schwarz_fun_mask_, C_buffers);
         }
-printf("first K\n");
-        C_DGEMM('N', 'T', ntb_, ntb_, block_size * nocc, 1.0, T1t_p, nocc * block_size, T2t_p, nocc * block_size, 1.0, Kpqp, ntb_);
-printf("second K\n");
-        C_DGEMM('N', 'T', nob_, ntb_, block_size * nocc, 1.0, T1o_p, nocc * block_size, T2t_p, nocc * block_size, 1.0, Kfqp, ntb_);
-printf("third K\n");
-        C_DGEMM('N', 'T', nob_, nob_, block_size * nocc, 1.0, T1o_p, nocc * block_size, T2o_p, nocc * block_size, 1.0, Kfgp, nob_);
+        if (do_JK_oo_) {
+            first_transform_pQq(nocc, bcount, block_size, Mop, T1o_p, Clp, nob_, nbf_, ob_ao_big_skips_, ob_ao_small_skips_, ob_ao_schwarz_fun_mask_, C_buffers);
+        }
+
+        if (!lr_symmetric) {
+            if (!do_JK_oo_ && (do_JK_tt_ || do_JK_ot_) ) {    
+                first_transform_pQq(nocc, bcount, block_size, Mtp, T2t_p, Crp, ntb_, nbf_, big_skips_, small_skips_, schwarz_fun_mask_, C_buffers);
+                }
+            if (do_JK_oo_) {
+                first_transform_pQq(nocc, bcount, block_size, Mop, T2o_p, Crp, nob_, nbf_, ob_ao_big_skips_, ob_ao_small_skips_, ob_ao_schwarz_fun_mask_, C_buffers);
+            }
+        }
+
+        if (do_JK_tt_ && !do_JK_oo_) {
+            C_DGEMM('N', 'T', ntb_, ntb_, block_size * nocc, 1.0, T1t_p, nocc * block_size, T2t_p, nocc * block_size, 1.0, Kpqp, ntb_);
+        }
+
+        if ( do_JK_ot_ && !do_JK_oo_ ) {
+            C_DGEMM('N', 'T', nob_, ntb_, block_size * nocc, 1.0, T1o_p, nocc * block_size, T2t_p, nocc * block_size, 1.0, Kfqp, ntb_);
+        }
+
+        if (do_JK_oo_) {
+            C_DGEMM('N', 'T', nob_, nob_, block_size * nocc, 1.0, T1o_p, nocc * block_size, T2o_p, nocc * block_size, 1.0, Kfgp, nob_);
+        }
+
+        if (do_JK_oo_ && do_JK_ot_)
+
+
+        if (do_JK_oo_ && do_JK_ot_) {
+            for (int i = 0; i < nob_; i++ ) {
+                for (int j = 0; j < nbf_; j++) {
+                    Kfqp[i * nbf_ + j ] = Kfgp[ i * nob_ + prim_to_ob_[j] ];
+                }
+            }
+        }
+
     }
-printf("all K's\n");
+    
 } //DFHelper_2B::compute_K_2B
 // look at the arguments to the dgemm if you need to know what the arguments to
 //   first_transform mean
@@ -1529,23 +1588,12 @@ void DFHelper_2B::first_transform_pQq(size_t bsize,
         C_DGEMM('N', 'N', block_size, bsize, sp_size, 1.0, &Mp[jump], sp_size, &C_buffers[rank][0], bsize, 0.0, &Tp[k * block_size * bsize], bsize );
     }
 } // DFHelper_2B::first_transform_pQq
-
-/* Do I add q-blocking now or later?*/ 
-
-
-/* in each of these functions, we have the AO integrals */
-
-/*
-void DFHelper_2B::build_JK_oo(){
-
-} // DFHelper_2B::build_JK_oo
-
-void DFHelper_2B::build_JK_ot(){ } // DFHelper_2B::build_JK_ot()
-
-void DFHelper_2B::build_JK_tt(){
-} // DFHelper_2B::build_JK_tt()
-*/
-
+void DFHelper_2B::set_do_JK_tt(bool do_JK_tt) {do_JK_tt_ = do_JK_tt;}
+bool DFHelper_2B::get_do_JK_tt() {return do_JK_tt_;} 
+void DFHelper_2B::set_do_JK_ot(bool do_JK_ot) {do_JK_ot_ = do_JK_ot;} 
+bool DFHelper_2B::get_do_JK_ot() {return do_JK_ot_;} 
+void DFHelper_2B::set_do_JK_oo(bool do_JK_oo) {do_JK_oo_ = do_JK_oo;}
+bool DFHelper_2B::get_do_JK_oo() {return do_JK_oo_;} 
 
 } // namespace psi
 
