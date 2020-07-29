@@ -669,6 +669,8 @@ std::unique_ptr<double[]> Ppq_reg_;
 
     void compute_sparse_fPg_blocking_p( size_t start, size_t stop, double* Mp, std::vector<std::shared_ptr<TwoBodyAOInt>> eri );
 
+    void compute_sparse_fPg_blocking_p_symm( size_t start, size_t stop, double* Mp, std::vector<std::shared_ptr<TwoBodyAOInt>> eri );
+
     void contract_metric_pPq_core(size_t func1, size_t func2, double* Qpq, double* metp);
     void contract_metric_fPq_core(size_t func1, size_t func2, double* Qfq, double* metp);
     void contract_metric_fPg_core(size_t func1, size_t func2, double* Qfg, double* metp);
