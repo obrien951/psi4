@@ -82,6 +82,7 @@ DFHelper_2B::DFHelper_2B( std::shared_ptr<BasisSet> one_basis, std::shared_ptr<B
 
 void DFHelper_2B::form_prim_to_ob() {
     prim_to_ob_.resize(nbf_);
+    prim_to_ob_sh_.resize(pshells_);
     // number of atoms in the basis set
     std::vector<size_t> ob_atom_to_shell(primary_->shell(primary_->nshell()-1).ncenter()+1);
     int lastatom = -1;
@@ -104,9 +105,18 @@ void DFHelper_2B::form_prim_to_ob() {
         int ob_shell_start = one_basis_->shell(
 ob_atom_to_shell[atom_last] +shell_on_atom_index
                                                ).function_index();
+        prim_to_ob_sh_[i] = ob_atom_to_shell[atom_last] + shell_on_atom_index;
         for (int j = 0; j < primary_->shell(i).nfunction(); j++ ) {
             prim_to_ob_[pr_shell_start + j] = ob_shell_start + j;
         }
+    }
+    ob_to_prim_.resize(nob_, -1ul);
+    ob_to_prim_sh_.resize(oshells_, -1ul);
+    for (size_t i = 0; i < nbf_; i++) {
+        ob_to_prim_[ prim_to_ob_[i] ] = i;
+    }
+    for (size_t i = 0; i < pshells_; i++) {
+        ob_to_prim_sh_[ prim_to_ob_sh_[i] ] = i;
     }
 }
 
@@ -256,35 +266,45 @@ void DFHelper_2B::prepare_sparsity() {
     ob_ob_buffer[rank] = ob_ob_eri[rank]->buffer();
 }
 
-#pragma omp parallel for
-    for (size_t ao_iters = 0; ao_iters < pshells_; ao_iters++) {
+
+#pragma omp parallel for num_threads(nthreads)
+    for (size_t ob_iters = 0; ob_iters < oshells_; ob_iters++) {
         int rank = 0;
 #ifdef _OPENMP
         rank = omp_get_thread_num();
 #endif
-        for (size_t ao_jters = 0; ao_jters < pshells_; ao_jters++) {
-            eri[rank]->compute_shell(ao_iters, ao_jters, ao_iters, ao_jters);
-            size_t nummu = primary_->shell(ao_iters).nfunction();
-            size_t numnu = primary_->shell(ao_jters).nfunction();
-            for (size_t ao_iter = 0; ao_iter < nummu; ao_iter++) {
-                size_t omu = primary_->shell(ao_iters).function_index() + ao_iter;
-                for (size_t ao_jter = 0; ao_jter < numnu; ao_jter++) {
-                    size_t onu = primary_->shell(ao_jters).function_index() + ao_jter;
-                    size_t index = ao_iter * (numnu + numnu * nummu * numnu ) + ao_jter * (nummu * numnu + 1);
-                    double val = fabs(buffer[rank][index]);
-                    max_integral = std::max(max_integral, val);
-                    if (shell_max_vals[pshells_ * ao_iters + ao_jters] < val) {
-                        shell_max_vals[pshells_ * ao_iters + ao_jters] = val;
+        size_t nphi = one_basis_->shell(ob_iters).nfunction();
+        size_t ind_phi = one_basis_->shell(ob_iters).function_index();
+        for (size_t ob_jters = 0; ob_jters < oshells_; ob_jters++) {
+            ob_ob_eri[rank]->compute_shell(ob_iters, ob_jters, ob_iters, ob_jters);
+            size_t ngam = one_basis_->shell(ob_jters).nfunction();
+            size_t ind_gamma = one_basis_->shell(ob_jters).function_index();
+            for (size_t ob_iter = 0; ob_iter < nphi; ob_iter++) {
+                size_t phi = ind_phi + ob_iter;
+                for (size_t ob_jter = 0; ob_jter < ngam; ob_jter++) {
+                    size_t gamma = ind_gamma + ob_jter;
+                    double val = fabs(ob_ob_buffer[rank][ ob_iter * (ngam + ngam * nphi * ngam) + ob_jter * (1 + ngam * nphi ) ]);
+                    ob_ob_max_integral = std::max(ob_ob_max_integral, val);
+                    ob_ob_shell_max_vals[ ob_iters * oshells_ + ob_jters ] = std::max(ob_ob_shell_max_vals[ ob_iters * oshells_ + ob_jters ], val);
+                    ob_ob_fun_max_vals[ phi * nob_ + gamma ] = std::max(ob_ob_fun_max_vals[ phi * nob_ + gamma ], val);
+                    if ( ob_to_prim_[gamma] != -1ul ) {
+                        ob_ao_fun_max_vals[ phi * nbf_ + ob_to_prim_[gamma] ] = std::max(ob_ao_fun_max_vals[ phi * nbf_ + ob_to_prim_[gamma] ], val);
+                        if (ob_to_prim_[phi] != -1ul) {
+                            fun_max_vals[ ob_to_prim_[phi] * nbf_ + ob_to_prim_[gamma]] = std::max(fun_max_vals[ ob_to_prim_[phi] * nbf_ + ob_to_prim_[gamma]], val);
+                        }
                     }
-                    if (fun_max_vals[omu * nbf_ + onu ] < val ) {
-                        fun_max_vals[omu * nbf_ + onu] = val;
+                    if ( ob_to_prim_sh_[ob_jters] != -1ul ) {
+                        ob_ao_shell_max_vals[ob_iters * pshells_ + ob_to_prim_sh_[ob_jters] ] = std::max(ob_ao_shell_max_vals[ob_iters * pshells_ + ob_to_prim_sh_[ob_jters] ], val);
+                        if (ob_to_prim_sh_[ob_iters] != -1ul){
+                            shell_max_vals[ ob_to_prim_sh_[ob_iters] * pshells_ + ob_to_prim_sh_[ob_jters]] = std::max(shell_max_vals[ ob_to_prim_sh_[ob_iters] * pshells_ + ob_to_prim_sh_[ob_jters]], val);
+                        }
                     }
                 }
             }
         }
     }
 
-    double tolerance = cutoff_ * cutoff_ / max_integral;
+    double tolerance = cutoff_ * cutoff_/ ob_ob_max_integral;
 
     for (size_t ao_iters = 0; ao_iters < pshells_ * pshells_; ao_iters++) {
         schwarz_shell_mask_[ao_iters] = (shell_max_vals[ao_iters] < tolerance ? 0 : 1);
@@ -311,30 +331,6 @@ void DFHelper_2B::prepare_sparsity() {
     }
     small_skips_[nbf_] = coltots;
 
-//#pragma omp parallel for num_threads(nthreads)
-    for (size_t ob_iters = 0; ob_iters < oshells_; ob_iters++) {
-        int rank = 0;
-//#ifdef _OPENMP
-        rank = omp_get_thread_num();
-//#endif
-        for (size_t ao_iters = 0; ao_iters < pshells_; ao_iters++ ) {
-            ob_ao_eri[rank]->compute_shell(ob_iters, ao_iters, ob_iters, ao_iters);
-            size_t numphi = one_basis_->shell(ob_iters).nfunction();
-            size_t nummu = primary_->shell(ao_iters).nfunction();
-            for (size_t ob_iter = 0; ob_iter < numphi; ob_iter++) {
-                size_t ophi = one_basis_->shell(ob_iters).function_index() + ob_iter;
-                for (size_t ao_iter = 0; ao_iter < nummu; ao_iter++) {
-                    size_t omu = primary_->shell(ao_iters).function_index() + ao_iter;
-                    double val = fabs(ob_ao_buffer[rank][ob_iter * (nummu + nummu * numphi * nummu) + ao_iter * (numphi * nummu + 1) ]);
-                    ob_ao_max_integral = std::max(ob_ao_max_integral, val);
-                    ob_ao_shell_max_vals[pshells_ * ob_iters + ao_iters] = std::max(ob_ao_shell_max_vals[pshells_ * ob_iters + ao_iters], val);
-                    ob_ao_fun_max_vals[ophi * nbf_ + omu] = std::max(ob_ao_fun_max_vals[ophi * nbf_ + omu], val);
-                }
-            }
-        }
-    }
-
-    tolerance = cutoff_ * cutoff_ / ob_ao_max_integral;
     for (size_t ob_iters = 0; ob_iters < oshells_ * pshells_; ob_iters++ ) {ob_ao_schwarz_shell_mask_[ob_iters] = ( ob_ao_shell_max_vals[ob_iters] > tolerance ? 1 : 0); } 
 
     for (size_t ob_iter = 0, count = 0; ob_iter < nob_; ob_iter++) {
@@ -358,32 +354,6 @@ void DFHelper_2B::prepare_sparsity() {
     }
     ob_ao_small_skips_[nob_] = coltots;
 
-#pragma omp parallel for num_threads(nthreads)
-    for (size_t ob_iters = 0; ob_iters < oshells_; ob_iters++) {
-        int rank = 0;
-#ifdef _OPENMP
-        rank = omp_get_thread_num();
-#endif
-        size_t nphi = one_basis_->shell(ob_iters).nfunction();
-        size_t ind_phi = one_basis_->shell(ob_iters).function_index();
-        for (size_t ob_jters = 0; ob_jters < oshells_; ob_jters++) {
-            ob_ob_eri[rank]->compute_shell(ob_iters, ob_jters, ob_iters, ob_jters);
-            size_t ngam = one_basis_->shell(ob_jters).nfunction();
-            size_t ind_gamma = one_basis_->shell(ob_jters).function_index();
-            for (size_t ob_iter = 0; ob_iter < nphi; ob_iter++) {
-                size_t phi = ind_phi + ob_iter;
-                for (size_t ob_jter = 0; ob_jter < ngam; ob_jter++) {
-                    size_t gamma = ind_gamma + ob_jter;
-                    double val = fabs(ob_ob_buffer[rank][ ob_iter * (ngam + ngam * nphi * ngam) + ob_jter * (1 + ngam * nphi ) ]);
-                    ob_ob_max_integral = std::max(ob_ob_max_integral, val);
-                    ob_ob_shell_max_vals[ ob_iters * oshells_ + ob_jters ] = std::max(ob_ob_shell_max_vals[ ob_iters * oshells_ + ob_jters ], val);
-                    ob_ob_fun_max_vals[ phi * nob_ + gamma ] = std::max(ob_ob_fun_max_vals[ phi * nob_ + gamma ], val);
-                }
-            }
-        }
-    }
-
-    tolerance = cutoff_ * cutoff_/ ob_ob_max_integral;
 
     for (size_t ob_iters = 0; ob_iters < oshells_ * oshells_; ob_iters++) { ob_ob_schwarz_shell_mask_[ob_iters] = ( ob_ob_shell_max_vals[ob_iters] > tolerance ? 1 : 0); }
 
@@ -408,61 +378,6 @@ void DFHelper_2B::prepare_sparsity() {
         coltots += ob_ob_small_skips_[ob_iter] ;
     }
     ob_ob_small_skips_[nob_] = coltots;
-
-/*    for (size_t iter = 1; iter < nbf_; iter++) {
-        small_skips_[iter] = nbf_;
-        big_skips_[iter] = big_skips_[iter - 1] + nbf_ * naux_;
-    }
-    big_skips_[nbf_] = big_skips_[nbf_ - 1] + nbf_ * naux_; */
-
-    for (size_t iter = 1; iter < nob_; iter++) {
-//        ob_ao_small_skips_[iter] = nbf_;
-//        ob_ao_big_skips_[iter] = ob_ao_big_skips_[iter - 1] + nbf_*naux_;
-//        ob_ob_small_skips_[iter] = nob_;
-//        ob_ob_big_skips_[iter] = ob_ob_big_skips_[iter - 1] + nob_*naux_;
-    }
-
-//    ob_ao_big_skips_[nob_] = ob_ao_big_skips_[nob_ - 1] + nbf_*naux_;
-//    ob_ob_big_skips_[nob_] = ob_ob_big_skips_[nob_ - 1] + nob_*naux_;
-
-
-/*    for (size_t iter = 0; iter < pshells_; iter++) {
-        for (size_t jter = 0; jter < pshells_; jter++) {
-            schwarz_shell_mask_[ iter * pshells_ + jter ] = 1;
-        }
-    } */
-  
-/*#pragma omp parallel for*/
-    for (size_t ob_iter = 0; ob_iter < oshells_; ob_iter++) {
-        for (size_t ao_iter = 0; ao_iter < pshells_; ao_iter++) {
-            //ob_ao_schwarz_shell_mask_[ob_iter*pshells_ + ao_iter] = 1;
-        } 
-        for (size_t ob_jter = 0; ob_jter < oshells_; ob_jter++) {
-//            ob_ob_schwarz_shell_mask_[ob_iter* oshells_ + ob_jter] = 1;
-        }
-    }
-
-
-/*    for (size_t iter = 0; iter < nbf_; iter++) {
-        for (size_t jter = 0; jter < nbf_; jter++) {
-            schwarz_fun_mask_[ iter * nbf_ + jter] = jter + 1;
-        }
-    } */
-
-/*#pragma omp parallel for*/
-    for (size_t ob_iter = 0; ob_iter < nob_; ob_iter++) {
-        for (size_t ao_iter = 0; ao_iter < nbf_; ao_iter++) {
-  //          ob_ao_schwarz_fun_mask_[ob_iter * nbf_ + ao_iter] = 1 + ao_iter;
-        } 
-        for (size_t ob_jter = 0; ob_jter < nob_; ob_jter++) {
- //           ob_ob_schwarz_fun_mask_[ob_iter * nob_ + ob_jter] = 1 + ob_jter;
-        }
-    }
-
-    // these ones are special
-    /*small_skips_[nbf_] = nbf_ * nbf_;*/
- //   ob_ao_small_skips_[nob_] = nbf_ * nob_;
-//    ob_ob_small_skips_[nob_] = nob_ * nob_;
 
     sparsity_prepared_ = true;
     timer_off("DFH_2B: sparsity prep");
