@@ -617,10 +617,16 @@ class PSI_API DFHelper_2B : public DFHelper {
     bool do_JK_ot_ = true;
     bool do_JK_oo_ = true;
 
+    std::vector<size_t> lastind_;
+
     std::vector<size_t> oshell_aggs_;
     std::vector<size_t> tshell_aggs_;
 
+    std::vector<size_t> prim_to_ob_sh_;
     std::vector<size_t> prim_to_ob_;
+
+    std::vector<size_t> ob_to_prim_;
+    std::vector<size_t> ob_to_prim_sh_;
 
 //    void prepare_AO();
     void prepare_AO_core() override;
@@ -672,8 +678,12 @@ std::unique_ptr<double[]> Ppq_reg_;
     void compute_sparse_fPg_blocking_p_symm( size_t start, size_t stop, double* Mp, std::vector<std::shared_ptr<TwoBodyAOInt>> eri );
 
     void contract_metric_pPq_core(size_t func1, size_t func2, double* Qpq, double* metp);
+
     void contract_metric_fPq_core(size_t func1, size_t func2, double* Qfq, double* metp);
+
     void contract_metric_fPg_core(size_t func1, size_t func2, double* Qfg, double* metp);
+
+    void contract_metric_f_pPg_q_core_parsim(size_t start_func, size_t stop_func, double* taop, double* metp);
 
     void first_transform_pQq(size_t bsize, size_t bcount, size_t block_size, double* Mp, double* Tp, double* Bp, size_t nbf, std::vector<size_t> sm_skips, std::vector<size_t> bg_skips, std::vector<std::vector<double>>& C_buffers, std::vector<size_t> fun_mask);
 
