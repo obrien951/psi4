@@ -222,6 +222,10 @@ void DFHelper_2B::prepare_sparsity() {
 
     small_skips_.resize(nbf_ + 1);
     big_skips_.resize(nbf_ + 1);
+    symm_small_skips_.resize(nbf_);
+    symm_big_skips_.resize(nbf_ + 1);
+    symm_ignored_columns_.resize(nbf_);
+
 
     ob_ao_small_skips_.resize(nob_ + 1);
     ob_ao_big_skips_.resize(nob_ + 1);
@@ -336,6 +340,19 @@ void DFHelper_2B::prepare_sparsity() {
         big_skips_[ao_iter] = big_skips_[ao_iter - 1] + naux_ * small_skips_[ao_iter - 1];
     }
     small_skips_[nbf_] = coltots;
+
+    // thanks matt
+    for (size_t i = 0; i < nbf_; i++) {
+        size_t size = 0;
+        size_t skip = 0;
+        for (size_t j = 0; j < nbf_; j++) {
+            if (schwarz_fun_mask_[i * nbf_ + j]) {
+                (j >= i ? size++: skip++);
+            }
+        }
+        symm_small_skips_[i] = size;
+        symm_ignored_columns_[i] = skip;
+    }
 
     for (size_t ob_iters = 0; ob_iters < oshells_ * pshells_; ob_iters++ ) {ob_ao_schwarz_shell_mask_[ob_iters] = ( ob_ao_shell_max_vals[ob_iters] > tolerance ? 1 : 0); } 
 
@@ -614,35 +631,37 @@ void DFHelper_2B::prepare_AO_core() {
 
     std::unique_ptr<double[]> Qpq(new double[std::get<0>(ao_ao_plargest)]);
     double* taop = Qpq.get();
-
-    for (size_t i = 0; i < ao_ao_psteps.size(); i++) { 
-        size_t start = std::get<0>(ao_ao_psteps[i]); 
-        size_t stop = std::get<1>(ao_ao_psteps[i]);
-        size_t start_func = primary_->shell(start).function_index();
-        size_t stop_func = primary_->shell(stop).function_index() + primary_->shell(stop).nfunction() - 1;
-        size_t begin = pshell_aggs_[start];
-        size_t end = pshell_aggs_[stop + 1] - 1;
-        compute_sparse_pQq_blocking_p(start, stop, taop, ao_ao_eri);
-        // (P|ls) <- temp
-       // C_DCOPY(big_skips_[stop_func + 1] - big_skips_[start_func], taop, 1, &ppqr[big_skips_[start_func]], 1);
-        // [J^{1/2}]_{QP}(P|ls)
-        contract_metric_pPq_core(start_func, stop_func, taop, metp);
+    if (do_JK_tt_ && !do_JK_oo_) {
+        for (size_t i = 0; i < ao_ao_psteps.size(); i++) { 
+            size_t start = std::get<0>(ao_ao_psteps[i]); 
+            size_t stop = std::get<1>(ao_ao_psteps[i]);
+            size_t start_func = primary_->shell(start).function_index();
+            size_t stop_func = primary_->shell(stop).function_index() + primary_->shell(stop).nfunction() - 1;
+            size_t begin = pshell_aggs_[start];
+            size_t end = pshell_aggs_[stop + 1] - 1;
+            compute_sparse_pQq_blocking_p(start, stop, taop, ao_ao_eri);
+            // (P|ls) <- temp
+           // C_DCOPY(big_skips_[stop_func + 1] - big_skips_[start_func], taop, 1, &ppqr[big_skips_[start_func]], 1);
+            // [J^{1/2}]_{QP}(P|ls)
+            contract_metric_pPq_core(start_func, stop_func, taop, metp);
+        }
     }
 
     Qpq.reset();
     std::unique_ptr<double[]> Qfq(new double[std::get<0>(ob_ao_flargest)]);
     taop = Qfq.get();
-
-    for (size_t i = 0; i < ob_ao_fsteps.size(); i++) { 
-        size_t start = std::get<0>(ob_ao_fsteps[i]); 
-        size_t stop = std::get<1>(ob_ao_fsteps[i]);
-        size_t start_func = one_basis_->shell(start).function_index();
-        size_t stop_func = one_basis_->shell(stop).function_index() + one_basis_->shell(stop).nfunction() - 1;
-        size_t begin = oshell_aggs_[start];
-        size_t end = oshell_aggs_[stop + 1] - 1;
-        //compute_sparse_fPq_blocking_p(start, stop, taop, ob_ao_eri);
-        // [J^{1/2}]_{QP}(P|rs)
-		//contract_metric_fPq_core(start_func, stop_func, taop, metp);
+    if (do_JK_ot_ && !do_JK_oo_) {
+        for (size_t i = 0; i < ob_ao_fsteps.size(); i++) { 
+            size_t start = std::get<0>(ob_ao_fsteps[i]); 
+            size_t stop = std::get<1>(ob_ao_fsteps[i]);
+            size_t start_func = one_basis_->shell(start).function_index();
+            size_t stop_func = one_basis_->shell(stop).function_index() + one_basis_->shell(stop).nfunction() - 1;
+            size_t begin = oshell_aggs_[start];
+            size_t end = oshell_aggs_[stop + 1] - 1;
+            compute_sparse_fPq_blocking_p(start, stop, taop, ob_ao_eri);
+            // [J^{1/2}]_{QP}(P|rs)
+    		contract_metric_fPq_core(start_func, stop_func, taop, metp);
+        }
     }
 
     Qfq.reset();
@@ -657,12 +676,11 @@ void DFHelper_2B::prepare_AO_core() {
         size_t begin = oshell_aggs_[start];
         size_t end = oshell_aggs_[stop + 1] - 1;
         compute_sparse_fPg_blocking_p_symm(start, stop, taop, ob_ob_eri);//taop, ob_ob_eri);
-        contract_metric_fPq_core(start_func, stop_func, taop, metp);
+        //contract_metric_fPq_core(start_func, stop_func, taop, metp);
         contract_metric_f_pPg_q_core_parsim(start_func, stop_func, taop, metp);
         //C_DCOPY(ob_ob_big_skips_[stop_func + 1] - ob_ob_big_skips_[start_func], taop, 1, &pfg[ob_ob_big_skips_[start_func]], 1);
         // [J^{1/2}]_{QP}(P|rq)
         //contract_metric_fPg_core( begin, end, taop, metp);
-        //contract_metric_f_pPg_q_core_parsim(start_func, stop_func, taop, metp);
     } 
     //contract_metric_f_pPg_q_core_parsim(start_func, stop_func, taop, metp);
     Qfg.reset();
@@ -919,16 +937,51 @@ void DFHelper_2B::contract_metric_fPg_core(size_t func1, size_t func2, double* Q
         C_DGEMM('N', 'N', naux_, ob_ob_small_skips_[i], naux_, 1.0, metp, naux_, &Qfg[ob_ob_big_skips_[i]- ob_ob_big_skips_[func1]], ob_ob_small_skips_[i], 0.0, &pfg[ob_ob_big_skips_[i]], ob_ob_small_skips_[i] );
     }
 } // contract_metric_Pfg_core
-void DFHelper_2B::contract_metric_f_pPg_q_core_parsim(size_t start_func, size_t stop_func, double* taop, double* metp) {
-    double* pfg = Pfg_.get();
-    double* pfq = Pfq_.get();
-    double* ppq = Ppq_.get();
-    for (size_t bf_iter = start_func; bf_iter < stop_func; bf_iter++) {
-        if (ob_to_prim_[bf_iter] == -1) {
+void DFHelper_2B::contract_metric_f_pPg_q_core_parsim(size_t start_func, size_t stop_func, double* Qfq, double* metp) {
+	double * pfq = Pfq_.get();
+    double * ppq = Ppq_.get();
+#pragma omp parallel for num_threads(nthreads_) schedule(guided)
+    for (int i = start_func; i <= stop_func; i++) {
+        if ( ob_to_prim_[i] == -1ul ) {
+            C_DGEMM('N', 'N', naux_, ob_ao_small_skips_[i], naux_, 1.0, metp, naux_, &Qfq[ob_ao_big_skips_[i] - ob_ao_big_skips_[start_func]], ob_ao_small_skips_[i], 0.0, &pfq[ob_ao_big_skips_[i]], ob_ao_small_skips_[i]);
         } else {
+            C_DGEMM('N', 'N', naux_, symm_small_skips_[ ob_to_prim_[i] ], naux_, 1.0, metp, naux_, &Qfq[ob_ao_big_skips_[i] - ob_ao_big_skips_[start_func] + symm_ignored_columns_[ ob_to_prim_[i] ] ], ob_ao_small_skips_[i], 0.0, &ppq[big_skips_[ob_to_prim_[i]] + symm_ignored_columns_[ob_to_prim_[i]] ], small_skips_[ob_to_prim_[i]]);
         }
     }
-}
+#pragma omp parallel for num_threads(nthreads_) schedule(guided)
+    for (size_t p = start_func; p <= stop_func ; p++) { 
+        if (ob_to_prim_[p] != -1) {
+            for (size_t Q = 0; Q < naux_; Q++) { 
+                for (size_t q = 0; q <= ob_to_prim_[p]; q++ ) {
+                    if ( ob_ao_schwarz_fun_mask_[p * nbf_ + q ] ) {
+pfq[ob_ao_big_skips_[p] + Q * ob_ao_small_skips_[p] + 
+    ob_ao_schwarz_fun_mask_[p * nbf_ + q] - 1 ] =
+ppq[big_skips_[ob_to_prim_[p]] + Q * small_skips_[ob_to_prim_[p]] + 
+    schwarz_fun_mask_[ ob_to_prim_[p] * nbf_ + q] - 1 ];
+                    }
+                }
+                for (size_t q = ob_to_prim_[p] + 1; q < nbf_ ; q++) {
+                    if ( ob_ao_schwarz_fun_mask_[p * nbf_ + q ] ) {
+
+pfq[ob_ao_big_skips_[p] + Q * ob_ao_small_skips_[p] + 
+    ob_ao_schwarz_fun_mask_[p * nbf_ + q] - 1 ]
+=
+pfq[ ob_ao_big_skips_[ prim_to_ob_[q] ] + Q * ob_ao_small_skips_[ prim_to_ob_[q] ] +
+     ob_ao_schwarz_fun_mask_[ prim_to_ob_[q] * nbf_ + ob_to_prim_[p] ] - 1 ]
+=
+// I want qQ ob_to_prim[p]
+ppq[ big_skips_[q] + Q * small_skips_[q] + 
+     schwarz_fun_mask_[ q * nbf_ + ob_to_prim_[p] ] - 1 ]
+=
+ppq[ big_skips_[ob_to_prim_[p]] + Q * small_skips_[ ob_to_prim_[p] ] + 
+     schwarz_fun_mask_[ob_to_prim_[p] * nbf_ + q ] - 1 ] ;
+
+                    }
+                }
+            }
+        }
+    }
+} // contract_metric_f_pPg_q_core_parsim
 /* This function asks the user to supply big skips and small skips 
    which allows them (me) to transform any basis out of the AO basis!*/ 
 void DFHelper_2B::first_transform_pQq(size_t bsize, size_t bcount, size_t block_size, double* Mp, double* Tp, double* Bp, size_t nbf, std::vector<size_t> sm_skips, std::vector<size_t> bg_skips, std::vector<std::vector<double>>& C_buffers, std::vector<size_t> fun_mask) {
