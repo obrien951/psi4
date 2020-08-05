@@ -675,9 +675,13 @@ void DFHelper_2B::prepare_AO_core() {
         size_t stop_func = one_basis_->shell(stop).function_index() + one_basis_->shell(stop).nfunction() - 1;
         size_t begin = oshell_aggs_[start];
         size_t end = oshell_aggs_[stop + 1] - 1;
+        timer_on("DFH_2B: ERI Calculation");
         compute_sparse_fPg_blocking_p_symm(start, stop, taop, ob_ob_eri);//taop, ob_ob_eri);
+        timer_off("DFH_2B: ERI Calculation");
         //contract_metric_fPq_core(start_func, stop_func, taop, metp);
+        timer_on("DFH_2B: Metric Contraction");
         contract_metric_f_pPg_q_core_parsim(start_func, stop_func, taop, metp);
+        timer_off("DFH_2B: Metric Contraction");
         //C_DCOPY(ob_ob_big_skips_[stop_func + 1] - ob_ob_big_skips_[start_func], taop, 1, &pfg[ob_ob_big_skips_[start_func]], 1);
         // [J^{1/2}]_{QP}(P|rq)
         //contract_metric_fPg_core( begin, end, taop, metp);
@@ -1315,9 +1319,11 @@ void DFHelper_2B::build_2B_JK(std::vector<SharedMatrix> Cleft,
 
     /* this function can't block due to the working equation we've chosen 
        for the coulomb matrix. The last two arguments are superfluous*/
+    timer_on("DFH_2B J");
     if (AO_core_) {
         compute_J_2B_core(D, J_pq, J_fq, J_fg, c_buffers, ppq, pfq, pfg, t1_fp, qvec, qvec2, metp, 0, naux_);
     }
+    timer_off("DFH_2B J");
 
     for (size_t bl_iter = 0, bcount=0; bl_iter < Qsteps.size(); bl_iter++) {
         size_t start = std::get<0>(Qsteps[bl_iter]);
@@ -1603,6 +1609,7 @@ void DFHelper_2B::compute_K_2B(std::vector<SharedMatrix> Cleft,
         double* Kfqp = K_fq[i]->pointer()[0];
         double* Kfgp = K_fg[i]->pointer()[0];
 
+        timer_on("DFH_2B K1");
         if (!do_JK_oo_ && (do_JK_tt_ || do_JK_ot_) ) {    
             first_transform_pQq(nocc, bcount, block_size, Mtp, T1t_p, Clp, ntb_, nbf_, big_skips_, small_skips_, schwarz_fun_mask_, C_buffers);
         }
@@ -1618,7 +1625,9 @@ void DFHelper_2B::compute_K_2B(std::vector<SharedMatrix> Cleft,
                 first_transform_pQq(nocc, bcount, block_size, Mop, T2o_p, Crp, nob_, nbf_, ob_ao_big_skips_, ob_ao_small_skips_, ob_ao_schwarz_fun_mask_, C_buffers);
             }
         }
+        timer_off("DFH_2B K1");
 
+        timer_on("DFH_2B K2");
         if (do_JK_tt_ && !do_JK_oo_) {
             C_DGEMM('N', 'T', ntb_, ntb_, block_size * nocc, 1.0, T1t_p, nocc * block_size, T2t_p, nocc * block_size, 1.0, Kpqp, ntb_);
         }
@@ -1630,8 +1639,7 @@ void DFHelper_2B::compute_K_2B(std::vector<SharedMatrix> Cleft,
         if (do_JK_oo_) {
             C_DGEMM('N', 'T', nob_, nob_, block_size * nocc, 1.0, T1o_p, nocc * block_size, T2o_p, nocc * block_size, 1.0, Kfgp, nob_);
         }
-
-        if (do_JK_oo_ && do_JK_ot_)
+        timer_off("DFH_2B K2");
 
 
         if (do_JK_oo_ && do_JK_ot_) {
