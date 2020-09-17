@@ -26,6 +26,10 @@
  * @END LICENSE
  */
 
+
+#include <stdlib.h>
+
+
 #include "psi4/libpsio/psio.hpp"
 #include "psi4/libpsio/psio.h"
 #include "psi4/libpsio/aiohandler.h"
@@ -148,4 +152,35 @@ void MemDFJK::set_wcombine(bool wcombine) {
         dfh_->set_wcombine(wcombine); 
     }
 }
+}
+void MemDFJK::dgemm_time(int nbf_im, int naux_im, int nocc_im, int omp__threads, bool do_second) {
+    double essaye = 0.0;
+    std::unique_ptr<double[]> A_im(new double[nbf_im * nbf_im * naux_im]);
+    std::unique_ptr<double[]> B_im(new double[nbf_im * nbf_im * naux_im]);
+    std::unique_ptr<double[]> CMET_im(new double[naux_im * naux_im]);
+    srand(42);
+
+    double* a = A_im.get();
+    double* b = B_im.get();
+    double* cmet = CMET_im.get();
+
+    memset( (void*) a, 3, 8 * nbf_im * nbf_im * naux_im );
+    memset( (void*) b, 4, 8 * nbf_im * nbf_im * naux_im );
+    timer_on("First DGEMM");
+    //imitates Qpq layout of [J^{-0.5}]_QP (P|pq) ROB
+    C_DGEMM('N', 'N', naux_im, nbf_im*nbf_im, naux_im, 1.0, cmet, naux_im, a, nbf_im * nbf_im, 0.0, b, nbf_im*nbf_im);
+    timer_off("First DGEMM");
+
+
+    //imitates pQq layout of [J^{-0.5}]_QP (P|pq)
+    timer_on("second DGEMM");
+#pragma omp parallel for schedule(static) // consider changing the scheduling parameter MATT
+    for (int i = 0; i < nbf_im; i++){
+    C_DGEMM('N', 'N', naux_im, nbf_im, naux_im, 1.0, cmet, naux_im, a + i*(nbf_im * naux_im), nbf_im, 0.0, b + i*(nbf_im * naux_im), nbf_im);
+    }
+    timer_off("second DGEMM");
+
+
+
+//    printf("ping\n");
 }

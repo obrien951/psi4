@@ -1106,6 +1106,8 @@ class PSI_API MemDFJK : public JK {
      * Returns the DFHelper object
      */
     std::shared_ptr<DFHelper> dfh() { return dfh_; }
+
+    void dgemm_time(int nbf_im, int naux_im, int nocc_im, int omp__threads, bool do_second);
 };
 
 }

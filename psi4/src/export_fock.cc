@@ -95,7 +95,8 @@ void export_fock(py::module &m) {
         .def("print_header", &JK::print_header, "docstring");
 
     py::class_<MemDFJK, std::shared_ptr<MemDFJK>, JK>(m, "MemDFJK", "docstring")
-        .def("dfh", &MemDFJK::dfh, "Return the DFHelper object.");
+        .def("dfh", &MemDFJK::dfh, "Return the DFHelper object.")
+        .def("dgemm_time", &MemDFJK::dgemm_time);
 
     py::class_<LaplaceDenominator, std::shared_ptr<LaplaceDenominator>>(m, "LaplaceDenominator", "docstring")
         .def(py::init<std::shared_ptr<Vector>, std::shared_ptr<Vector>, double>())
