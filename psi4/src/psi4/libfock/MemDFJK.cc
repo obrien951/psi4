@@ -160,6 +160,8 @@ void MemDFJK::dgemm_time(int nbf_im, int naux_im, int nocc_im, int omp__threads,
     std::unique_ptr<double[]> CMET_im(new double[naux_im * naux_im]);
     srand(42);
 
+    Process::environment.set_n_threads(omp__threads);
+
     double* a = A_im.get();
     double* b = B_im.get();
     double* cmet = CMET_im.get();
