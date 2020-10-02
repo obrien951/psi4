@@ -84,7 +84,7 @@ size_t DiskDFJK::memory_estimate() {
     size_t memory = three_memory + two_memory;
     memory += memory_overhead();
     memory += memory_temp();
-
+printf("memory is %zu\n", memory);
     return memory;
 }
 SharedVector DiskDFJK::iaia(SharedMatrix Ci, SharedMatrix Ca) {
