@@ -155,7 +155,7 @@ void DFHelper_2B::initialize() {
 
 void DFHelper_2B::AO_core() {
     prepare_sparsity();
-    required_core_size_ = big_skips_[nbf_];
+    required_core_size_  = big_skips_[nbf_];
     required_core_size_ += ob_ao_big_skips_[nob_];
     required_core_size_ += ob_ob_big_skips_[nob_];
     required_core_size_ += 2 * naux_ * naux_;
@@ -165,7 +165,7 @@ void DFHelper_2B::AO_core() {
 }
 
 size_t DFHelper_2B::calcfull_3index(bool symm) {
-    return naux_ * nbf_ * nbf_ + naux_ * nbf_ * nob_ + naux_ * nob_ * nob_;
+    return big_skips_[nbf_] + ob_ao_big_skips_[nob_] + ob_ob_big_skips_[nob_];
 }
 
 void DFHelper_2B::prepare_blocking() {
@@ -404,7 +404,7 @@ void DFHelper_2B::prepare_sparsity() {
 
     sparsity_prepared_ = true;
     timer_off("DFH_2B: sparsity prep");
-}
+} // DFHelper_2B::prepare_sparsity() 
 
 std::pair<size_t, size_t> DFHelper_2B::fshell_blocks_for_ob_ao_AO_build(const size_t mem,
                                                      size_t symm,
@@ -1690,6 +1690,7 @@ void DFHelper_2B::first_transform_pQq(size_t bsize,
         C_DGEMM('N', 'N', block_size, bsize, sp_size, 1.0, &Mp[jump], sp_size, &C_buffers[rank][0], bsize, 0.0, &Tp[k * block_size * bsize], bsize );
     }
 } // DFHelper_2B::first_transform_pQq
+
 void DFHelper_2B::set_do_JK_tt(bool do_JK_tt) {do_JK_tt_ = do_JK_tt;}
 bool DFHelper_2B::get_do_JK_tt() {return do_JK_tt_;} 
 void DFHelper_2B::set_do_JK_ot(bool do_JK_ot) {do_JK_ot_ = do_JK_ot;} 
