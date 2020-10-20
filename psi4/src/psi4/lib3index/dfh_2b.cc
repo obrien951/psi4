@@ -277,12 +277,12 @@ void DFHelper_2B::prepare_sparsity() {
 }
 
 
-#pragma omp parallel for num_threads(nthreads)
+//#pragma omp parallel for num_threads(nthreads)
     for (size_t ob_iters = 0; ob_iters < oshells_; ob_iters++) {
         int rank = 0;
-#ifdef _OPENMP
+//#ifdef _OPENMP
         rank = omp_get_thread_num();
-#endif
+//#endif
         size_t nphi = one_basis_->shell(ob_iters).nfunction();
         size_t ind_phi = one_basis_->shell(ob_iters).function_index();
         for (size_t ob_jters = 0; ob_jters < oshells_; ob_jters++) {
