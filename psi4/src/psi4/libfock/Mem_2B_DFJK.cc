@@ -132,6 +132,8 @@ void Mem_2B_DFJK::compute_D_2B(){
     K_ot_ao_.clear();
     K_tt_ao_.clear();
 
+    D_ao_.clear();
+
     //size_t nocc = static_cast<size_t>(max_nocc());
     C_left_ao_ = C_left_;
     if (lr_symmetric_) {
@@ -251,4 +253,3 @@ void Mem_2B_DFJK::set_do_JK_oo(bool v) {do_JK_oo_=v; if (dfh_) {dfh_->set_do_JK_
 void Mem_2B_DFJK::set_do_JK_ot(bool v) {do_JK_ot_=v; if (dfh_) {dfh_->set_do_JK_ot(v);}}
 void Mem_2B_DFJK::set_do_JK_tt(bool v) {do_JK_tt_=v; if (dfh_) {dfh_->set_do_JK_tt(v);}}
 } // namespace psi
-
