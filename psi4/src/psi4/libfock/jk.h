@@ -47,6 +47,7 @@ class TwoBodyAOInt;
 class Options;
 class PSIO;
 class DFHelper;
+class gtfock_interface;
 
 namespace pk {
 class PKManager;
@@ -756,6 +757,28 @@ class PSI_API DirectJK : public JK {
     * type on output file
     */
     void print_header() const override;
+};
+
+/** Small subclass wrapping GTFock 2021 (Tell David I took so long because
+ *  nothing good happened in 2020 ;)
+ *  
+ *
+ */
+class PSI_API GTFock_JK : public JK {
+    protected:
+        std::shared_ptr<gtfock_interface> gtfock_;
+        int NMats_ = 0;
+        std::string name() override {return "GTFock_JK"; }
+        size_t memory_estimate() override { return 0; } /* effectively */
+        bool C1() const override{ return true; }
+        void compute_JK() override;
+        void postiterations() override {}
+        void print_header() const override; 
+        ~GTFock_JK() override;
+
+    public:
+        GTFock_JK(std::shared_ptr<BasisSet> Primary, size_t NMats, bool AreSymm);
+
 };
 
 /** \brief Derived class extending the JK object to GTFock

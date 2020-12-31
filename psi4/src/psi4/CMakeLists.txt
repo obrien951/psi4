@@ -20,9 +20,14 @@ foreach(dir_name
   libsapt_solver
   libscf_solver
   libtrans
+  libgtfock_interface
   )
   add_subdirectory(${dir_name})
 endforeach ()
+
+#include_directories(
+#  /storage/home/hcoda1/2/jobrien60/.conda/envs/gtfock_JK/include
+#  )
 
 foreach(dir_name
   adc
